@@ -68,6 +68,8 @@ let SEQ=store.get('etl.seq',0);
 let SESSION=store.get('etl.session',null);
 let SIMOFF=store.get('etl.simoff',false);
 const UI={acId:store.get('etl.ac',null),tab:'log',page:null,defFilter:'active',loginUser:null,auditAll:false};
+const OFFREQ=['./','index.html','app.css','fonts.css','app.js','config.js','version.js','manifest.webmanifest','vendor/supabase.js','vendor/591.supabase.js','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
+const off={ready:null,missing:[],checking:false};
 const net={state:'connecting',err:null,last:store.get('etl.last',null),flushing:false,slow:false,loaded:!!store.get('etl.cursor',null),email:null};
 let db=null,S=null,sheetSubmit=null,sheetLive=null,sbChan=null;
 
@@ -78,6 +80,10 @@ UI.draft=(()=>{const d=store.get('etl.draft',null);return d&&d.ac===BIND&&d.d?d.
 
 function persist(){store.set('etl.ev',EV);store.set('etl.out',OUT);store.set('etl.seq',SEQ)}
 function mode(){return UI.office?'office':'crew'}
+// Shared account (all iPads) → crew picks themselves and signs with PIN.
+// Personal account (web) → its e-mail matches a person in the log, who is signed in directly.
+function acctEmail(){return String(net.email||store.get('etl.acct','')||'').toLowerCase()}
+function personal(){const e=acctEmail();if(!e||!S)return null;return Object.values(S.users).find(x=>x.active!==false&&x.email&&x.email===e)||null}
 function setOffice(on){UI.office=on;store.set('etl.office',on)}
 function isBase(icao){return !!icao&&(S.cfg.bases||[]).includes(String(icao).toUpperCase())}
 function crewValid(){return !!(S&&CREW&&Date.now()-CREW.at<18*3600e3&&S.users[CREW.pic]&&S.users[CREW.pic].active!==false)}
@@ -190,7 +196,7 @@ async function initDb(){
   if(!window.supabase||!CONF.supabaseUrl||!CONF.supabaseKey){net.state='local';net.err=CONF.supabaseUrl?'Knihovna Supabase se nenačetla.':'Chybí nastavení serveru (config.js).';softRender();return}
   db=window.supabase.createClient(CONF.supabaseUrl,CONF.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'etl.sb.auth'}});
   db.auth.onAuthStateChange((ev,session)=>{
-    net.email=session&&session.user?session.user.email:null;
+    net.email=session&&session.user?session.user.email:null;if(net.email)store.set('etl.acct',net.email);
     if(ev==='SIGNED_OUT'){net.state='auth';stopSync();softRender()}
   });
   await ensureSession();
@@ -208,6 +214,29 @@ async function ensureSession(){
     else{net.state='auth';stopSync()}
   }catch(e){net.state=hadSession()?'nosignal':'auth'}
   finally{net.checking=false;softRender()}
+}
+// offline start needs: home-screen app (iOS keeps a separate store for it), an active service worker
+// and every required file of this version in its cache
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const standalone=()=>navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+async function checkOffline(){
+  if(off.checking)return;off.checking=true;const was=off.ready;
+  try{
+    if(!('serviceWorker' in navigator)||!window.caches){off.ready=false;off.missing=['prohlížeč nepodporuje offline režim']}
+    else{
+      const reg=await navigator.serviceWorker.getRegistration();
+      const c=await caches.open('etl-'+(window.ETL_VERSION||'dev'));
+      const miss=[];for(const f of OFFREQ){if(!(await c.match(new URL(f,location.href).href,{ignoreSearch:true})))miss.push(f)}
+      off.missing=miss;off.ready=!!(reg&&reg.active)&&!miss.length;
+      if(!(reg&&reg.active))off.missing=['offline režim se instaluje'].concat(miss);
+    }
+  }catch(e){off.ready=false;off.missing=[String(e&&e.message||e)]}
+  finally{off.checking=false;if(was!==off.ready)softRender();else renderPill()}
+}
+function offlineNote(){
+  if(isIOS&&!standalone())return `<div class="warnline warn wrap"><b>Otevřeno v Safari.</b> Bez signálu se spustí jen aplikace z ikony na ploše: Sdílet → Přidat na plochu a dál otevírejte jen ikonu.</div>`;
+  if(off.ready===false)return `<div class="warnline caution wrap"><b>Offline režim ještě není připravený.</b> Nechte aplikaci chvíli otevřenou se signálem${off.missing.length?` <span class="muted">(${esc(off.missing.slice(0,3).join(', '))}${off.missing.length>3?'…':''})</span>`:''}.</div>`;
+  return '';
 }
 function stopSync(){try{if(sbChan)db.removeChannel(sbChan)}catch(e){}sbChan=null}
 function startSync(){
@@ -264,9 +293,9 @@ setInterval(()=>{if(db&&net.state!=='auth'&&navigator.onLine!==false)resume()},6
 
 function renderDeviceLogin(){
   return `<div class="wrap"><div class="center">
-    <div><p class="label">Přihlášení zařízení</p><h1>Připojit k serveru</h1><p class="muted" style="margin-top:6px">Jednou na každém iPadu a počítači. Pak už se posádka jen vybírá a podepisuje PINem. Zápisy uložené v zařízení zůstávají a odešlou se po přihlášení.</p></div>
+    <div><p class="label">Přihlášení</p><h1>Připojit k serveru</h1><p class="muted" style="margin-top:6px"><b>iPad v letadle:</b> společný účet iPadů – jednou, pak se posádka jen vybírá a podepisuje PINem.<br><b>Web:</b> váš osobní e-mail. Zápisy uložené v zařízení zůstávají a odešlou se po přihlášení.</p></div>
     <form id="dev-login" class="panel" data-keep novalidate>
-      <div class="fgrid wide"><label class="fld"><span>E-mail účtu zařízení</span><input type="text" id="dl-email" autocomplete="username" inputmode="email" autocapitalize="off" value="${esc(store.get('etl.lastEmail','')||'')}"></label>
+      <div class="fgrid wide"><label class="fld"><span>E-mail</span><input type="text" id="dl-email" autocomplete="username" inputmode="email" autocapitalize="off" value="${esc(store.get('etl.lastEmail','')||'')}"></label>
       <label class="fld"><span>Heslo</span><input type="password" id="dl-pass" autocomplete="current-password"></label></div>
       <p class="form-err" id="dl-err" hidden></p>
       <div><button class="btn primary" type="submit">Přihlásit zařízení</button></div>
@@ -319,6 +348,7 @@ function header(){
   const u=me();const crew=mode()==='crew';const bac=BIND&&S.ac[BIND];
   let right='';
   if(crew){if(crewValid()){const sic=CREW.sic&&S.users[CREW.sic];right=`<div class="who"><span><b>${esc(u.name)}</b>${sic?' · '+esc(sic.name):''}</span><button class="btn sm" data-act="crew-end">Konec dne</button><button class="btn sm" data-act="crew-logout">Odhlásit</button></div>`}}
+  else if(u&&personal())right=`<div class="who"><span><b>${esc(u.name)}</b> · ${u.roles.map(r=>ROLE[r]).join(', ')}</span><button class="btn sm" data-act="dev-logout">Odhlásit</button></div>`;
   else if(u)right=`<div class="who"><span><b>${esc(u.name)}</b> · ${u.roles.map(r=>ROLE[r]).join(', ')}</span><button class="btn sm" data-act="office-off">Režim posádky</button><button class="btn sm" data-act="logout">Odhlásit</button></div>`;
   return `<header class="top"><div class="top-in wrap">
     <div class="brand"><span class="brand-mark">ATL</span><div><b>${S.cfg.opName?esc(S.cfg.opName)+' ':''}eTechLog</b><small>${crew&&bac?'iPad · '+esc(bac.reg):S.cfg.aoc?esc(S.cfg.aoc):'nenastaveno'} · testovací verze</small></div></div>
@@ -339,10 +369,14 @@ function render(){
   renderPending=false;
   let body='';
   const users=Object.values(S.users).filter(x=>x.active!==false);
-  if(db&&net.state==='auth'&&!Object.keys(S.users).length){
+  const pu=personal();
+  if(pu){if(!UI.office)setOffice(true);if(!SESSION||SESSION.userId!==pu.userId){SESSION={userId:pu.userId,at:Date.now()};store.set('etl.session',SESSION)}}
+  if(db&&net.state==='auth'&&(!Object.keys(S.users).length||store.get('etl.needLogin',false))){
     body=renderDeviceLogin();
   }else if(!Object.keys(S.users).length){
     body=db&&!net.loaded?(net.state==='error'||net.state==='nosignal'||navigator.onLine===false?`<div class="wrap"><div class="center"><div class="empty"><h2>První spuštění potřebuje internet</h2><p>Zařízení si musí jednou stáhnout data ze serveru. Připojte se k síti.</p>${net.err?`<p class="muted">${esc(net.err)}</p>`:''}<button class="btn" data-act="sync-now">Zkusit znovu</button></div></div></div>`:`<div class="loading">Načítám data ze serveru…</div>`):renderSetup();
+  }else if(!pu&&acctEmail()&&Object.values(S.users).some(x=>x.email===acctEmail()&&x.active===false)){
+    body=`<div class="wrap"><div class="center"><div class="empty"><h2>Účet je deaktivovaný</h2><p>Přístup pro ${esc(acctEmail())} správce vypnul.</p><button class="btn" data-act="dev-logout">Odhlásit</button></div></div></div>`;
   }else if(mode()==='crew'){
     body=renderCrew();
   }else if(!me()||me().active===false){
@@ -351,7 +385,7 @@ function render(){
   }else body=renderApp();
   // a sync can re-render while someone is half-way through a form: keep what they typed
   const kept={};app.querySelectorAll('[data-keep] input[id],[data-keep] textarea[id]').forEach(el=>{if(el.type!=='checkbox'&&el.type!=='radio'&&el.type!=='file'&&el.value)kept[el.id]=el.value});
-  app.innerHTML=header()+body+`<p class="footnote wrap">Testovací verze. Neslouží jako úřední záznam – papírový technický deník platí dál. Zařízení <span class="mono">${esc(DEV)}</span> · časy v UTC.</p>`;
+  app.innerHTML=header()+(Object.keys(S.users).length?offlineNote():'')+body+`<p class="footnote wrap">Testovací verze. Neslouží jako úřední záznam – papírový technický deník platí dál. Zařízení <span class="mono">${esc(DEV)}</span> · časy v UTC.</p>`;
   for(const k in kept){const el=document.getElementById(k);if(el&&!el.value&&el.closest('[data-keep]'))el.value=kept[k]}
   renderPill();
   if(mode()==='crew')crewLive();
@@ -759,7 +793,8 @@ function ofpIn(o,k,label,opt){opt=opt||{};const val=ofpVal(o,k);if(o.closed||o.v
   return `<label class="fld ${opt.full?'full':''}"><span>${label}</span>${opt.area?`<textarea data-of="${esc(k)}" ${opt.ro?'readonly':''}>${esc(val)}</textarea>`:`<input type="text" data-of="${esc(k)}" value="${esc(val)}" ${opt.ro?'readonly':''} ${opt.num?'inputmode="numeric"':''} ${opt.ph?`placeholder="${esc(opt.ph)}"`:''} ${opt.cls?`class="${opt.cls}"`:''}>`}</label>`}
 function viewOfp(o,u){
   const f=o.fuel||{},w=o.weights||{},l=o.leg;const ro=!!o.void;
-  const atd=l&&parseHM(l.off)!=null?parseHM(l.off):parseHM(ofpVal(o,'atd'));
+  const atd=l&&parseHM(l.off)!=null?parseHM(l.off):parseHM(ofpVal(o,'x_off')||ofpVal(o,'atd'));
+  const nonR=!!ofpVal(o,'nonRvsm');
   const eto=acc=>{const a=parseHM(acc);return atd==null||a==null?'':(()=>{const t=(atd+a)%1440;return pad(Math.floor(t/60))+':'+pad(t%60)})()};
   const fr=(k,lab)=>f[k]?`<tr><td>${lab}</td><td class="r mono">${esc(f[k].time||'')}</td><td class="r mono">${fmtN(f[k].fuel)}</td></tr>`:'';
   const [sc,st]=ofpStatus(o);
@@ -780,7 +815,7 @@ function viewOfp(o,u){
     t=((t%1440)+1440)%1440;return pad(Math.floor(t/60))+':'+pad(t%60)};
   const LK=!!(o.closed||o.void);
   const wrows=W.map((p,i)=>{
-    if(p.rvsm)return `<tr class="rvsmrow"><td colspan="3"><b>RVSM</b> ALT DIFF (ft)</td><td colspan="8"><span class="inline" style="gap:6px;max-width:360px">${['lh','sb','rh'].map(x=>`<input type="text" data-of="r${i}_${x}" value="${esc(ofpVal(o,'r'+i+'_'+x))}" inputmode="numeric" placeholder="${x.toUpperCase()}" aria-label="RVSM ${x.toUpperCase()}">`).join('')}</span></td></tr>`;
+    if(p.rvsm)return `<tr class="rvsmrow rvsm-only" ${nonR?'hidden':''}><td colspan="3"><b>RVSM</b> ALT DIFF (ft)</td><td colspan="8"><span class="inline" style="gap:6px;max-width:360px">${['lh','sb','rh'].map(x=>`<input type="text" data-of="r${i}_${x}" value="${esc(ofpVal(o,'r'+i+'_'+x))}" inputmode="numeric" placeholder="${x.toUpperCase()}" aria-label="RVSM ${x.toUpperCase()}">`).join('')}</span></td></tr>`;
     const sk=skip.has(i);const isDct=!!ofpVal(o,'w'+i+'_dct');const d=dcts.find(x=>x.to===i);
     const act=num(ofpVal(o,'w'+i+'_fuel'));const diff=act!=null&&p.mreq!=null?act-p.mreq:null;
     const dctBtn=sk?'<span class="muted" style="font-size:.78rem">vynecháno</span>':LK?(isDct?'<span class="ann info" style="font-size:.62rem">DCT</span>':''):isDct?`<button type="button" class="btn sm" data-act="ofp-dct-undo" data-id="${esc(o.ofpId)}|${i}">Zrušit DCT</button>`:(i>lastPassed&&i>0&&!o.void?`<button type="button" class="btn sm" data-act="ofp-dct" data-id="${esc(o.ofpId)}|${i}" title="ATC: direct to ${esc(p.wpt)}">DCT</button>`:'');
@@ -811,16 +846,22 @@ function viewOfp(o,u){
   </div>
   <div class="panel"><p class="label">Před odletem</p>
     <div class="fgrid wide">${ofpIn(o,'clr','ATC clearance',{area:true})}${ofpIn(o,'atisDep','ATIS DEP',{area:true})}</div>
-    <div><p class="label">RVSM check – ground / entry FL (ft)</p><div class="fgrid">${ofpIn(o,'rg_lh','Ground LH',{num:true})}${ofpIn(o,'rg_sb','Ground SBY',{num:true})}${ofpIn(o,'rg_rh','Ground RH',{num:true})}${ofpIn(o,'re_lh','Entry FL LH',{num:true})}${ofpIn(o,'re_sb','Entry FL SBY',{num:true})}${ofpIn(o,'re_rh','Entry FL RH',{num:true})}</div></div>
-    <div><p class="label">Vzletová data</p><div class="fgrid">${ofpIn(o,'to_w','Weight',{num:true})}${ofpIn(o,'to_dist','TO Dist',{num:true})}${ofpIn(o,'to_pwr','Power')}${ofpIn(o,'to_flaps','Flaps')}${ofpIn(o,'v1','V1',{num:true})}${ofpIn(o,'vr','VR',{num:true})}${ofpIn(o,'v2','V2',{num:true})}${ofpIn(o,'vfto','VFTO',{num:true,ph:'160'})}</div></div>
+    <div><p class="label">Kontrola výškoměrů (ft)</p>
+      <p class="muted" style="margin:4px 0 0;font-weight:600">On ground</p><div class="fgrid">${ofpIn(o,'rg_lh','LH',{num:true})}${ofpIn(o,'rg_sb','SBY',{num:true})}${ofpIn(o,'rg_rh','RH',{num:true})}</div>
+      <p class="muted" style="margin:8px 0 0;font-weight:600">RVSM</p>
+      <div class="fgrid rvsm-only" ${nonR?'hidden':''}>${ofpIn(o,'re_lh','Entry FL LH',{num:true})}${ofpIn(o,'re_sb','Entry FL SBY',{num:true})}${ofpIn(o,'re_rh','Entry FL RH',{num:true})}</div>
+      <label class="check"><input type="checkbox" data-of="nonRvsm" ${nonR?'checked':''} ${LK?'disabled':''}><span>Let není prováděn v RVSM</span></label></div>
+    <div><p class="label">Vzletová data</p><div class="fgrid">${ofpIn(o,'to_w','Weight',{num:true})}${ofpIn(o,'to_dist','TO Dist',{num:true})}${ofpIn(o,'to_pwr','Power')}${ofpIn(o,'to_flaps','Flaps')}${ofpIn(o,'v1','V1',{num:true})}${ofpIn(o,'vr','VR',{num:true})}${ofpIn(o,'v2','V2',{num:true})}${ofpIn(o,'vfto','VFTO',{num:true,ph:'160'})}</div>
+      <p class="muted" style="margin:8px 0 0;font-weight:600">Emergency return</p><div class="fgrid">${ofpIn(o,'emr_vref','EMR VREF',{num:true})}${ofpIn(o,'emr_vapp','EMR VAPP',{num:true})}</div></div>
     ${o.signed?'':`<div class="chips">${can.leg(u)?`<button class="btn" data-act="ofp-sign" data-id="${esc(o.ofpId)}">${ICON.check}Podepsat OFP – velitel</button>`:''}</div>`}
   </div>
-  <div class="panel"><div class="panel-head"><p class="label">Navigační log – ETO počítá z času vzletu</p>${l&&parseHM(l.off)!=null?`<span class="muted mono">ATD ${esc(l.off)}Z z ATL</span>`:`<label class="fld" style="max-width:150px"><span>ATD (vzlet) UTC</span><input type="text" class="t4 ofp-t" data-of="atd" value="${esc(ofpVal(o,'atd'))}" inputmode="numeric" maxlength="5" placeholder="––:––"></label>`}</div>
+  <div class="panel"><p class="label">Odlet a navigační log – ETO počítá z času vzletu</p>
+    ${l&&parseHM(l.off)!=null?`<p class="mono">Off-block ${esc(l.out||'–')}Z · vzlet ${esc(l.off)}Z <span class="muted">z ATL</span></p>`:`<div class="t4grid" style="max-width:420px;grid-template-columns:repeat(2,minmax(0,1fr))">${[['x_out','Off-block',ofpVal(o,'x_out')],['x_off','Vzlet (ATD)',ofpVal(o,'x_off')||ofpVal(o,'atd')]].map(([k,lb,val])=>`<label class="fld"><span>${lb}</span><input type="text" class="t4 ofp-t" data-of="${k}" value="${esc(val)}" inputmode="numeric" maxlength="5" placeholder="––:––" ${LK?'disabled':''}></label>`).join('')}</div>`}
     <p class="muted" style="font-size:.86rem">ETO = čas vzletu + plánovaný čas z OFP. Po přeletu bodu (vyplněné ATO) se další ETO počítají od skutečného ATO; direct je zkrátí o ušetřený čas.</p>
     <div class="scroll-x"><table class="plain ofplog"><thead><tr><th>Direct</th><th>WPT</th><th>AWY / FL</th><th class="r">Dist</th><th class="r">Čas</th><th class="r">ETO</th><th>ATO</th><th class="r">MREQ</th><th>Palivo ACT</th><th class="r">±</th><th>FL / Poznámka</th></tr></thead><tbody>${wrows}</tbody></table></div>${dctSum}</div>
   <div class="panel"><p class="label">Přílet</p>
     <div class="fgrid wide">${ofpIn(o,'atisArr','ATIS ARR',{area:true})}</div>
-    <div><p class="label">Přistávací data</p><div class="fgrid">${ofpIn(o,'ld_w','Weight',{num:true})}${ofpIn(o,'ld_dist','LD Dist',{num:true})}${ofpIn(o,'vref','VREF',{num:true})}${ofpIn(o,'vapp','VAPP',{num:true})}${ofpIn(o,'vfs','VFS',{num:true,ph:'160'})}${ofpIn(o,'magrad','MA grad')}${ofpIn(o,'ld167','LD × 1,67',{num:true})}${ofpIn(o,'emr_vref','EMR VREF',{num:true})}${ofpIn(o,'emr_vapp','EMR VAPP',{num:true})}</div></div></div>
+    <div><p class="label">Přistávací data</p><div class="fgrid">${ofpIn(o,'ld_w','Weight',{num:true})}${ofpIn(o,'ld_dist','LD Dist',{num:true})}${ofpIn(o,'vref','VREF',{num:true})}${ofpIn(o,'vapp','VAPP',{num:true})}${ofpIn(o,'vfs','VFS',{num:true,ph:'160'})}${ofpIn(o,'magrad','MA grad')}${ofpIn(o,'ld167','LD × 1,67',{num:true})}</div></div></div>
   ${ofpClosePanel(o,u,atl)}
   <div class="panel">${ofpIn(o,'notes','Poznámky',{area:true,full:true})}<p class="muted" style="font-size:.86rem">Vyplněné údaje se ukládají samy a každá změna zůstává v auditu.${o.void?'':''}</p>
     ${!o.void&&!l&&can.leg(u)?`<div class="links"><button type="button" class="linkbtn" data-act="ofp-void" data-id="${esc(o.ofpId)}">Zrušit tento OFP (špatný soubor, nahrazen novějším)</button></div>`:''}</div>
@@ -841,7 +882,8 @@ function ofpMissing(o){
   const m=[];const v=k=>String(ofpVal(o,k)||'').trim();
   if(!o.signed)m.push('podpis velitele');if(!v('clr'))m.push('ATC clearance');if(!v('atisDep'))m.push('ATIS DEP');if(!v('atisArr'))m.push('ATIS ARR');
   if(!v('v1')||!v('vr')||!v('v2'))m.push('V1/VR/V2');if(!v('vref')||!v('vapp'))m.push('VREF/VAPP');
-  if(!v('rg_lh')||!v('rg_rh'))m.push('RVSM ground check');
+  if(!v('rg_lh')||!v('rg_rh'))m.push('kontrola výškoměrů on ground');
+  if(!v('nonRvsm')&&(!v('re_lh')||!v('re_rh')))m.push('kontrola výškoměrů RVSM (nebo zaškrtnout let mimo RVSM)');
   const W=o.wpts||[];const skip=new Set();W.forEach((p,i)=>{if(!p.rvsm&&ofpVal(o,'w'+i+'_dct')){const a=num(ofpVal(o,'w'+i+'_dctFrom'));if(a!=null)for(let k=a+1;k<i;k++)skip.add(k)}});
   let ato=0,fu=0;W.forEach((p,i)=>{if(p.rvsm||skip.has(i)||i===0)return;if(parseHM(ofpVal(o,'w'+i+'_ato'))==null)ato++;if(num(ofpVal(o,'w'+i+'_fuel'))==null)fu++});
   if(ato)m.push(`ATO u ${ato} bodů`);if(fu)m.push(`palivo u ${fu} bodů`);
@@ -859,7 +901,8 @@ function ofpClosePanel(o,u,atl){
   const pic=S.users[l.pic],sic=l.sic&&S.users[l.sic];
   return `<div class="panel"><p class="label">Přistání – údaje pro ATL</p>
     <div class="fgrid"><label class="fld"><span>Datum letu (UTC)</span><input type="text" class="t-date" data-of="x_cdate" value="${esc(val('x_cdate')||fmtDate(l.date))}" inputmode="numeric"></label></div>
-    <div class="t4grid">${XT.map(([k,lb])=>`<label class="fld"><span>${lb}</span><input type="text" class="t4 ofp-t" data-of="x_${k}" value="${esc(k==='off'?(val('x_off')||val('atd')):val('x_'+k))}" inputmode="numeric" maxlength="5" placeholder="––:––"></label>`).join('')}</div>
+    <p class="muted" style="font-size:.9rem">Odlet: off-block <b class="mono">${esc(val('x_out')||'–')}</b> · vzlet <b class="mono">${esc(val('x_off')||val('atd')||'–')}</b> <span style="font-size:.84rem">(vyplňuje se nahoře u navigačního logu)</span></p>
+    <div class="t4grid">${XT.filter(([k])=>k==='on'||k==='in').map(([k,lb])=>`<label class="fld"><span>${lb}</span><input type="text" class="t4 ofp-t" data-of="x_${k}" value="${esc(val('x_'+k))}" inputmode="numeric" maxlength="5" placeholder="––:––"></label>`).join('')}</div>
     <div class="fgrid">
       <label class="fld"><span>Kam (při odklonu přepište)</span><input type="text" class="icao" data-of="x_cto" value="${esc(val('x_cto'))}" maxlength="4" placeholder="${esc(l.to)}" autocapitalize="characters"></label>
       <label class="fld"><span>Přistání (počet)</span><input type="text" data-of="x_ldg" value="${esc(val('x_ldg')||'1')}" inputmode="numeric"></label>
@@ -950,7 +993,7 @@ function viewAdmin(u){
   <div class="panel"><div class="panel-head"><h2>Letadla</h2><button class="btn sm" data-act="ac-form">${ICON.plus}Přidat</button></div>
     <div class="scroll-x"><table class="plain"><thead><tr><th>Registrace</th><th>Typ</th><th>První str.</th><th class="r">TTAF</th><th></th></tr></thead><tbody>${acs.map(a=>`<tr><td class="mono">${esc(a.reg)}${a.archived?' <span class="ann mute">archiv</span>':!a.isLive?' <span class="ann caution">nastavuje se</span>':''}</td><td>${esc(a.type||'–')}</td><td class="mono">${esc(a.startPage)}</td><td class="r mono">${hm(a.air)}</td><td><button class="btn sm" data-act="ac-form" data-id="${esc(a.acId)}">Upravit</button></td></tr>`).join('')}</tbody></table></div></div>
   <div class="panel"><div class="panel-head"><h2>Uživatelé</h2><button class="btn sm" data-act="user-form">${ICON.plus}Přidat</button></div>
-    <div class="scroll-x"><table class="plain"><thead><tr><th>Jméno</th><th>Role</th><th>Licence</th><th></th></tr></thead><tbody>${users.map(x=>`<tr><td>${esc(x.name)}${x.active===false?' <span class="ann mute">neaktivní</span>':''}</td><td>${x.roles.map(r=>ROLE[r]).join(', ')}</td><td class="mono">${esc(x.licence||'–')}</td><td><button class="btn sm" data-act="user-form" data-id="${esc(x.userId)}">Upravit</button></td></tr>`).join('')}</tbody></table></div></div>
+    <div class="scroll-x"><table class="plain"><thead><tr><th>Jméno</th><th>Role</th><th>Licence / web</th><th></th></tr></thead><tbody>${users.map(x=>`<tr><td>${esc(x.name)}${x.active===false?' <span class="ann mute">neaktivní</span>':''}</td><td>${x.roles.map(r=>ROLE[r]).join(', ')}</td><td class="mono">${esc(x.licence||'–')}${x.email?`<br><span class="muted" style="font-size:.84rem">web: ${esc(x.email)}</span>`:''}</td><td><button class="btn sm" data-act="user-form" data-id="${esc(x.userId)}">Upravit</button></td></tr>`).join('')}</tbody></table></div></div>
   <div class="panel"><h2>Záloha a obnova</h2>
     <p class="muted">Data leží ve sdílené databázi a zároveň v každém zařízení, které deník otevřelo. Úplná záloha je celý log podpisů – z něj se dá cokoliv obnovit.</p>
     <div class="chips"><button class="btn" data-act="export-json">Stáhnout úplnou zálohu (JSON)</button><button class="btn" data-act="export-legs">Lety vybraného letadla (CSV)</button></div>
@@ -962,6 +1005,7 @@ function viewAdmin(u){
 function syncDetails(){
   const s=syncInfo();
   return `<dl class="kvgrid"><dt>Stav</dt><dd><span class="dot ${s.cls}" style="display:inline-block"></span> ${esc(s.t)}</dd>
+    <dt>Spuštění bez signálu</dt><dd>${isIOS&&!standalone()?'<span style="color:var(--warn)">ne – otevřeno v Safari, použijte ikonu na ploše</span>':off.ready?'<span style="color:var(--ok)">připraveno</span> · verze '+esc(window.ETL_VERSION||''):off.ready===false?'<span style="color:var(--caution)">nepřipraveno</span> – '+esc(off.missing.join(', ')):'ověřuji…'}</dd>
     <dt>Účet zařízení</dt><dd>${esc(net.email||'–')}</dd>
     <dt>Zařízení</dt><dd class="mono">${esc(DEV)}</dd>
     <dt>Záznamů v zařízení</dt><dd class="mono">${Object.keys(EV).length}</dd>
@@ -1693,7 +1737,7 @@ function viewSetup(u){
   const s2=step(2,st.live,'Letadla a počáteční stav',`<p class="muted">U každého letadla opište z poslední podepsané stránky papírového deníku hodiny a cykly, číslo stránky a všechny otevřené a odložené závady. Posádky letadlo uvidí, až počáteční stav podepíšete.</p>
     ${acs.length?`<div class="grid-list">${acs.map(acCard).join('')}</div>`:''}`,`<button class="btn ${acs.length?'sm':'primary'}" data-act="ac-form">${ICON.plus}Přidat letadlo</button>`);
   const s3=step(3,st.ppl,'Posádky a mechanici',`<p class="muted">Každý pilot a mechanik má vlastní jméno a PIN, kterým podepisuje zápisy. ${st.mech?'':'<span style="color:var(--caution)">Zatím tu není mechanik s licencí – bez něj nejde vydat CRS.</span>'}</p>
-    <div class="scroll-x"><table class="plain"><thead><tr><th>Jméno</th><th>Role</th><th>Licence</th><th></th></tr></thead><tbody>${users.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.roles.map(r=>ROLE[r]).join(', ')}</td><td class="mono">${esc(x.licence||'–')}</td><td><button class="btn sm" data-act="user-form" data-id="${esc(x.userId)}">Upravit</button></td></tr>`).join('')}</tbody></table></div>`,
+    <div class="scroll-x"><table class="plain"><thead><tr><th>Jméno</th><th>Role</th><th>Licence / web</th><th></th></tr></thead><tbody>${users.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.roles.map(r=>ROLE[r]).join(', ')}</td><td class="mono">${esc(x.licence||'–')}${x.email?`<br><span class="muted" style="font-size:.84rem">web: ${esc(x.email)}</span>`:''}</td><td><button class="btn sm" data-act="user-form" data-id="${esc(x.userId)}">Upravit</button></td></tr>`).join('')}</tbody></table></div>`,
     `<button class="btn ${st.ppl?'sm':'primary'}" data-act="user-form">${ICON.plus}Přidat</button>`);
   const s4=step(4,st.done,'iPady v letadlech',`<ol class="muted" style="margin:0;padding-left:1.2em"><li>Na iPadu otevřete adresu deníku v Safari (se signálem).</li><li>Sdílet → Přidat na plochu, dál spouštějte jen z ikony.</li><li>Přihlaste zařízení jeho účtem a vyberte letadlo – iPad si ho zapamatuje.</li><li>Zkuste zahájit a uzavřít cvičný let v režimu letadlo.</li></ol>
     ${st.done?'<p style="margin-top:10px"><b>Úvodní nastavení je hotové.</b> Další letadla a uživatele přidáte ve Správě.</p>':''}`);
@@ -1778,6 +1822,7 @@ function openSettings(){
 function openUserForm(id){
   const x=id?S.users[id]:{roles:['crew']};
   openSheet(id?'Upravit uživatele':'Nový uživatel',`<div class="fgrid wide">${F.text('f-name','Jméno',x.name)}${F.text('f-lic','Licence / oprávnění (mechanik)',x.licence)}
+    ${F.text('f-email','Osobní e-mail pro přihlášení z webu (nepovinné)',x.email||'',{attrs:'inputmode="email" autocapitalize="off" autocomplete="off" placeholder="jmeno@firma.cz"'})}
     <label class="fld"><span>${id?'Nový PIN (nepovinné)':'PIN (4–6 číslic)'}</span><input type="password" id="f-upin" inputmode="numeric" autocomplete="off"></label></div>
     <fieldset><legend class="label">Role</legend>${F.check('r-crew','Posádka – zápis letů, závad a odkladů',x.roles.includes('crew'))}${F.check('r-mech','Mechanik – CRS, odstranění závad, uzemnění',x.roles.includes('mech'))}${F.check('r-camo','CAMO – opravy zápisů, správa, zálohy',x.roles.includes('camo'))}${can.settings(me())?F.check('r-admin','Správce – nastavení provozovatele, pravidla služby, základny',x.roles.includes('admin')):''}</fieldset>
     ${(S.cfg.bases||[]).length>1?F.sel('f-hb','Domovská základna',S.cfg.bases.map(b=>[b,b]),x.homeBase||S.cfg.bases[0]):''}
@@ -1785,9 +1830,13 @@ function openUserForm(id){
     const name=v('f-name');if(name.length<3)fail('Vyplňte jméno.');const roles=['admin','crew','mech','camo'].filter(r=>chk('r-'+r)||(r==='admin'&&!can.settings(me())&&x.roles.includes('admin')));if(!roles.length)fail('Vyberte alespoň jednu roli.');
     const pin=v('f-upin');if(!id&&!/^\d{4,6}$/.test(pin))fail('PIN musí mít 4–6 číslic.');if(pin&&!/^\d{4,6}$/.test(pin))fail('PIN musí mít 4–6 číslic.');
     if(roles.includes('mech')&&!v('f-lic'))fail('Mechanik potřebuje číslo licence.');
+    const email=v('f-email').toLowerCase();
+    if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))fail('E-mail není ve správném tvaru.');
+    if(email&&Object.values(S.users).some(y=>y.userId!==id&&y.email===email))fail('Tento e-mail už má jiný uživatel.');
+    if(email&&BIND&&email===acctEmail())fail('Tohle je účet iPadu v letadle – osobní e-mail musí být jiný, jinak by se iPady přihlašovaly jako tento uživatel.');
     if(id===me().id&&!roles.includes('camo')&&!roles.includes('admin'))fail('Sám sobě správu neodebírejte – zůstali byste bez přístupu.');
     if(id===me().id&&has(me(),'admin')&&!roles.includes('admin')&&!Object.values(S.users).some(y=>y.userId!==id&&y.active!==false&&has(y,'admin')))fail('Jste poslední správce – nejdřív přidělte roli správce někomu dalšímu.');
-    await checkPin();const userId=id||rid('usr');const p={userId,name,licence:v('f-lic'),roles,active:id?chk('f-active'):true};if(v('f-hb'))p.homeBase=v('f-hb');if(pin)p.pinHash=await sha(userId+':'+pin);
+    await checkPin();const userId=id||rid('usr');const p={userId,name,licence:v('f-lic'),email,roles,active:id?chk('f-active'):true};if(v('f-hb'))p.homeBase=v('f-hb');if(pin)p.pinHash=await sha(userId+':'+pin);
     emit([['user.upsert',p]]);closeSheet();toast('Uživatel uložen');
   }});
 }
@@ -1847,9 +1896,9 @@ document.addEventListener('click',e=>{
       const email=v('dl-email'),pass=document.getElementById('dl-pass').value;if(!email||!pass)fail('Vyplňte e-mail a heslo.');
       const {data,error}=await db.auth.signInWithPassword({email,password:pass});
       if(error)fail(/Invalid login/i.test(String(error.message))?'Nesprávný e-mail nebo heslo.':navigator.onLine===false?'Přihlášení potřebuje internet.':sbErr(error));
-      store.set('etl.lastEmail',email);net.email=data.user.email;net.err=null;closeSheet();startSync();toast('Zařízení přihlášeno')}});break;
-    case 'dev-logout':openSheet('Odhlásit zařízení?',`<p>Zařízení se odpojí od serveru. Data v něm zůstanou${OUT.length?`, ale <b>${OUT.length} neodeslaných záznamů</b> se odešle až po novém přihlášení`:''}.</p><div class="chips"><button type="button" class="btn" data-act="close-sheet">Zpět</button><button type="button" class="btn danger" data-act="dev-logout-ok">Odhlásit zařízení</button></div>`,{focus:false});break;
-    case 'dev-logout-ok':closeSheet();Promise.resolve().then(()=>db.auth.signOut()).catch(()=>{}).finally(()=>{net.state='auth';stopSync();render()});break;
+      store.set('etl.lastEmail',email);store.set('etl.acct',data.user.email);store.set('etl.needLogin',false);net.email=data.user.email;net.err=null;closeSheet();startSync();toast('Zařízení přihlášeno')}});break;
+    case 'dev-logout':openSheet(personal()?'Odhlásit se?':'Odhlásit zařízení?',`<p>${personal()?'Účet '+esc(acctEmail())+' se v tomto prohlížeči odhlásí.':'Zařízení se odpojí od serveru.'} Data v něm zůstanou${OUT.length?`, ale <b>${OUT.length} neodeslaných záznamů</b> se odešle až po novém přihlášení`:''}.</p><div class="chips"><button type="button" class="btn" data-act="close-sheet">Zpět</button><button type="button" class="btn danger" data-act="dev-logout-ok">${personal()?'Odhlásit':'Odhlásit zařízení'}</button></div>`,{focus:false});break;
+    case 'dev-logout-ok':{const was=personal();closeSheet();store.set('etl.acct','');store.set('etl.needLogin',true);if(was){SESSION=null;store.set('etl.session',null)}Promise.resolve().then(()=>db.auth.signOut()).catch(()=>{}).finally(()=>{net.email=null;net.state='auth';stopSync();render()});break}
     case 'leg-form':openLegForm();break;
     case 'predep-form':openPredep();break;
     case 'ofp-pick':{const f=document.getElementById('ofp-file');if(f)f.click();break}
@@ -1939,6 +1988,7 @@ document.addEventListener('change',e=>{
   else if(t.id==='q-all'){UI.qAll=t.checked;const r=document.getElementById('q-res');if(r)r.innerHTML=searchResults(S.ac[UI.acId])}
   else if(t.id==='ofp-file'&&t.files&&t.files[0]){importOfp(t.files[0]);t.value=''}
   else if(t.id==='import-file'&&t.files&&t.files[0]){importJson(t.files[0]);t.value=''}
+  else if(t.type==='checkbox'&&t.dataset&&t.dataset.of==='nonRvsm'){const c=t.closest('[data-ofp]');if(c){ofpSet(c.dataset.ofp,'nonRvsm',t.checked?'1':'');c.querySelectorAll('.rvsm-only').forEach(x=>x.hidden=t.checked)}}
   else if(t.id==='f-paper'){const r=document.getElementById('paper-row');if(r)r.hidden=!t.checked}
   else if(t.classList.contains('d-mel')){const f=t.closest('.def-row').querySelector('.d-melf');if(f)f.hidden=!t.checked}
   else if(t.dataset&&t.dataset.k&&(t.type==='checkbox'||t.type==='radio'||t.tagName==='SELECT')){UI.draft[t.dataset.k]=t.type==='checkbox'?t.checked:t.value;saveDraft();if(t.dataset.k==='defMel'||t.dataset.k==='secRes')render();else if(t.dataset.k==='app'){const o=document.getElementById('c-app-other');if(o)o.hidden=t.value!=='OTHER';crewLive()}else crewLive()}
@@ -1950,9 +2000,10 @@ document.addEventListener('input',e=>{
   const ofpC=t.closest&&t.closest('[data-ofp]');
   if(ofpC&&t.dataset.of){
     if(t.classList.contains('t4')){const dg=t.value.replace(/\D/g,'').slice(0,4);if(dg.length===4){t.value=dg.slice(0,2)+':'+dg.slice(2);t.classList.toggle('bad',parseHM(t.value)==null)}else t.classList.remove('bad')}
-    ofpSet(ofpC.dataset.ofp,t.dataset.of,t.value);
+    ofpSet(ofpC.dataset.ofp,t.dataset.of,t.type==='checkbox'?(t.checked?'1':''):t.value);
+    if(t.dataset.of==='nonRvsm')ofpC.querySelectorAll('.rvsm-only').forEach(x=>x.hidden=t.checked);
     if(t.dataset.pair){const ot=document.getElementById(t.dataset.pair);const dep=num(t.dataset.dep),vv=num(t.value);if(ot&&dep!=null){ot.value=vv==null?'':String(dep-vv);ot.classList.toggle('bad',vv!=null&&dep-vv<0);ofpSet(ofpC.dataset.ofp,ot.dataset.of,ot.value)}}
-    if(t.classList.contains('t4')&&/^\d{2}:\d{2}$/.test(t.value)&&/^x_/.test(t.dataset.of)){const ord=['x_out','x_off','x_on','x_in'];const nx=ofpC.querySelector(`[data-of="${ord[ord.indexOf(t.dataset.of)+1]}"]`);if(nx)nx.focus();else t.blur()}
+    if(t.classList.contains('t4')&&/^\d{2}:\d{2}$/.test(t.value)&&/^x_/.test(t.dataset.of)){const nxt={x_out:'x_off',x_on:'x_in'}[t.dataset.of];const nx=nxt&&ofpC.querySelector(`[data-of="${nxt}"]`);if(nx)nx.focus();else t.blur()}
     if(t.classList.contains('icao'))ofpSet(ofpC.dataset.ofp,t.dataset.of,t.value);
     const mm=t.dataset.of.match(/^w(\d+)_fuel$/);if(mm){const o=ofpOf(ofpC.dataset.ofp);const p=o&&o.wpts[+mm[1]];const c=document.getElementById('wd-'+mm[1]);const a=num(t.value);if(c&&p){const df=a==null?null:a-p.mreq;c.textContent=df==null?'':(df>0?'+':'')+fmtN(df);c.style.color=df==null?'inherit':df<0?'var(--warn)':'var(--ok)'}}
     return;
@@ -1991,7 +2042,7 @@ document.addEventListener('submit',async e=>{
     const email=v('dl-email'),pass=document.getElementById('dl-pass').value;const err=document.getElementById('dl-err');const btn=f.querySelector('button[type=submit]');
     if(!email||!pass){err.textContent='Vyplňte e-mail a heslo.';err.hidden=false;return}
     btn.disabled=true;
-    try{const {data,error}=await db.auth.signInWithPassword({email,password:pass});if(error)throw error;store.set('etl.lastEmail',email);net.email=data.user.email;net.err=null;startSync()}
+    try{const {data,error}=await db.auth.signInWithPassword({email,password:pass});if(error)throw error;store.set('etl.lastEmail',email);store.set('etl.acct',data.user.email);store.set('etl.needLogin',false);net.email=data.user.email;net.err=null;startSync()}
     catch(x){err.textContent=/Invalid login/i.test(String(x&&x.message))?'Nesprávný e-mail nebo heslo.':navigator.onLine===false?'Přihlášení potřebuje internet.':sbErr(x);err.hidden=false;btn.disabled=false}
   }else if(f.id==='start-form'){
     const u=S.users[UI.startPic];const pin=v('st-pin');const err=document.getElementById('st-err');
@@ -2012,4 +2063,6 @@ document.addEventListener('submit',async e=>{
 
 /* ---------- boot ---------- */
 rebuild();render();initDb();
+checkOffline();if('serviceWorker' in navigator){navigator.serviceWorker.ready.then(()=>setTimeout(checkOffline,500)).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>setTimeout(checkOffline,500))}
+setInterval(()=>{if(off.ready!==true)checkOffline()},15000);
 })();

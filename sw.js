@@ -16,8 +16,14 @@ const FONTS = [
   'ibm-plex-mono-latin-ext-400', 'ibm-plex-mono-latin-ext-500', 'ibm-plex-mono-latin-ext-600'
 ].map(f => 'fonts/' + f + '-normal.woff2');
 
+// Everything the app needs to start and work without signal must be cached, or the new version is not installed
+// (the previous one keeps running). Fonts and icons are best effort: a missing one never blocks offline start.
+const REQUIRED = SHELL.filter(f => !f.startsWith('icons/'));
+const OPTIONAL = SHELL.filter(f => f.startsWith('icons/')).concat(FONTS);
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.concat(FONTS))).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(REQUIRED.map(u => new Request(u, { cache: 'reload' })))
+    .then(() => Promise.all(OPTIONAL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => null)))))
+    .then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('etl-') && k !== CACHE).map(k => caches.delete(k))))
