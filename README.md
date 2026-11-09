@@ -58,6 +58,13 @@ iPady si novou verzi stáhnou při dalším otevření se signálem.
 - **Soubor** – přes nabídku sdílení (AirDrop); na druhém iPadu *Načíst soubor*.
 Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy odešle na server i přebírající iPad.
 
+## OFP – předvyplnění, limity, divert
+- **Správa → OFP – předvyplnění a limity**: výchozí hodnoty polí (např. Flaps 15, VFTO/VFS 160) a maxima (např. hmotnosti), i jen pro určitý typ letadla. Předvyplnění se uloží do OFP při nahrání.
+- **DIVERT**: v OFP tlačítko pod navigačním logem otevře route to alternate s ETO od začátku divertu; letiště přistání se do ATL přenese jako alternate.
+
+## Závady v ATL
+Na stránce deníku je u každé závady vedle sebe její odstranění (CRS) nebo odklad, i když proběhlo jiný den.
+
 ## PDF z OFP
 V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signálu). Z nabídky sdílení jde vytisknout (AirPrint), uložit do Souborů nebo poslat.
 

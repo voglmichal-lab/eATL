@@ -318,3 +318,17 @@ table.ofplog tr.rvsmrow input{width:80px}
 details summary{list-style:none;display:inline-block}
 details summary::-webkit-details-marker{display:none}
 .pager{flex-wrap:nowrap}.pager select{flex:1 1 200px;min-width:0}
+
+/* OFP: limits and emergency return */
+.fld .lim{font-weight:500;color:var(--muted);font-size:.78em}
+.fld.over input{border-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+.fld.over .lim{color:var(--warn);font-weight:700}
+.emr{margin-top:10px;border-left:4px solid var(--warn);padding:6px 0 4px 12px;background:linear-gradient(90deg,var(--warn-soft),transparent 70%);border-radius:0 8px 8px 0}
+.emr .label{color:var(--warn);font-weight:700;letter-spacing:.04em}
+table.rules select,table.rules input{min-height:40px}
+.panel.divert{border:2px solid var(--warn)}
+.panel.divert h2{color:var(--warn)}
+table.defrect td{vertical-align:top}
+table.defrect td:nth-child(2),table.defrect td:nth-child(3){width:45%}
+table.defrect small{color:var(--muted)}
+table.defrect tr.open td:nth-child(3){background:var(--warn-soft)}
