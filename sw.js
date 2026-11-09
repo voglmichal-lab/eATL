@@ -5,7 +5,8 @@
 importScripts('version.js');
 const CACHE = 'etl-' + (self.ETL_VERSION || 'dev');
 const SHELL = ['./', 'index.html', 'app.css', 'fonts.css', 'app.js', 'config.js', 'version.js', 'manifest.webmanifest',
-  'vendor/supabase.js', 'vendor/591.supabase.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js',
+  'vendor/supabase.js', 'vendor/591.supabase.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js', 'vendor/qrcode.min.js', 'vendor/jsqr.min.js',
+  'vendor/pdf-lib.min.js', 'vendor/fontkit.min.js', 'fonts/pdf/barlow-400.ttf', 'fonts/pdf/barlow-600.ttf', 'fonts/pdf/plexmono-400.ttf', 'fonts/pdf/plexmono-600.ttf',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const FONTS = [
   'barlow-latin-400', 'barlow-latin-500', 'barlow-latin-600', 'barlow-latin-700',

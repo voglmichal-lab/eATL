@@ -13,7 +13,11 @@ na iPadu se přidá na plochu a funguje i bez signálu. Data se synchronizují p
 3. **Authentication → Sign In / Providers**: vypněte **Allow new users to sign up**
    (účty zakládáte jen vy).
 4. **Authentication → Users → Add user**: e-mail + heslo, zaškrtněte *Auto Confirm User*.
-   Doporučení: jeden účet na každý iPad (`ipad-wnd@…`) a jeden pro každého, kdo pracuje z počítače.
+   - **Jeden společný účet pro všechny iPady.** Na iPadu se pak posádka vybírá jménem
+     a podepisuje PINem.
+   - **Osobní účet pro každého, kdo pracuje z webu.** Stejný e-mail zadejte v aplikaci
+     u uživatele (**Správa → Uživatelé → Osobní e-mail**). Po přihlášení tímto e-mailem
+     aplikace člověka pozná sama, každý podpis ale dál potvrzuje PINem.
 5. **Project Settings → API**: zkopírujte **Project URL** a **anon / publishable key**
    do `config.js`. Klíč **service_role** do aplikace nikdy nedávejte.
 
@@ -48,6 +52,15 @@ iPady si novou verzi stáhnou při dalším otevření se signálem.
 - Ostatní zařízení dostávají nové zápisy živě, nebo při dalším otevření.
 - Vypršení přihlášení bez signálu posádku nezablokuje – synchronizace jen počká.
 
+## Předání dat mezi iPady bez signálu
+**⇄ Druhý iPad** (u registrace letadla, v OFP nebo v panelu synchronizace):
+- **QR kód** – předávající iPad ukáže střídající se QR kódy, druhý je načte kamerou. Nepotřebuje Wi-Fi ani Bluetooth.
+- **Soubor** – přes nabídku sdílení (AirDrop); na druhém iPadu *Načíst soubor*.
+Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy odešle na server i přebírající iPad.
+
+## PDF z OFP
+V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signálu). Z nabídky sdílení jde vytisknout (AirPrint), uložit do Souborů nebo poslat.
+
 ## Omezení testovací verze
 - PIN posádky ověřuje zařízení. Otisky PINů jsou čitelné pro přihlášená zařízení –
   pro ostrý provoz se ověření přesune na server.
@@ -63,6 +76,7 @@ iPady si novou verzi stáhnou při dalším otevření se signálem.
 | `config.js` | adresa a veřejný klíč Supabase |
 | `version.js` | číslo verze (zvyšte při každém nasazení) |
 | `sw.js`, `manifest.webmanifest`, `icons/` | offline režim a ikona na ploše |
-| `vendor/` | Supabase klient a čtečka PDF (pdf.js) – kvůli offline běhu lokálně |
+| `vendor/` | knihovny – Supabase, čtení PDF (pdf.js), tvorba PDF (pdf-lib, fontkit), QR kódy (qrcode, jsQR); lokálně kvůli offline běhu |
+| `fonts/pdf/` | písma pro PDF s českou diakritikou (SIL OFL) |
 | `fonts/`, `fonts.css` | písma (lokálně kvůli offline) |
 | `supabase/schema.sql` | databáze, pravidla přístupu a živá synchronizace |

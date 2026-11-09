@@ -68,7 +68,7 @@ let SEQ=store.get('etl.seq',0);
 let SESSION=store.get('etl.session',null);
 let SIMOFF=store.get('etl.simoff',false);
 const UI={acId:store.get('etl.ac',null),tab:'log',page:null,defFilter:'active',loginUser:null,auditAll:false};
-const OFFREQ=['./','index.html','app.css','fonts.css','app.js','config.js','version.js','manifest.webmanifest','vendor/supabase.js','vendor/591.supabase.js','vendor/pdf.min.js','vendor/pdf.worker.min.js'];
+const OFFREQ=['./','index.html','app.css','fonts.css','app.js','config.js','version.js','manifest.webmanifest','vendor/supabase.js','vendor/591.supabase.js','vendor/pdf.min.js','vendor/pdf.worker.min.js','vendor/qrcode.min.js','vendor/jsqr.min.js','vendor/pdf-lib.min.js','vendor/fontkit.min.js','fonts/pdf/barlow-400.ttf','fonts/pdf/barlow-600.ttf','fonts/pdf/plexmono-400.ttf','fonts/pdf/plexmono-600.ttf'];
 const off={ready:null,missing:[],checking:false};
 const net={state:'connecting',err:null,last:store.get('etl.last',null),flushing:false,slow:false,loaded:!!store.get('etl.cursor',null),email:null};
 let db=null,S=null,sheetSubmit=null,sheetLive=null,sbChan=null;
@@ -791,13 +791,10 @@ function viewOfpList(ac){
 function plannedOfps(ac){const lim=addDays(todayISO(),-7);return (ac.ofps||[]).filter(o=>!o.void&&!o.leg&&o.date>=lim)}
 function ofpIn(o,k,label,opt){opt=opt||{};const val=ofpVal(o,k);if(o.closed||o.void)opt.ro=true;
   return `<label class="fld ${opt.full?'full':''}"><span>${label}</span>${opt.area?`<textarea data-of="${esc(k)}" ${opt.ro?'readonly':''}>${esc(val)}</textarea>`:`<input type="text" data-of="${esc(k)}" value="${esc(val)}" ${opt.ro?'readonly':''} ${opt.num?'inputmode="numeric"':''} ${opt.ph?`placeholder="${esc(opt.ph)}"`:''} ${opt.cls?`class="${opt.cls}"`:''}>`}</label>`}
-function viewOfp(o,u){
-  const f=o.fuel||{},w=o.weights||{},l=o.leg;const ro=!!o.void;
+function ofpCalc(o){
+  const l=o.leg;
   const atd=l&&parseHM(l.off)!=null?parseHM(l.off):parseHM(ofpVal(o,'x_off')||ofpVal(o,'atd'));
   const nonR=!!ofpVal(o,'nonRvsm');
-  const eto=acc=>{const a=parseHM(acc);return atd==null||a==null?'':(()=>{const t=(atd+a)%1440;return pad(Math.floor(t/60))+':'+pad(t%60)})()};
-  const fr=(k,lab)=>f[k]?`<tr><td>${lab}</td><td class="r mono">${esc(f[k].time||'')}</td><td class="r mono">${fmtN(f[k].fuel)}</td></tr>`:'';
-  const [sc,st]=ofpStatus(o);
   // DIRECT TO: points between the DCT origin and target are skipped; ETO downstream shortened by saved time
   const W=o.wpts||[];const dcts=[];const skip=new Set();
   W.forEach((p,i)=>{if(!p.rvsm&&ofpVal(o,'w'+i+'_dct')){const a=num(ofpVal(o,'w'+i+'_dctFrom'));if(a==null||!W[a])return;
@@ -813,6 +810,14 @@ function viewOfp(o,u){
     if(lastAto!=null&&i>lastPassed){const b=parseHM(W[lastPassed].tAcc)||0;t=lastAto+(a-b)-dcts.filter(d=>d.to>lastPassed&&d.to<=i).reduce((x,d)=>x+d.min,0)}
     else{if(atd==null)return '';t=atd+a-savedBefore(i)}
     t=((t%1440)+1440)%1440;return pad(Math.floor(t/60))+':'+pad(t%60)};
+  return {atd,nonR,W,dcts,skip,lastPassed,etoAdj};
+}
+function viewOfp(o,u){
+  const f=o.fuel||{},w=o.weights||{},l=o.leg;const ro=!!o.void;
+  const {atd,nonR,W,dcts,skip,lastPassed,etoAdj}=ofpCalc(o);
+  const eto=acc=>{const a=parseHM(acc);return atd==null||a==null?'':(()=>{const t=(atd+a)%1440;return pad(Math.floor(t/60))+':'+pad(t%60)})()};
+  const fr=(k,lab)=>f[k]?`<tr><td>${lab}</td><td class="r mono">${esc(f[k].time||'')}</td><td class="r mono">${fmtN(f[k].fuel)}</td></tr>`:'';
+  const [sc,st]=ofpStatus(o);
   const LK=!!(o.closed||o.void);
   const wrows=W.map((p,i)=>{
     if(p.rvsm)return `<tr class="rvsmrow rvsm-only" ${nonR?'hidden':''}><td colspan="3"><b>RVSM</b> ALT DIFF (ft)</td><td colspan="8"><span class="inline" style="gap:6px;max-width:360px">${['lh','sb','rh'].map(x=>`<input type="text" data-of="r${i}_${x}" value="${esc(ofpVal(o,'r'+i+'_'+x))}" inputmode="numeric" placeholder="${x.toUpperCase()}" aria-label="RVSM ${x.toUpperCase()}">`).join('')}</span></td></tr>`;
@@ -834,7 +839,7 @@ function viewOfp(o,u){
     :'<p class="muted">Tyto údaje se doplní samy, až se podle tohoto OFP zahájí a uzavře let v ATL.</p>';
   return `<div class="ofp" data-keep data-ofp="${esc(o.ofpId)}">
   <div class="panel"><div class="panel-head"><div><p class="label">OFP ${esc(o.ofpId)} · ${esc(o.reg)} ${esc(o.type||'')}</p><h2 class="mono">${esc(o.flt)} · ${esc(o.dep)} → ${esc(o.des)}</h2><p class="muted">${ofpDateTxt(o)} · STD ${esc(o.std)}Z · STA ${esc(o.sta||'')}Z · ALTN ${esc(o.altn||'–')}${o.altn2?' / '+esc(o.altn2):''} · CMD ${esc(o.cmd||'–')}</p></div>
-    <div class="chips"><span class="ann ${sc}">${st}</span>${o.signed?`<span class="ann ok">podepsal ${esc(o.signed.name)} ${hmOfIso(o.signed.at)}Z</span>`:''}</div></div>
+    <div class="chips"><span class="ann ${sc}">${st}</span>${o.signed?`<span class="ann ok">podepsal ${esc(o.signed.name)} ${hmOfIso(o.signed.at)}Z</span>`:''}<button type="button" class="btn sm" data-act="ofp-pdf" data-id="${esc(o.ofpId)}">PDF / tisk</button></div></div>
     ${l?'':(!o.void&&can.leg(u)?`<div class="chips"><button class="btn primary" data-act="ofp-start" data-id="${esc(o.ofpId)}">${ICON.plus}Začít let podle tohoto OFP</button></div>`:'')}
   </div>
   <div class="two">
@@ -867,6 +872,146 @@ function viewOfp(o,u){
     ${!o.void&&!l&&can.leg(u)?`<div class="links"><button type="button" class="linkbtn" data-act="ofp-void" data-id="${esc(o.ofpId)}">Zrušit tento OFP (špatný soubor, nahrazen novějším)</button></div>`:''}</div>
   </div>`;
 }
+
+/* --- OFP as PDF: print, archive, send. Built in the iPad, works without signal. --- */
+let pdfKit=null;
+function loadPdfKit(){
+  if(!pdfKit)pdfKit=(async()=>{
+    if(!window.PDFLib)await loadScript('vendor/pdf-lib.min.js');if(!window.fontkit)await loadScript('vendor/fontkit.min.js');
+    const get=async f=>{const r=await fetch('fonts/pdf/'+f);if(!r.ok)throw new Error('Písmo pro PDF se nenačetlo.');return r.arrayBuffer()};
+    const [b,bs,m,ms]=await Promise.all(['barlow-400.ttf','barlow-600.ttf','plexmono-400.ttf','plexmono-600.ttf'].map(get));
+    return {lib:window.PDFLib,fk:window.fontkit,fonts:{b,bs,m,ms}};
+  })().catch(e=>{pdfKit=null;throw e});
+  return pdfKit;
+}
+async function ofpPdf(o){
+  ofpFlush();
+  const {lib,fk,fonts}=await loadPdfKit();const {PDFDocument,rgb}=lib;
+  const doc=await PDFDocument.create();doc.registerFontkit(fk);
+  const F={b:await doc.embedFont(fonts.b,{subset:true}),bs:await doc.embedFont(fonts.bs,{subset:true}),m:await doc.embedFont(fonts.m,{subset:true}),ms:await doc.embedFont(fonts.ms,{subset:true})};
+  const C={ink:rgb(.08,.11,.15),mute:rgb(.42,.46,.52),line:rgb(.80,.83,.87),soft:rgb(.95,.96,.97),ok:rgb(.09,.47,.29),caut:rgb(.60,.36,.02),warn:rgb(.69,.16,.13)};
+  const PW=595.28,PH=841.89,M=34,CW=PW-2*M,BOT=48;
+  let page,y;const pages=[];
+  const clean=v=>String(v==null?'':v).replace(/[   ]/g,' ').replace(/→/g,'-').replace(/[^\S\n ]+/g,' ');
+  const tw=(t,f,sz)=>F[f].widthOfTextAtSize(clean(t),sz);
+  const T=(t,x,yy,f='b',sz=9,c=C.ink)=>{t=clean(t);if(t)page.drawText(t,{x,y:yy,size:sz,font:F[f],color:c})};
+  const TR=(t,xr,yy,f='m',sz=8.5,c=C.ink)=>T(t,xr-tw(t,f,sz),yy,f,sz,c);
+  const fit=(t,f,sz,w)=>{t=clean(t);if(tw(t,f,sz)<=w)return t;while(t.length>1&&tw(t+'…',f,sz)>w)t=t.slice(0,-1);return t+'…'};
+  const wrap=(t,f,sz,w)=>{const out=[];for(const para of clean(t).split('\n')){let line='';for(let word of para.split(' ')){
+      while(tw(word,f,sz)>w){let k=word.length;while(k>1&&tw(word.slice(0,k),f,sz)>w)k--;if(line){out.push(line);line=''}out.push(word.slice(0,k));word=word.slice(k)}
+      const cand=line?line+' '+word:word;if(tw(cand,f,sz)>w&&line){out.push(line);line=word}else line=cand}
+    out.push(line)}return out};
+  const HL=(yy,x1=M,x2=PW-M,c=C.line,th=.6)=>page.drawLine({start:{x:x1,y:yy},end:{x:x2,y:yy},thickness:th,color:c});
+  const newPage=()=>{page=doc.addPage([PW,PH]);pages.push(page);y=PH-M};
+  const need=h=>{if(y-h<BOT){newPage();return true}return false};
+  const val=k=>ofpVal(o,k);const dash=v=>v==null||String(v).trim()===''?'–':String(v).trim();
+  const l=o.leg;const f=o.fuel||{},w=o.weights||{};const cfg=S.cfg;
+  const {atd,nonR,W,dcts,skip,etoAdj}=ofpCalc(o);
+  const section=t=>{need(34);y-=14;T(t.toUpperCase(),M,y,'bs',8,C.mute);y-=4;HL(y);y-=11};
+  // label/value cells in columns
+  const cells=(items,cols)=>{const cw=CW/cols;for(let i=0;i<items.length;i+=cols){const row=items.slice(i,i+cols);
+      const lines=row.map(([,v,o2])=>wrap(dash(v),(o2&&o2.font)||'m',8.5,cw-8));const h=10+Math.max(...lines.map(x=>x.length))*10.5+4;need(h);
+      row.forEach(([lab,,o2],j)=>{const x=M+j*cw;T(lab,x,y,'b',7,C.mute);lines[j].forEach((ln,k)=>T(ln,x,y-10.5-k*10.5,(o2&&o2.font)||'m',8.5,(o2&&o2.color)||C.ink))});
+      y-=h}};
+  newPage();
+  // --- header ---
+  const opn=[cfg.opName,cfg.aoc].filter(Boolean).join(' · ');
+  T(opn||'eTechLog',M,y-2,'bs',9,C.mute);TR('OPERATIONAL FLIGHT PLAN',PW-M,y-2,'bs',9,C.mute);y-=24;
+  T(`${o.flt||''}  ${o.dep||''} – ${o.des||''}`,M,y,'ms',17);
+  const st=o.void?['ZRUŠENO',C.warn]:o.closed?['UZAVŘENO',C.ok]:l&&l.state==='closed'?['LET UZAVŘEN, OFP NEUZAVŘENO',C.caut]:['ROZPRACOVÁNO',C.caut];
+  TR(st[0],PW-M,y+2,'bs',10,st[1]);y-=16;
+  const dTxt=l&&l.date&&l.date!==o.date?`${fmtDate(l.date)} (plán ${fmtDate(o.date)})`:fmtDate(o.date);
+  T(`${dTxt}  ·  STD ${o.std||'–'}Z  ·  STA ${o.sta||'–'}Z  ·  ${o.reg||''} ${o.type||''}  ·  ALTN ${o.altn||'–'}${o.altn2?' / '+o.altn2:''}  ·  OFP ${o.ofpId}`,M,y,'m',8.5);y-=12;
+  const pic=l&&S.users[l.pic],sic=l&&l.sic&&S.users[l.sic];
+  T(`CMD (OFP) ${o.cmd||'–'}${pic?'  ·  PIC '+pic.name:''}${sic?'  ·  SIC '+sic.name:''}`,M,y,'b',9);y-=8;HL(y,M,PW-M,C.ink,1);y-=4;
+  // --- plan and fuel ---
+  section('Plán letu');
+  cells([['Vzdálenost',`${fmtN(o.dist)} NM`],['Max FL',o.maxFl],['Vítr',o.wind],['PAX / POB',`${o.totPax??'–'} PAX · POB ${o.pob??'–'}`],['Cargo',o.cargo!=null?fmtN(o.cargo)+' lb':''],['Druh',o.ops]],6);
+  if(o.route){need(24);T('ATC route',M,y,'b',7,C.mute);y-=10.5;for(const ln of wrap(o.route,'m',8,CW)){need(10);T(ln,M,y,'m',8);y-=10}y-=2}
+  section('Palivo (lbs)');
+  const fk2=[['trip','Trip'],['altn','Alternate'],['cont','Contingency'],['final','Final reserve'],['taxi','Taxi'],['add','Additional'],['extra','Extra'],['discr','Discretionary']].filter(([k])=>f[k]);
+  cells(fk2.map(([k,lb])=>[lb,`${fmtN(f[k].fuel)}${f[k].time?'  '+f[k].time:''}`]).concat([['Ramp MREQ',fmtN(f.rampMreq),{font:'ms'}],['Ramp EST',fmtN(f.rampEst)],['Used CALC',fmtN(f.usedCalc)]]),6);
+  const wk=['ZFM','TOM','ELM','PLD','FUEL'].filter(k=>w[k]);if(wk.length)cells(wk.map(k=>[k+' max / est (lb)',`${w[k].max?fmtN(w[k].max)+' / ':''}${fmtN(w[k].est)}`]),5);
+  // --- before departure ---
+  section('Před odletem');
+  cells([['ATC clearance',val('clr')],['ATIS DEP',val('atisDep')]],2);
+  cells([['Výškoměry on ground LH',val('rg_lh')],['SBY',val('rg_sb')],['RH',val('rg_rh')]].concat(nonR?[['RVSM','let není prováděn v RVSM',{font:'b'}]]:[['RVSM entry FL LH',val('re_lh')],['SBY',val('re_sb')],['RH',val('re_rh')]]),6);
+  cells([['TO weight',val('to_w')],['TO dist',val('to_dist')],['Power',val('to_pwr')],['Flaps',val('to_flaps')],['V1',val('v1')],['VR',val('vr')],['V2',val('v2')],['VFTO',val('vfto')],['EMR VREF',val('emr_vref')],['EMR VAPP',val('emr_vapp')]],6);
+  const offb=l&&l.state==='closed'?l.out:val('x_out'),tko=l&&parseHM(l.off)!=null?l.off:(val('x_off')||val('atd'));
+  cells([['Off-block (UTC)',offb,{font:'ms'}],['Vzlet / ATD (UTC)',tko,{font:'ms'}],['Podpis velitele',o.signed?`${o.signed.name} · ${fmtTs(o.signed.at)}`:'nepodepsáno',{font:'b',color:o.signed?C.ink:C.warn}]],3);
+  // --- nav log ---
+  section('Navigační log');
+  const cols=[['WPT',70,'l'],['AWY / FL',62,'l'],['DIST',34,'r'],['ACC',34,'r'],['ČAS',34,'r'],['ETO',36,'r'],['ATO',36,'r'],['MREQ',44,'r'],['ACT',44,'r'],['±',38,'r']];
+  const used=cols.reduce((a,c)=>a+c[1],0);cols.push(['Poznámka',CW-used,'l']);
+  const head=()=>{page.drawRectangle({x:M,y:y-4,width:CW,height:14,color:C.soft});let x=M;for(const [h,wd,al] of cols){if(al==='r')TR(h,x+wd-3,y,'bs',7,C.mute);else T(h,x+3,y,'bs',7,C.mute);x+=wd}y-=16};
+  need(40);head();
+  W.forEach((p,i)=>{
+    if(p.rvsm){if(nonR)return;if(need(14))head();
+      T(`RVSM ALT DIFF (ft)   LH ${dash(val('r'+i+'_lh'))}   SBY ${dash(val('r'+i+'_sb'))}   RH ${dash(val('r'+i+'_rh'))}`,M+3,y,'m',8,C.ink);y-=6;HL(y);y-=9;return}
+    const sk=skip.has(i);const isD=!!val('w'+i+'_dct');const d=dcts.find(x=>x.to===i);
+    const note=val('w'+i+'_note');const noteL=note?wrap(note,'b',7.5,cols[10][1]-6):[];
+    const rh=Math.max(20,8+Math.max(2,noteL.length)*9);if(need(rh))head();
+    const act=num(val('w'+i+'_fuel'));const diff=act!=null&&p.mreq!=null?act-p.mreq:null;
+    const cc=sk?C.mute:C.ink;let x=M;
+    T(fit(p.wpt+(isD?' DCT':''),'ms',8.5,cols[0][1]-4),x+3,y,'ms',8.5,cc);T(fit(sk?'vynecháno (DCT)':d?`z ${W[d.from].wpt} −${d.min} min`:(p.name||''),'b',6.8,cols[0][1]-4),x+3,y-9,'b',6.8,sk||d?C.caut:C.mute);x+=cols[0][1];
+    T(fit(p.awy||'','m',7.5,cols[1][1]-4),x+3,y,'m',7.5,cc);T(fit(p.fl||'','m',7.5,cols[1][1]-4),x+3,y-9,'m',7.5,C.mute);x+=cols[1][1];
+    const rv=[p.distInt??'',p.distAcc??'',p.tAcc||'',sk?'–':(etoAdj(p.tAcc,i)||'–'),sk?'–':dash(val('w'+i+'_ato')),fmtN(p.mreq),sk?'–':(act!=null?fmtN(act):'–'),diff==null?'':(diff>0?'+':'')+fmtN(diff)];
+    rv.forEach((t,k)=>{const c=cols[k+2];const col=k===4&&t!=='–'?C.ink:k===7&&diff!=null?(diff<0?C.warn:C.ok):cc;TR(String(t),x+c[1]-3,y,k===4||k===6?'ms':'m',8,col);x+=c[1]});
+    noteL.forEach((ln,k)=>T(ln,x+3,y-k*9,'b',7.5));
+    y-=rh-8;HL(y);y-=9;
+  });
+  if(nonR){need(14);T('Let není prováděn v RVSM.',M+3,y,'b',8,C.mute);y-=12}
+  if(dcts.length){need(14);for(const d of dcts){need(11);T(`DCT ${W[d.from].wpt} - ${W[d.to].wpt}: zkráceno o ${d.saved} NM, ~${d.min} min`,M+3,y,'b',8,C.caut);y-=11}}
+  // --- arrival ---
+  section('Přílet');
+  cells([['ATIS ARR',val('atisArr')]],1);
+  cells([['LD weight',val('ld_w')],['LD dist',val('ld_dist')],['VREF',val('vref')],['VAPP',val('vapp')],['VFS',val('vfs')],['MA grad',val('magrad')],['LD × 1,67',val('ld167')]],7);
+  // --- ATL ---
+  section('Technický deník (ATL)');
+  if(l&&l.state==='closed'){
+    const pf=l.pf&&S.users[l.pf];
+    cells([['Off-block',l.out,{font:'ms'}],['Vzlet',l.off,{font:'ms'}],['Přistání',l.on,{font:'ms'}],['On-block',l.in,{font:'ms'}],['Block',hm(l.block),{font:'ms'}],['Flight',hm(l.air),{font:'ms'}],
+      ['Palivo na odlet',l.fuelBlk!=null?fmtN(l.fuelBlk)+' lbs':''],['Spáleno',l.fuelBurn!=null?`${fmtN(l.fuelBurn)} lbs (plán ${fmtN(f.usedCalc)})`:''],['Po přistání',l.fuelRem!=null?fmtN(l.fuelRem)+' lbs':''],['Přiblížení',l.app],['Přistání (počet)',l.ldg],['Pilot flying',pf?pf.name:''],
+      ['Stránka ATL',l.page?l.page+'/'+l.idx:''],['Let podepsal',l.signed?`${l.signed.name} · ${fmtTs(l.signed.at)}`:'',{font:'b'}]],6);
+  }else{
+    cells([['Přistání',val('x_on'),{font:'ms'}],['On-block',val('x_in'),{font:'ms'}],['Po přistání (lbs)',val('x_fuelRem')],['Spáleno (lbs)',val('x_fuelBurn')],['Přiblížení',val('x_app')==='OTHER'?val('x_appOther'):val('x_app')],['Závada',val('x_defText')||'NIL',{font:'b'}]],6);
+    need(12);T(l?'Let v ATL ještě není uzavřený – údaje jsou z rozpracovaného OFP.':'Podle tohoto OFP zatím nebyl zahájen let v ATL.',M,y,'b',8,C.caut);y-=12;
+  }
+  if(String(val('notes')).trim()){section('Poznámky');for(const ln of wrap(val('notes'),'b',9,CW)){need(12);T(ln,M,y,'b',9);y-=12}}
+  // --- signatures ---
+  section('Podpisy a záznam');
+  const sig=[];
+  sig.push(['OFP podepsal (velitel)',o.signed?`${o.signed.name} · ${fmtTs(o.signed.at)} · zařízení ${o.signed.dev||'–'}`:'nepodepsáno']);
+  (o.reopened||[]).forEach(r=>sig.push(['Znovu otevřel',`${r.name} · ${fmtTs(r.at)} · důvod: ${r.reason||'–'}`]));
+  if(o.closed)sig.push(['OFP uzavřel',`${o.closed.name} · ${fmtTs(o.closed.at)}${o.closed.dev?' · zařízení '+o.closed.dev:''}`]);
+  if(o.closed&&o.missing&&o.missing.length)sig.push(['Při uzavření chybělo',o.missing.join(', ')]);
+  if(o.void)sig.push(['Zrušil',`${o.void.name} · ${fmtTs(o.void.at)} · ${o.void.reason||''}`]);
+  sig.push(['Importováno',`${o.imported?o.imported.name+' · '+fmtTs(o.imported.at):''}${o.file?' · '+o.file:''}`]);
+  for(const [a,b] of sig){const ls=wrap(b,'b',8.5,CW-130);need(ls.length*11+2);T(a,M,y,'b',8,C.mute);ls.forEach((ln,k)=>T(ln,M+130,y-k*11,'b',8.5));y-=ls.length*11+2}
+  need(26);y-=6;for(const ln of wrap(`Vytvořeno ${fmtTs(new Date().toISOString())} v zařízení ${DEV}, eTechLog ${window.ETL_VERSION||''}. Elektronický záznam: údaje a podpisy (PIN) jsou uložené jako neměnné záznamy s časem a autorem v auditu eTechLogu.`,'b',7.5,CW)){T(ln,M,y,'b',7.5,C.mute);y-=9.5}
+  // --- footer on every page ---
+  pages.forEach((pg,i)=>{page=pg;HL(30,M,PW-M,C.line,.5);T(`${o.flt||''} ${o.dep||''}-${o.des||''} · ${l&&l.date?fmtDate(l.date):fmtDate(o.date)} · OFP ${o.ofpId}`,M,19,'m',7,C.mute);TR(`${st[0]} · strana ${i+1}/${pages.length}`,PW-M,19,'b',7,C.mute)});
+  doc.setTitle(`OFP ${o.flt||''} ${o.dep||''}-${o.des||''} ${o.ofpId}`);doc.setAuthor(opn||'eTechLog');doc.setCreator('eTechLog');doc.setProducer('eTechLog');
+  const bytes=await doc.save();
+  const dt=String((l&&l.date)||o.date||'').replace(/\D/g,'');
+  return {bytes,name:`OFP-${clean(o.flt||'').replace(/[^A-Z0-9]/gi,'')}-${o.dep||''}-${o.des||''}-${dt}.pdf`};
+}
+let pdfOut=null;
+async function openOfpPdf(id){
+  const o=ofpOf(id);if(!o)return;
+  openSheet('PDF – OFP '+(o.flt||''),`<p id="pdf-st">Vytvářím PDF…</p>`,{focus:false});
+  try{
+    const r=await ofpPdf(o);
+    if(pdfOut)URL.revokeObjectURL(pdfOut.url);
+    const blob=new Blob([r.bytes],{type:'application/pdf'});pdfOut={name:r.name,blob,url:URL.createObjectURL(blob)};
+    const canShare=(()=>{try{return !!(navigator.canShare&&navigator.canShare({files:[new File([blob],r.name,{type:'application/pdf'})]}))}catch(e){return false}})();
+    hoBody(`<p><b class="mono">${esc(r.name)}</b> · ${Math.max(1,Math.round(r.bytes.length/1024))} kB</p>
+      <div class="chips">${canShare?`<button type="button" class="btn primary" data-act="pdf-share">Tisk / sdílet / uložit</button>`:''}<a class="btn ${canShare?'':'primary'}" id="pdf-open" href="${pdfOut.url}" download="${esc(r.name)}" target="_blank" rel="noopener">Otevřít PDF</a></div>
+      <p class="muted" style="font-size:.86rem">${canShare?'V nabídce sdílení je Tisk (AirPrint), Uložit do Souborů, AirDrop a e-mail.':'PDF se otevře nebo stáhne – vytisknete ho z prohlížeče.'} ${o.closed?'':'OFP ještě není uzavřené – v PDF je označené jako rozpracované.'}</p>`);
+  }catch(e){hoBody(`<p class="form-err">PDF se nepodařilo vytvořit: ${esc(e.message||String(e))}</p>`)}
+}
+function sharePdf(){if(!pdfOut)return;const file=new File([pdfOut.blob],pdfOut.name,{type:'application/pdf'});
+  navigator.share({files:[file],title:pdfOut.name}).catch(e=>{if(e&&e.name!=='AbortError'){const a=document.getElementById('pdf-open');if(a)a.click()}})}
 
 /* --- close OFP and transfer to ATL --- */
 const XT=[['out','Off-block'],['off','Vzlet'],['on','Přistání'],['in','On-block']];
@@ -1013,7 +1158,7 @@ function syncDetails(){
     <dt>Poslední spojení</dt><dd>${net.last?fmtClock(net.last):'–'}</dd>
     ${net.err?`<dt>Chyba</dt><dd style="color:var(--warn)">${esc(net.err)}</dd>`:''}</dl>
     <label class="check"><input type="checkbox" id="simoff" ${SIMOFF?'checked':''}> <span><b>Simulovat výpadek sítě</b><br><span class="muted">Zápisy zůstanou v zařízení a odešlou se po vypnutí simulace. Pro skutečný test stačí zapnout režim letadlo.</span></span></label>
-    <div class="chips"><button class="btn sm" data-act="sync-now" ${(!db||SIMOFF)?'disabled':''}>Synchronizovat teď</button>${db&&net.email&&net.state!=='auth'?`<button class="btn sm" data-act="dev-logout">Odhlásit zařízení</button>`:''}${db&&net.state==='auth'?`<button class="btn sm primary" data-act="dev-login">Přihlásit zařízení</button>`:''}</div>
+    <div class="chips"><button class="btn sm" data-act="ho">⇄ Předat / převzít – druhý iPad</button><button class="btn sm" data-act="sync-now" ${(!db||SIMOFF)?'disabled':''}>Synchronizovat teď</button>${db&&net.email&&net.state!=='auth'?`<button class="btn sm" data-act="dev-logout">Odhlásit zařízení</button>`:''}${db&&net.state==='auth'?`<button class="btn sm primary" data-act="dev-login">Přihlásit zařízení</button>`:''}</div>
     <p class="mode-note">Verze aplikace ${esc(window.ETL_VERSION||'')}</p>
     ${BIND&&S.ac[BIND]?`<p class="mode-note">Na tomto zařízení je naposledy zvolené letadlo <b class="mono">${esc(S.ac[BIND].reg)}</b>.</p>`:''}`;
 }
@@ -1043,13 +1188,13 @@ function renderCrew(){
   if(!crewValid())return renderCrewStart(ac);
   if(UI.crewView!=='today'){
     const u=me();
-    return `<div class="wrap view"><div class="chips"><button class="btn" data-act="crew-view" data-id="today">‹ Zpět na dnešek</button></div>${UI.crewView==='log'?viewLog(ac,u):UI.crewView==='search'?viewSearch(ac):UI.crewView==='ofp'?((UI.ofpId&&ofpOf(UI.ofpId))?`<div class="chips"><button class="btn" data-act="ofp-back">‹ Seznam OFP</button></div>${viewOfp(ofpOf(UI.ofpId),u)}`:viewOfpList(ac)):viewDefects(ac,u)}</div>`;
+    return `<div class="wrap view"><div class="chips"><button class="btn" data-act="crew-view" data-id="today">‹ Zpět na dnešek</button><button class="btn" data-act="ho">⇄ Druhý iPad</button></div>${UI.crewView==='log'?viewLog(ac,u):UI.crewView==='search'?viewSearch(ac):UI.crewView==='ofp'?((UI.ofpId&&ofpOf(UI.ofpId))?`<div class="chips"><button class="btn" data-act="ofp-back">‹ Seznam OFP</button></div>${viewOfp(ofpOf(UI.ofpId),u)}`:viewOfpList(ac)):viewDefects(ac,u)}</div>`;
   }
   return crewToday(ac);
 }
 function crewHead(ac){
   const lbl=ac.status==='ok'?'Provozuschopné':ac.status==='caution'?`Odklady MEL: ${ac.deferred.length}`:'Neprovozuschopné';
-  return `<div class="crew-head"><div><span class="reg-big">${esc(ac.reg)}</span> <span class="muted">${esc(ac.type||'')}</span> <button type="button" class="linkbtn" data-act="change-ac" style="display:inline;min-height:0;padding:0 0 0 8px">změnit letadlo</button></div><button class="ann lg ${ac.status}" data-act="crew-view" data-id="defects">${lbl} ›</button></div>${ac.status==='warn'?statusNote(ac):''}`;
+  return `<div class="crew-head"><div><span class="reg-big">${esc(ac.reg)}</span> <span class="muted">${esc(ac.type||'')}</span> <button type="button" class="linkbtn" data-act="change-ac" style="display:inline;min-height:0;padding:0 0 0 8px">změnit letadlo</button> <button type="button" class="linkbtn" data-act="ho" style="display:inline;min-height:0;padding:0 0 0 8px">⇄ druhý iPad</button></div><button class="ann lg ${ac.status}" data-act="crew-view" data-id="defects">${lbl} ›</button></div>${ac.status==='warn'?statusNote(ac):''}`;
 }
 function briefing(ac){
   const it=[];
@@ -1399,7 +1544,7 @@ function openSheet(title,html,opt){
   const first=el.querySelector('.sheet-body input:not([type=hidden]):not([readonly]),.sheet-body textarea,.sheet-body select');
   if(first&&opt.focus!==false&&matchMedia('(pointer:fine)').matches)first.focus();
 }
-function closeSheet(){const el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.classList.remove('noscroll');sheetSubmit=null;sheetLive=null}
+function closeSheet(){hoStop();const el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.classList.remove('noscroll');sheetSubmit=null;sheetLive=null}
 function fail(msg){throw new Error(msg)}
 async function checkPin(){if(mode()==='crew'&&crewValid())return;const pin=v('f-pin');const u=me();if(!pin)fail('Pro podpis zadejte svůj PIN.');const h=await sha(u.id+':'+pin);if(h!==u.pinHash){const el=document.getElementById('f-pin');if(el){el.value='';el.classList.add('bad')}fail('Nesprávný PIN.')}}
 function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>{el.hidden=true},3200)}
@@ -1782,6 +1927,149 @@ function openGoLive(acId){
   }});
 }
 
+/* --- handover between iPads without signal: QR codes or a file (AirDrop) ---
+   The package is a set of signed records. Records only ever get added and each has its own id,
+   so taking over the same data twice, or in both directions, never duplicates or overwrites anything.
+   Records taken over are queued for upload here too: whichever iPad gets signal first sends them. */
+const HO_TYPES=new Set(['user.upsert','ac.upsert','cfg.set','leg.open','leg.sign','leg.amend','leg.void','defect.report','defect.defer','defect.rectify','crs.issue','ac.ground','daily.sign','sec.sign','ofp.import','ofp.fill','ofp.sign','ofp.void','ofp.close','ofp.reopen']);
+const HO_HOURS=36,HO_CHUNK=900;
+let hoRun=null;
+function hoAcId(){return mode()==='crew'?BIND:UI.acId}
+function hoEvents(acId){
+  ofpFlush();
+  const since=new Date(Date.now()-HO_HOURS*3600e3).toISOString();
+  const legs=new Set(),ofps=new Set(),defs=new Set();
+  for(const l of Object.values(S.legs))if(!acId||l.acId===acId)legs.add(l.legId);
+  for(const o of Object.values(S.ofps))if(!acId||o.acId===acId)ofps.add(o.ofpId);
+  for(const d of Object.values(S.defects))if(!acId||d.acId===acId)defs.add(d.defId);
+  const mine=e=>{const p=e.p||{};return !acId||p.acId===acId||legs.has(p.legId)||ofps.has(p.ofpId)||defs.has(p.defId)};
+  const pick=new Map();
+  for(const e of Object.values(EV))if((e.at>=since&&mine(e))||S.out.has(e.id))pick.set(e.id,e);
+  // records the picked ones build on (flight opened, OFP imported, defect reported) come along even if older
+  const need=new Set();for(const e of pick.values()){const p=e.p||{};if(p.legId)need.add('l'+p.legId);if(p.ofpId)need.add('o'+p.ofpId);if(p.defId)need.add('d'+p.defId)}
+  for(const e of Object.values(EV)){const p=e.p||{};
+    if((e.type==='leg.open'&&need.has('l'+p.legId))||(e.type==='ofp.import'&&need.has('o'+p.ofpId))||(e.type==='defect.report'&&need.has('d'+p.defId)))pick.set(e.id,e)}
+  return [...pick.values()].sort((a,b)=>a.at<b.at?-1:1).map(e=>({id:e.id,type:e.type,p:e.p,at:e.at,n:e.n||0,by:e.by,bn:e.bn,dev:e.dev,seq:e.seq||0}));
+}
+function hoPackage(){const acId=hoAcId();const ac=acId&&S.ac[acId];
+  return {f:'etl-handover',v:1,ac:acId||null,reg:ac?ac.reg:'',dev:DEV,at:new Date().toISOString(),ev:hoEvents(acId)}}
+function hoMerge(pkg){
+  if(!pkg||pkg.f!=='etl-handover'||!Array.isArray(pkg.ev))throw new Error('Tohle nejsou data z eTechLogu.');
+  let added=0;
+  for(const e of pkg.ev){
+    if(!e||typeof e.id!=='string'||!HO_TYPES.has(e.type)||typeof e.at!=='string'||!e.p||typeof e.p!=='object')continue;
+    if(EV[e.id])continue;
+    EV[e.id]={id:e.id,type:e.type,p:e.p,at:e.at,n:+e.n||0,by:e.by,bn:e.bn,dev:e.dev,seq:+e.seq||0};OUT.push(e.id);added++;
+  }
+  if(added){persist();rebuild();render();flush()}
+  return {added,total:pkg.ev.length,reg:pkg.reg||''};
+}
+// base45 (RFC 9285): binary as QR "alphanumeric" characters, the densest QR mode
+const B45='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:';
+function b45enc(u8){let o='';for(let i=0;i<u8.length;i+=2){if(i+1<u8.length){let n=u8[i]*256+u8[i+1];o+=B45[n%45]+B45[(n/45|0)%45]+B45[n/2025|0]}else{const n=u8[i];o+=B45[n%45]+B45[n/45|0]}}return o}
+function b45dec(s){const out=[];for(let i=0;i<s.length;i+=3){const c=B45.indexOf(s[i]),d=B45.indexOf(s[i+1]);if(c<0||d<0)throw new Error('Poškozený QR kód.');
+  if(i+2<s.length){const e=B45.indexOf(s[i+2]);if(e<0)throw new Error('Poškozený QR kód.');const n=c+d*45+e*2025;out.push(n>>8,n&255)}else out.push(c+d*45)}return new Uint8Array(out)}
+async function zip(u8,dir){const S2=dir?window.CompressionStream:window.DecompressionStream;if(!S2)return null;
+  const st=new Blob([u8]).stream().pipeThrough(new S2('deflate'));return new Uint8Array(await new Response(st).arrayBuffer())}
+async function hoFrames(pkg){
+  const raw=new TextEncoder().encode(JSON.stringify(pkg));const z=await zip(raw,true).catch(()=>null);
+  const body=b45enc(z||raw);const sid=Math.random().toString(36).slice(2,6).toUpperCase().padEnd(4,'0');
+  const n=Math.max(1,Math.ceil(body.length/HO_CHUNK));const fr=[];
+  // header: ETL + Z (deflate) / R (raw), 4-char session, frame index and count (3 digits each)
+  for(let i=0;i<n;i++)fr.push('ETL'+(z?'Z':'R')+sid+String(i).padStart(3,'0')+String(n).padStart(3,'0')+body.slice(i*HO_CHUNK,(i+1)*HO_CHUNK));
+  return fr;
+}
+function hoStop(){if(!hoRun)return;clearInterval(hoRun.timer);cancelAnimationFrame(hoRun.raf);if(hoRun.stream)hoRun.stream.getTracks().forEach(t=>t.stop());hoRun=null}
+function hoBody(html){const b=document.querySelector('#sheet .sheet-body');if(b)b.innerHTML=html}
+function openHandover(){
+  hoStop();const acId=hoAcId();const ac=acId&&S.ac[acId];const evs=hoEvents(acId);const pend=evs.filter(e=>S.out.has(e.id)).length;
+  openSheet('Druhý iPad'+(ac?' – '+ac.reg:''),`<div class="two">
+    <div class="panel" style="margin:0"><p class="label">Předat z tohoto iPadu</p><p><b>${evs.length}</b> záznamů${ac?' letadla '+esc(ac.reg):''} za posledních ${HO_HOURS} h – lety, OFP, závady${pend?`, z toho <b>${pend}</b> ještě neodeslaných`:''}.</p>
+      <div class="chips"><button type="button" class="btn primary" data-act="ho-qr" ${evs.length?'':'disabled'}>Ukázat QR kód</button><button type="button" class="btn" data-act="ho-file" ${evs.length?'':'disabled'}>Poslat souborem</button></div>
+      <p class="muted" style="font-size:.84rem">Soubor jde poslat přes AirDrop – v režimu letadlo se zapnutou Wi-Fi a Bluetooth.</p></div>
+    <div class="panel" style="margin:0"><p class="label">Převzít do tohoto iPadu</p><p>Z druhého iPadu, který ukazuje QR kód nebo poslal soubor.</p>
+      <div class="chips"><button type="button" class="btn primary" data-act="ho-scan">Skenovat QR kód</button><label class="btn">Načíst soubor<input type="file" id="ho-in" accept=".json,application/json" hidden></label></div></div></div>
+    <p class="muted">Data se jen doplní – nic se nepřepíše ani nezdvojí. Převzaté záznamy odešle na server i tento iPad, jakmile bude signál.</p>`,{focus:false});
+}
+async function hoShowQr(){
+  try{
+    if(!window.qrcode)await loadScript('vendor/qrcode.min.js');
+    const fr=await hoFrames(hoPackage());
+    hoBody(`<div style="text-align:center"><canvas id="ho-cv" style="width:min(100%,560px);aspect-ratio:1;background:#fff;border-radius:10px;image-rendering:pixelated"></canvas>
+      <p style="margin:8px 0 0">Kód <b id="ho-i">1</b> / ${fr.length}</p>
+      <p class="muted">Na druhém iPadu: <b>Druhý iPad → Skenovat QR kód</b>. Držte kameru nad tímto displejem, dokud druhý iPad neohlásí <b>Převzato</b>.</p>
+      <div class="chips" style="justify-content:center"><button type="button" class="btn" data-act="close-sheet">Hotovo</button></div></div>`);
+    const cv=document.getElementById('ho-cv');const ctx=cv.getContext('2d');
+    const imgs=fr.map(t=>{const q=qrcode(0,'L');q.addData(t,'Alphanumeric');q.make();return q});
+    const mc=Math.max(...imgs.map(q=>q.getModuleCount()));const sc=Math.max(3,Math.floor(560/(mc+8)));cv.width=cv.height=(mc+8)*sc;
+    let i=0;const draw=()=>{const q=imgs[i];const m=q.getModuleCount();const off=Math.floor((cv.width-m*sc)/2);
+      ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);ctx.fillStyle='#000';
+      for(let r=0;r<m;r++)for(let c=0;c<m;c++)if(q.isDark(r,c))ctx.fillRect(off+c*sc,off+r*sc,sc,sc);
+      const el=document.getElementById('ho-i');if(el)el.textContent=i+1;i=(i+1)%imgs.length};
+    draw();hoRun={timer:imgs.length>1?setInterval(draw,320):0,raf:0,frames:fr.length};
+  }catch(e){hoBody(`<p class="form-err">QR kód se nepodařilo vytvořit: ${esc(e.message||e)}</p>`)}
+}
+async function hoScan(){
+  hoStop();
+  hoBody(`<video id="ho-v" playsinline muted autoplay style="width:100%;max-height:60vh;background:#000;border-radius:10px"></video>
+    <p id="ho-st" style="margin:8px 0 4px">Namiřte kameru na QR kód na druhém iPadu…</p><div style="height:8px;background:var(--line,#ccd);border-radius:4px;overflow:hidden"><div id="ho-bar" style="height:100%;width:0;background:var(--ok,#2a7)"></div></div>`);
+  try{
+    if(!window.jsQR)await loadScript('vendor/jsqr.min.js');
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('Kamera tu není k dispozici.');
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}},audio:false});
+    const v=document.getElementById('ho-v');if(!v){stream.getTracks().forEach(t=>t.stop());return}
+    v.srcObject=stream;await v.play().catch(()=>{});
+    const cv=document.createElement('canvas');const ctx=cv.getContext('2d',{willReadFrequently:true});
+    const got={};let sid=null,n=0,last=0;
+    hoRun={timer:0,raf:0,stream};
+    const tick=async t=>{
+      if(!hoRun||hoRun.stream!==stream)return;
+      hoRun.raf=requestAnimationFrame(tick);
+      if(t-last<90||v.readyState<2)return;last=t;
+      const w=Math.min(1024,v.videoWidth),h=Math.round(v.videoHeight*w/v.videoWidth);if(!w||!h)return;
+      cv.width=w;cv.height=h;ctx.drawImage(v,0,0,w,h);
+      const code=jsQR(ctx.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'dontInvert'});
+      if(!code||!/^ETL[ZR][0-9A-Z]{4}\d{6}/.test(code.data))return;
+      const d=code.data,s2=d.slice(3,8),i=+d.slice(8,11),cnt=+d.slice(11,14);
+      if(s2!==sid){sid=s2;n=cnt;for(const k in got)delete got[k]}
+      if(got[i]==null){got[i]=d.slice(14);const k=Object.keys(got).length;
+        const bar=document.getElementById('ho-bar'),st=document.getElementById('ho-st');if(bar)bar.style.width=Math.round(k/n*100)+'%';if(st)st.textContent=`Načteno ${k} z ${n} kódů…`}
+      if(Object.keys(got).length===n){
+        cancelAnimationFrame(hoRun.raf);stream.getTracks().forEach(x=>x.stop());hoRun=null;
+        let body='';for(let k=0;k<n;k++)body+=got[k];
+        let bytes=b45dec(body);if(s2[0]&&d[3]==='Z'){const u=await zip(bytes,false);if(!u)throw new Error('Tento iPad neumí rozbalit data – aktualizujte iPadOS.');bytes=u}
+        hoDone(JSON.parse(new TextDecoder().decode(bytes)));
+      }
+    };
+    hoRun.raf=requestAnimationFrame(tick);
+  }catch(e){hoStop();const denied=e&&(e.name==='NotAllowedError'||e.name==='SecurityError');
+    hoBody(`<p class="form-err">${denied?'Aplikace nemá povolenou kameru. Povolte ji v Nastavení iPadu (Soukromí → Kamera) a zkuste to znovu.':esc(e.message||String(e))}</p><div class="chips"><button type="button" class="btn" data-act="ho-scan">Zkusit znovu</button></div>`)}
+}
+function hoDone(pkg){
+  try{const r=hoMerge(pkg);
+    hoBody(`<div class="warnline ${r.added?'ok':'info'}" style="margin:0"><b>${r.added?'Převzato':'Nic nového'}</b> – ${r.added?`${r.added} nových záznamů`:'všech '+r.total+' záznamů už tento iPad má'}${r.reg?' · '+esc(r.reg):''}.</div>
+      <div class="chips" style="margin-top:10px"><button type="button" class="btn primary" data-act="close-sheet">Hotovo</button></div>`);
+    if(r.added)toast(`Převzato ${r.added} záznamů z druhého iPadu`);
+  }catch(e){hoBody(`<p class="form-err">${esc(e.message||String(e))}</p>`)}
+}
+function hoSendFile(){
+  // build synchronously: iOS opens the share sheet only straight from the tap
+  const pkg=hoPackage();const json=JSON.stringify(pkg);
+  const d=new Date();const stamp=d.toISOString().slice(0,16).replace(/[-:]/g,'').replace('T','-');
+  const name=`eTechLog-${(pkg.reg||'data').replace(/[^A-Z0-9-]/gi,'')}-${stamp}.json`;
+  let file=null;try{file=new File([json],name,{type:'application/json'})}catch(e){}
+  if(file&&navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({files:[file],title:name}).then(()=>toast('Soubor odeslán')).catch(e=>{if(e&&e.name!=='AbortError')saveFile(name,json)});
+  }else saveFile(name,json);
+}
+function hoReadFile(file){
+  const r=new FileReader();
+  r.onload=()=>{let pkg;try{pkg=JSON.parse(r.result)}catch(e){hoBody('<p class="form-err">Soubor nejde přečíst.</p>');return}
+    if(pkg&&pkg.format==='silesia-etechlog-backup'&&Array.isArray(pkg.events))pkg={f:'etl-handover',v:1,reg:'',ev:pkg.events};
+    hoDone(pkg)};
+  r.readAsText(file);
+}
+
 /* --- admin forms --- */
 function openAcForm(id){
   const a=id?S.ac[id]:{};const hasLegs=id&&a.legs&&a.legs.length;
@@ -1965,6 +2253,12 @@ document.addEventListener('click',e=>{
     case 'ground-form':openGround();break;
     case 'daily-form':openDaily();break;
     case 'ac-form':openAcForm(id);break;
+    case 'ho':openHandover();break;
+    case 'ofp-pdf':openOfpPdf(id);break;
+    case 'pdf-share':sharePdf();break;
+    case 'ho-qr':hoShowQr();break;
+    case 'ho-scan':hoScan();break;
+    case 'ho-file':hoSendFile();break;
     case 'carry-form':openCarryForm(id);break;
     case 'golive-form':openGoLive(id);break;
     case 'user-form':openUserForm(id);break;
@@ -1989,6 +2283,7 @@ document.addEventListener('change',e=>{
   else if(t.id==='ofp-file'&&t.files&&t.files[0]){importOfp(t.files[0]);t.value=''}
   else if(t.id==='import-file'&&t.files&&t.files[0]){importJson(t.files[0]);t.value=''}
   else if(t.type==='checkbox'&&t.dataset&&t.dataset.of==='nonRvsm'){const c=t.closest('[data-ofp]');if(c){ofpSet(c.dataset.ofp,'nonRvsm',t.checked?'1':'');c.querySelectorAll('.rvsm-only').forEach(x=>x.hidden=t.checked)}}
+  else if(t.id==='ho-in'&&t.files&&t.files[0]){hoReadFile(t.files[0]);t.value=''}
   else if(t.id==='f-paper'){const r=document.getElementById('paper-row');if(r)r.hidden=!t.checked}
   else if(t.classList.contains('d-mel')){const f=t.closest('.def-row').querySelector('.d-melf');if(f)f.hidden=!t.checked}
   else if(t.dataset&&t.dataset.k&&(t.type==='checkbox'||t.type==='radio'||t.tagName==='SELECT')){UI.draft[t.dataset.k]=t.type==='checkbox'?t.checked:t.value;saveDraft();if(t.dataset.k==='defMel'||t.dataset.k==='secRes')render();else if(t.dataset.k==='app'){const o=document.getElementById('c-app-other');if(o)o.hidden=t.value!=='OTHER';crewLive()}else crewLive()}

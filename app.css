@@ -220,6 +220,7 @@ input.bad{border-color:var(--warn);background:var(--warn-soft)}
 .warnline.caution{background:var(--caution-soft);border-color:var(--caution)}
 .warnline.warn{background:var(--warn-soft);border-color:var(--warn)}
 .warnline.info{background:var(--accent-soft);border-color:var(--accent)}
+.warnline.ok{background:var(--ok-soft,var(--accent-soft));border-color:var(--ok)}
 .form-err{color:var(--warn);font-weight:600;background:var(--warn-soft);padding:10px 12px;border-radius:6px}
 .def-row{border:1px solid var(--line-strong);border-radius:8px;padding:12px;display:grid;gap:10px;background:var(--surface-2)}
 .statement{font-size:.88rem;background:var(--surface-2);border-radius:6px;padding:10px 12px;border-left:4px solid var(--accent)}
