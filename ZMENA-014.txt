@@ -1,0 +1,38 @@
+eTechLog – změna Z-014
+Verze: 0.6.1 (navazuje na Z-013 / 0.6.0)
+Datum: 2026-11-10
+
+Co se mění
+- Strana 2 Let, krok 6 „Přílet a přistání“: ATIS ARR, přistávací data a nově čas přistání, on-block,
+  palivo po přistání / spáleno (druhé pole se dopočítá), typ přiblížení, počet přistání.
+- Strana 3 „Shrnutí a uzavření“, krok 7 „Shrnutí letu“:
+    - datum, let, letiště přistání (při odklonu),
+    - časy off-block / vzlet / přistání / on-block – editovatelné, block a flight time,
+    - palivo natankováno / na odlet / po přistání / spáleno – editovatelné, porovnání s plánem,
+    - přiblížení, posádka (odkaz na úpravu), Pilot Flying, olej, závady,
+    - co v OFP chybí,
+    - „Potvrdit a zapsat do ATL“ → jedno okno s náhledem záznamu a podpisem kapitána.
+- Navigační log – oprava DCT:
+    - DCT, který už je přeletěný (cílový bod má ATO), nejde zrušit jedním klepnutím („DCT přeletěno“);
+      pro opravu nejdřív smazat ATO u cílového bodu,
+    - body před posledním ATO, které ATO nemají, jsou označené „bez ATO“
+      (dřív po zrušení DCT zůstaly bez označení a bez tlačítka).
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-014.txt) do kořene repozitáře eatl. config.js se nemění.
+
+Na co se podívat při testu
+- Zapsat přistání na straně Let, na straně 3 opravit palivo a zkontrolovat block/flight, podepsat.
+- DCT na bod, vyplnit u něj ATO, zkusit zrušit (nejde), smazat ATO, zrušit.
+
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

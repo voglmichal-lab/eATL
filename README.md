@@ -71,9 +71,12 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
 4. OFP je rozdělené podle fáze letu (otevře se na té aktuální); kroky jsou očíslované, hotový krok má štítek „hotovo“:
    - **Před letem**: 1 Posádka a kontrola OFP · 2 Palivo před odletem (natankováno, na odlet, minimum – jde upravit až do
      uzavření letu) · 3 Performance.
-   - **Let**: 4 Před odletem (ATIS, clearance, výškoměry) · 5 Odlet a trať (navigační log, divert) · 6 Přílet.
-   - **Přistání a uzavření**: 7 časy, palivo po přistání, přiblížení, PF, závady → *Uzavřít OFP a přenést do ATL*
-     (krok 1/2 uzavření OFP, krok 2/2 kontrola záznamu v ATL včetně paliva a podpis kapitána).
+   - **Let**: 4 Před odletem (ATIS, clearance, výškoměry) · 5 Odlet a trať (navigační log, divert) ·
+     6 Přílet a přistání (ATIS ARR, přistávací data, čas přistání, on-block, palivo po přistání, přiblížení, počet přistání).
+   - **Shrnutí a uzavření**: 7 Shrnutí letu – časy odletu a příletu i palivo jdou opravit, block/flight, posádka, PF,
+     olej, závady, chybějící položky OFP → *Potvrdit a zapsat do ATL* (podpis kapitána).
+   Navigační log: DCT, který je už přeletěný (cílový bod má ATO), nejde zrušit jedním klepnutím – pro opravu nejdřív
+   smažte ATO u cílového bodu.
 5. **Let podepisuje jen PIC.** Když je na iPadu přihlášený někdo jiný, PIC zadá svůj PIN při uzavření.
 
 Posádka se předvolí podle předchozího letu toho dne na stejném letadle, jinak podle přihlášení na iPadech letadla –
