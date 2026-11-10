@@ -42,7 +42,8 @@ příkaz, Output Directory ponechte prázdné → **Deploy**.
    4. iPady v letadlech.
 
 ## Aktualizace
-Upravte kód, v `version.js` zvyšte číslo verze a nahrajte na GitHub. Vercel nasadí sám,
+Nahrajte na GitHub **všechny soubory ze zipu změny** (zip obsahuje vždy celou sadu souborů aplikace). Pokud by se app.css a app.js lišily verzí, aplikace zobrazí upozornění „Neúplná aktualizace“.
+Při úpravách kódu zvyšte číslo verze ve `version.js` i `--etl-build` v `app.css`. Vercel nasadí sám,
 iPady si novou verzi stáhnou při dalším otevření se signálem.
 
 ## Jak funguje offline a synchronizace
@@ -65,14 +66,15 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
 ## Let na iPadu – postup
 1. **Přihlášení**: letadlo (iPad si ho pamatuje) → *Kdo jste?* → PIN. Přihlašuje se jen ten, kdo s iPadem pracuje.
 2. **Nahrát OFP** (PDF z NAVsystemu) → *Otevřít OFP*.
-3. OFP je rozdělené podle fáze letu – otevře se na té aktuální, kroky jsou očíslované a hotový krok je označený „hotovo“
-   (zůstává vidět):
-   - **Před letem**: 1 Posádka a kontrola OFP · 2 U letadla: palivo a security search (*Potvrdit palivo a security –
-     zahájit let*, let se založí v ATL) · 3 Performance.
-   - **Let**: 4 Před odletem (ATIS, clearance, výškoměry) · 5 Odlet a trať (navigační log, divert) · 6 Přílet (ATIS ARR, přistávací data).
-   - **Přistání a uzavření**: 7 časy, palivo, přiblížení, PF, závady → *Uzavřít OFP a přenést do ATL*
-     (krok 1/2 uzavření OFP, krok 2/2 kontrola záznamu v ATL a podpis kapitána).
-4. **Let podepisuje jen PIC.** Když je na iPadu přihlášený někdo jiný, PIC zadá svůj PIN při uzavření.
+3. **Security search** je v OFP úplně nahoře: výsledek (+ předletová prohlídka) → *Podepsat a odeslat security search*.
+   Tím se let založí v ATL a firma vidí, že security je hotová. Pak je z karty jeden řádek a posádka pracuje jen v OFP.
+4. OFP je rozdělené podle fáze letu (otevře se na té aktuální); kroky jsou očíslované, hotový krok má štítek „hotovo“:
+   - **Před letem**: 1 Posádka a kontrola OFP · 2 Palivo před odletem (natankováno, na odlet, minimum – jde upravit až do
+     uzavření letu) · 3 Performance.
+   - **Let**: 4 Před odletem (ATIS, clearance, výškoměry) · 5 Odlet a trať (navigační log, divert) · 6 Přílet.
+   - **Přistání a uzavření**: 7 časy, palivo po přistání, přiblížení, PF, závady → *Uzavřít OFP a přenést do ATL*
+     (krok 1/2 uzavření OFP, krok 2/2 kontrola záznamu v ATL včetně paliva a podpis kapitána).
+5. **Let podepisuje jen PIC.** Když je na iPadu přihlášený někdo jiný, PIC zadá svůj PIN při uzavření.
 
 Posádka se předvolí podle předchozího letu toho dne na stejném letadle, jinak podle přihlášení na iPadech letadla –
 vždy jen jako návrh ke kontrole. PIC se vybírá jen ze seznamu; SIC, který v systému není, jde napsat (jméno, licence)

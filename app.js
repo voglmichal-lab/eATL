@@ -240,7 +240,9 @@ async function checkOffline(){
   }catch(e){off.ready=false;off.missing=[String(e&&e.message||e)]}
   finally{off.checking=false;if(was!==off.ready)softRender();else renderPill()}
 }
+function cssMismatch(){try{const v2=getComputedStyle(document.documentElement).getPropertyValue('--etl-build').replace(/["'\s]/g,'');return v2!==String(window.ETL_VERSION||'')?(v2||'neznámá'):null}catch(e){return null}}
 function offlineNote(){
+  const cm=cssMismatch();if(cm)return `<div class="warnline warn wrap"><b>Neúplná aktualizace.</b> Vzhled (app.css) je z verze ${esc(cm)}, aplikace z verze ${esc(window.ETL_VERSION||'')}. Nahrajte na server všechny soubory z posledního zipu.</div>`;
   if(isIOS&&!standalone())return `<div class="warnline warn wrap"><b>Otevřeno v Safari.</b> Bez signálu se spustí jen aplikace z ikony na ploše: Sdílet → Přidat na plochu a dál otevírejte jen ikonu.</div>`;
   if(off.ready===false)return `<div class="warnline caution wrap"><b>Offline režim ještě není připravený.</b> Nechte aplikaci chvíli otevřenou se signálem${off.missing.length?` <span class="muted">(${esc(off.missing.slice(0,3).join(', '))}${off.missing.length>3?'…':''})</span>`:''}.</div>`;
   return '';
@@ -855,8 +857,47 @@ function ofpPhase(o){
   return 'pre';
 }
 function ofpPhaseTabs(o){const l=o.leg;const ph=ofpPhase(o);
-  const done={pre:!!(l&&ofpVal(o,'to_w')&&ofpVal(o,'v1')&&ofpVal(o,'v2')),flight:!!(ofpVal(o,'x_on')||(l&&l.state==='closed')),close:!!o.closed};
+  const done={pre:!!(l&&(ofpVal(o,'f_blk')||l.fuelBlk!=null)&&ofpVal(o,'to_w')&&ofpVal(o,'v1')&&ofpVal(o,'v2')),flight:!!(ofpVal(o,'x_on')||(l&&l.state==='closed')),close:!!o.closed};
   return `<div class="phase-tabs" role="tablist">${[['pre','Před letem'],['flight','Let'],['close','Přistání a uzavření']].map(([k,t],i)=>`<button type="button" role="tab" aria-selected="${ph===k}" class="ph ${ph===k?'on':''} ${done[k]?'done':''}" data-act="ofp-ph" data-id="${esc(o.ofpId)}|${k}"><span class="ph-n">${i+1}</span>${t}${done[k]?'<small>hotovo</small>':''}</button>`).join('')}</div>`}
+// Security search – the one thing signed and sent before departure. Signing it opens the flight in the ATL;
+// afterwards it is one line and the crew works only in the OFP.
+function ofpSecPanel(o,u){
+  if(o.void)return '';const l=o.leg;
+  if(l){const s2=l.sec;return `<div class="sec-line ${s2&&s2.result==='FOUND'?'found':''}"><span class="label">Security search</span><span>${s2?`${esc(s2.time)}Z · ${s2.result==='FOUND'?'<b>NÁLEZ</b> – '+esc(s2.notes):s2.result==='NA'?'nebylo nutné, letadlo pod dohledem':'provedena, bez nálezu'} · ${esc(s2.byName||'')}`:'–'}</span>${S.out.has(l.openEv)?'<span class="sync-s wait">čeká na signál</span>':'<span class="sync-s ok">odesláno</span>'}</div>`}
+  if(o.closed||!can.leg(u))return '';
+  if(mode()!=='crew')return `<div class="panel sec-card"><p class="label">Před odletem</p><div class="chips"><button class="btn primary" data-act="ofp-start" data-id="${esc(o.ofpId)}">Security search a zahájení letu</button></div></div>`;
+  const ac=S.ac[o.acId];
+  if(ac.openLeg)return `<div class="warnline warn">Na ${esc(ac.reg)} probíhá jiný let ${esc(ac.openLeg.from)} → ${esc(ac.openLeg.to)} – nejdřív ho uzavřete.${ac.openLeg.ofpId?` <button type="button" class="btn sm" data-act="ofp-open" data-id="${esc(ac.openLeg.ofpId)}">Otevřít jeho OFP</button>`:''}</div>`;
+  if(UI.draft.ofpId!==o.ofpId){UI.draft={ofpId:o.ofpId};saveDraft()}
+  const d=UI.draft;const pre=hasPreToday(ac);const last=ac.lastLeg&&ac.lastLeg.to;
+  return `<section class="panel sec-card" data-keep>
+    <div class="panel-head"><div><p class="label">Před odletem podepsat a odeslat</p><h2>Security search – ${esc(o.dep)}</h2></div><span class="muted">provádí ${esc((me()||{}).name||'')}</span></div>
+    ${ac.status==='warn'?`<div class="warnline warn" style="margin:0"><b>${esc(ac.reg)} není uvolněné do provozu.</b> Bez CRS letadlo nesmí odletět.</div>`:''}
+    ${last&&last!==o.dep?`<div class="warnline caution" style="margin:0">Minulé přistání bylo v <b class="mono">${esc(last)}</b>, OFP začíná v <b class="mono">${esc(o.dep)}</b>.</div>`:''}
+    ${secTiles('c-secres',d.secRes,true)}
+    ${d.secRes==='FOUND'?`<label class="fld"><span>Co a kde jste našli, komu nahlášeno</span><textarea data-k="secNote">${esc(d.secNote||'')}</textarea></label>`:''}
+    ${pre?'':`<label class="check"><input type="checkbox" data-k="pre" ${d.pre!==false?'checked':''}><span>Předletová prohlídka provedena – podepíše se zároveň</span></label>`}
+    <p class="form-err" id="c-err" hidden></p>
+    <button type="button" class="btn big primary" data-act="ofp-sec" data-id="${esc(o.ofpId)}">Podepsat a odeslat security search</button>
+    <p class="muted" style="font-size:.86rem;margin:0">Po odeslání firma vidí, že security je hotová, a let se založí v technickém deníku. Pak už se vyplňuje jen OFP.</p>
+  </section>`;
+}
+function ofpSecSign(id){
+  const o=ofpOf(id);if(!o)return;const ac=S.ac[o.acId];const d=UI.draft;
+  try{
+    if(o.leg)fail('Security search tohoto letu už je podepsaná.');
+    if(ac.openLeg)fail('Na letadle probíhá jiný let – nejdřív ho uzavřete.');
+    if(!d.secRes)fail('Vyberte výsledek security search.');
+    if(d.secRes==='FOUND'&&String(d.secNote||'').trim().length<3)fail('Popište, co jste našli a komu jste to nahlásili.');
+    const today=todayISO();const date=o.date&&Math.abs(daysBetween(o.date,today))<=1?o.date:today;
+    const who=crewUser();const c=ofpCrew(o);const legId=rid('leg');
+    const items=[['leg.open',{legId,acId:ac.acId,date,kind:'CAT',fno:String(o.flt||'').toUpperCase(),from:o.dep,to:o.des,std:o.std||'',pic:c.pic||who,sic:c.sic||'',sicTxt:c.sicTxt||'',ofpId:o.ofpId,fuelUp:null,fuelBlk:null,fuelMin:null,
+      sec:{time:nowHM(),place:o.dep,result:d.secRes,notes:d.secRes==='FOUND'?String(d.secNote).trim():d.secRes==='NA'?'Letadlo pod dohledem posádky':'',byName:(S.users[who]||{}).name||''}}]];
+    if(!hasPreToday(ac)&&d.pre!==false)items.push(['daily.sign',{acId:ac.acId,date,kind:'PRE',tyres:'',oil:'',brakes:false,notes:''}]);
+    UI.draft={};saveDraft();emit(items,who);window.scrollTo({top:0,behavior:'smooth'});
+    toast(online()?'Security search odeslána – let je založený v ATL':'Security search podepsána – odešle se, až bude signál');
+  }catch(x){crewErr(x)}
+}
 // crew mode: preparing and starting the flight happens inside the OFP
 function ofpStartPanel(o,u){
   if(mode()!=='crew'||o.leg||o.void||o.closed||!can.leg(u))return '';
@@ -898,20 +939,21 @@ function viewOfp(o,u){
   // one page, top to bottom in the order of the flight: crew and OFP check → fuel and security at the aircraft →
   // performance → before departure → departure and route → arrival → landing and closing
   const val2=k=>ofpVal(o,k);const cr=ofpCrew(o);
-  const done={crew:!!(cr.pic&&o.signed),fuel:!!l,perf:!!(val2('to_w')&&val2('v1')&&val2('v2')),dep:!!((val2('atisDep')||val2('clr'))&&val2('rg_lh')),
+  const done={crew:!!(cr.pic&&o.signed),fuel:!!(val2('f_blk')||(l&&l.fuelBlk!=null)),perf:!!(val2('to_w')&&val2('v1')&&val2('v2')),dep:!!((val2('atisDep')||val2('clr'))&&val2('rg_lh')),
     route:!!((l&&parseHM(l.off)!=null)||val2('x_off')),arr:!!(val2('ld_w')||val2('vref')),close:!!o.closed};
   let n=0;const stepH=(key,title,sub)=>{n++;return `<div class="ostep-h"><span class="ostep-n">${n}</span><div style="flex:1"><h2>${title}</h2>${sub?`<p class="muted">${sub}</p>`:''}</div>${done[key]?'<span class="ann ok">hotovo</span>':''}</div>`};
   const ph=ofpPhase(o);const sec=(k,html)=>`<div class="ophase" data-ph="${k}" ${ph===k?'':'hidden'}>${html}</div>`;
-  const pre1=l&&(S.daily[l.acId+'|'+l.date]||[]).find(x=>x.kind==='PRE'||x.kind==='DAILY');
-  const fuelStep=l?`<dl class="kvgrid"><dt>Natankováno</dt><dd class="mono">${fmtN(l.fuelUp)} L</dd><dt>Palivo na odlet</dt><dd class="mono">${fmtN(l.fuelBlk)} lbs <span class="muted">(min ${fmtN(l.fuelMin)} lbs)</span></dd>
-      <dt>Security search</dt><dd>${l.sec?`${esc(l.sec.time)}Z · ${l.sec.result==='FOUND'?'<b style="color:var(--warn)">NÁLEZ</b> – '+esc(l.sec.notes):l.sec.result==='NA'?'nebyla nutná – letadlo pod dohledem':'provedena, bez nálezu'} · ${esc(l.sec.byName||'')}`:'–'}</dd>
-      <dt>Předletová prohlídka</dt><dd>${pre1?`${hmOfIso(pre1.at)}Z · ${esc(pre1.name)}`:'–'}</dd>
-      <dt>Let zahájen</dt><dd>${hmOfIso(l.opened.at)}Z · ${esc(l.opened.name)} ${S.out.has(l.openEv)?'<span class="sync-s wait">čeká na signál</span>':''}</dd></dl>`
-    :o.void||o.closed?'':mode()==='crew'?ofpStartPanel(o,u):(can.leg(u)?`<div class="chips"><button class="btn primary" data-act="ofp-start" data-id="${esc(o.ofpId)}">${ICON.plus}Palivo, security a zahájení letu</button></div>`:'<p class="muted">Let ještě nebyl zahájen.</p>');
+  const fUp=val2('f_up'),fBlk=val2('f_blk'),fMin=val2('f_min')||(f.rampMreq!=null?String(f.rampMreq):'');
+  const lowF=num(fBlk)!=null&&num(fMin)!=null&&num(fBlk)<num(fMin);
+  const fuelStep=l&&l.fuelBlk!=null&&!fBlk?`<dl class="kvgrid"><dt>Natankováno</dt><dd class="mono">${fmtN(l.fuelUp)} L</dd><dt>Palivo na odlet</dt><dd class="mono">${fmtN(l.fuelBlk)} lbs <span class="muted">(min ${fmtN(l.fuelMin)} lbs)</span></dd></dl><p class="muted" style="font-size:.86rem">Zapsáno při zahájení letu – opravit jde při uzavření letu v ATL.</p>`
+    :`<div class="fgrid">${ofpIn(o,'f_up','Natankováno (L)',{num:true})}${ofpIn(o,'f_blk','Na odlet (lbs)',{num:true})}<label class="fld"><span>Min. required (lbs)</span><input type="text" data-of="f_min" value="${esc(fMin)}" inputmode="numeric" ${LK?'disabled':''}></label></div>
+      ${lowF?`<div class="warnline warn" style="margin:0">Palivo na odlet je pod minimem required.</div>`:''}
+      <p class="muted" style="font-size:.86rem">Plán: ramp EST ${fmtN(f.rampEst)} lbs · MREQ ${fmtN(f.rampMreq)} lbs. Údaje jde upravit až do uzavření letu, do ATL se zapíšou při uzavření.</p>`;
   return `<div class="ofp" data-keep data-ofp="${esc(o.ofpId)}">
   <div class="panel"><div class="panel-head"><div><p class="label">OFP ${esc(o.ofpId)} · ${esc(o.reg)} ${esc(o.type||'')}</p><h2 class="mono">${esc(o.flt)} · ${esc(o.dep)} → ${esc(o.des)}</h2><p class="muted">${ofpDateTxt(o)} · STD ${esc(o.std)}Z · STA ${esc(o.sta||'')}Z · ALTN ${esc(o.altn||'–')}${o.altn2?' / '+esc(o.altn2):''} · CMD ${esc(o.cmd||'–')}</p></div>
     <div class="chips"><span class="ann ${sc}">${st}</span>${o.signed?`<span class="ann ok">OFP podepsal ${esc(o.signed.name)} ${hmOfIso(o.signed.at)}Z</span>`:''}<button type="button" class="btn sm" data-act="ofp-pdf" data-id="${esc(o.ofpId)}">PDF / tisk</button></div></div>
   </div>
+  ${ofpSecPanel(o,u)}
   ${ofpPhaseTabs(o)}
   ${sec('pre',`<section class="panel ostep ${done.crew?'done':''}" id="ofps-crew">${stepH('crew','Posádka a kontrola OFP','Vyplňte posádku, zkontrolujte platnost OFP, trať a palivo.')}
     ${ofpCrewPanel(o,LK)}
@@ -924,7 +966,7 @@ function viewOfp(o,u){
     </div>
     ${o.signed||o.void||o.closed?'':`<div class="chips">${can.leg(u)?`<button class="btn" data-act="ofp-sign" data-id="${esc(o.ofpId)}">${ICON.check}OFP zkontrolováno – podpis velitele</button>`:''}</div>`}
   </section>
-  <section class="panel ostep ${done.fuel?'done':''}" id="ofps-fuel">${stepH('fuel','U letadla: palivo a security search','Stav paliva před odletem, security search a předletová prohlídka. Potvrzením se let založí v ATL – firma vidí, že security je hotová.')}
+  <section class="panel ostep ${done.fuel?'done':''}" id="ofps-fuel">${stepH('fuel','Palivo před odletem')}
     ${fuelStep}
   </section>
   <section class="panel ostep ${done.perf?'done':''}" id="ofps-perf">${stepH('perf','Performance')}
@@ -1126,6 +1168,9 @@ function xget(o){return k=>{
   if(k==='pic')return ofpCrew(o).pic;
   if(k==='sic')return ofpCrew(o).sic||'-';
   if(k==='sicTxt')return ofpCrew(o).sicTxt||'';
+  if(k==='fuelUp')return ofpVal(o,'f_up');
+  if(k==='fuelBlk')return ofpVal(o,'f_blk');
+  if(k==='fuelMin')return ofpVal(o,'f_min')||(o.fuel&&o.fuel.rampMreq!=null?String(o.fuel.rampMreq):'');
   return ofpVal(o,'x_'+k)}}
 // best guess of today's crew of an aircraft – only a pre-selection, always confirmed by the crew
 function crewGuess(acId){
@@ -1225,6 +1270,7 @@ function ofpMissing(o){
   let ato=0,fu=0;W.forEach((p,i)=>{if(p.rvsm||skip.has(i)||i===0)return;if(parseHM(ofpVal(o,'w'+i+'_ato'))==null)ato++;if(num(ofpVal(o,'w'+i+'_fuel'))==null)fu++});
   if(ato)m.push(`ATO u ${ato} bodů`);if(fu)m.push(`palivo u ${fu} bodů`);
   if(!ofpCrew(o).pic)m.push('posádka (PIC)');
+  if(!v('f_blk')&&!(o.leg&&o.leg.fuelBlk!=null))m.push('palivo před odletem');
   if(v('dv')&&!v('dv_start'))m.push('začátek divertu');
   if(v('dv')&&divMode(o)==='x'&&!/^[A-Z]{4}$/.test(divTo(o)))m.push('letiště divertu (ICAO)');
   for(const x of ofpOver(o))m.push('nad limitem: '+x);
@@ -1282,7 +1328,7 @@ function openAtlConfirm(id){
       <dt>Časy (UTC)</dt><dd class="mono">off-block ${esc(p.out)} · vzlet ${esc(p.off)} · přistání ${esc(p.on)} · on-block ${esc(p.in)}</dd>
       <dt>Block / flight</dt><dd class="mono"><b>${hm(dur(p.out,p.in))}</b> / <b>${hm(dur(p.off,p.on))}</b></dd>
       <dt>Přistání</dt><dd>${esc(p.ldg)} × · ${esc(p.app)}</dd>
-      <dt>Palivo (lbs)</dt><dd class="mono">odlet ${fmtN(l.fuelBlk)} · po přistání ${fmtN(p.fuelRem)} · spáleno ${fmtN(p.fuelBurn)}${o.fuel&&o.fuel.usedCalc?` <span class="muted">(plán ${fmtN(o.fuel.usedCalc)})</span>`:''}</dd>
+      <dt>Palivo</dt><dd class="mono">natankováno ${fmtN(p.fuelUp??l.fuelUp)} L · odlet ${fmtN(p.fuelBlk??l.fuelBlk)} lbs · po přistání ${fmtN(p.fuelRem)} · spáleno ${fmtN(p.fuelBurn)}${o.fuel&&o.fuel.usedCalc?` <span class="muted">(plán ${fmtN(o.fuel.usedCalc)})</span>`:''}</dd>
       <dt>Posádka</dt><dd>PIC <b>${esc(nm(p.pic))}</b> · SIC ${esc(sicN)}${pfN?` · PF ${esc(pfN)}`:''}</dd>
       <dt>Závady</dt><dd>${dfs.length?dfs.map((d,k)=>`<b>${esc(d.text)}</b>${dfr[k]?` – odklad MEL ${esc(dfr[k].melItem)} kat. ${esc(dfr[k].cat)}`:''}`).join('<br>'):'NIL'}</dd></dl>
     ${(()=>{const wv=Array.isArray(r.warn)?r.warn.filter(Boolean).join(' '):(r.warn||'');return wv?`<div class="warnline caution">${esc(wv)}</div>`:''})()}
@@ -1670,11 +1716,13 @@ function readClose(get,l){
   const twarn=checkTimes(l.acId,l.legId,{date,out:t.out,in:t.in},true);
   const ldg=parseInt(get('ldg')||'1',10);if(!(ldg>=1&&ldg<=50))fail('Počet přistání musí být alespoň 1.');
   const app=readApp(get);
-  const lf=readLandFuel(get,l);
+  const gU=get('fuelUp'),gB=get('fuelBlk');let fuel=null;
+  if((gU!=null&&gU!=='')||(gB!=null&&gB!==''))fuel=readFuel(get);else if(l.fuelBlk==null)fail('Doplňte palivo před odletem – natankováno (L), na odlet a minimum (lbs).');
+  const lf=readLandFuel(get,fuel?Object.assign({},l,fuel):l);
   const defOn=!!get('defOn'),defText=String(get('defText')||'').trim(),defMel=!!get('defMel'),defItem=String(get('defItem')||'').trim(),defCat=get('defCat')||'C';
   if(defOn&&defText.length<3)fail('Popište závadu, nebo zvolte „Žádné“.');
   if(defOn&&defMel&&!defItem)fail('U odkladu dle MEL doplňte položku MEL.');
-  const items=[['leg.sign',{legId:l.legId,acId:l.acId,date,pf,kind:l.kind||'CAT',fno:l.fno||'',from:l.from,to,out:t.out,off:t.off,on:t.on,in:t.in,ldg,app,pic:cPic,sic:cSic,sicTxt:cSicTxt,fuelRem:lf.fuelRem,fuelBurn:lf.fuelBurn,oil:get('oil')||'',rem:'',nil:!defOn,paper:null}]];
+  const items=[['leg.sign',{legId:l.legId,acId:l.acId,date,pf,kind:l.kind||'CAT',fno:l.fno||'',from:l.from,to,out:t.out,off:t.off,on:t.on,in:t.in,ldg,app,pic:cPic,sic:cSic,sicTxt:cSicTxt,...(fuel||{}),fuelRem:lf.fuelRem,fuelBurn:lf.fuelBurn,oil:get('oil')||'',rem:'',nil:!defOn,paper:null}]];
   if(defOn){const defId=rid('def');items.push(['defect.report',{defId,acId:l.acId,legId:l.legId,date,text:defText,src:'crew'}]);
     if(defMel)items.push(['defect.defer',{defId,melItem:defItem,cat:defCat,due:addDays(date,MELDAYS[defCat]),procO:true,procM:false,placard:true,rem:''}])}
   return {items,to,warn:twarn};
@@ -2492,6 +2540,7 @@ document.addEventListener('click',e=>{
     case 'pick-to':{UI.draft.to=id;saveDraft();const el=document.getElementById('c-to');if(el)el.value=id;crewLive();const o=document.getElementById('c-out');if(o&&!o.value)o.focus();break}
     case 'ldg':{const el=document.getElementById('c-ldg');const n=Math.min(20,Math.max(1,(parseInt(el&&el.value,10)||1)+parseInt(id,10)));UI.draft.ldg=String(n);saveDraft();if(el)el.value=n;break}
     case 'crew-start':crewStart();break;
+    case 'ofp-sec':ofpSecSign(id);break;
     case 'crew-close':crewClose();break;
     case 'cdate-edit':UI.draft.cdateEdit=true;saveDraft();render();break;
     case 'pf':UI.draft.pf=id;saveDraft();render();break;

@@ -1,0 +1,39 @@
+eTechLog – změna Z-013
+Verze: 0.6.0 (navazuje na Z-012 / 0.5.3)
+Datum: 2026-11-10
+
+DŮLEŽITÉ – nahrajte všechny soubory ze zipu
+Rozbitý vzhled záložek byl způsoben tím, že na serveru zůstal app.css ze starší verze (styly záložek byly
+ve změně Z-011). Od této změny obsahuje každý zip celou sadu souborů aplikace a aplikace sama upozorní
+„Neúplná aktualizace“, pokud se app.css a app.js liší verzí.
+
+Co se mění
+- Security search je v OFP úplně nahoře, samostatně: výsledek + předletová prohlídka →
+  „Podepsat a odeslat security search“. Tím se let založí v ATL (firma vidí security). Pak z karty
+  zůstane jeden řádek (čas, výsledek, kdo, odesláno / čeká na signál) a posádka pracuje jen v OFP.
+- Palivo před odletem je samostatný krok OFP (Před letem → 2): natankováno (L), na odlet (lbs),
+  minimum (předvyplněné MREQ z OFP). Jde upravit až do uzavření letu; do ATL se zapíše při uzavření
+  (v kroku 2/2 záznamu v ATL je vidět).
+- Kroky: Před letem 1 Posádka a kontrola OFP · 2 Palivo · 3 Performance
+         Let 4 Před odletem · 5 Odlet a trať · 6 Přílet
+         Přistání a uzavření 7
+- Let bez OFP (přelet) funguje beze změny – palivo a security se zadávají při zahájení.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-013.txt) nahrát do kořene repozitáře eatl. config.js se nemění.
+
+Na co se podívat při testu
+- Záložky Před letem / Let / Přistání a uzavření mají opět správný vzhled.
+- Security nahoře → po odeslání jeden řádek; palivo upravit po odeslání security; v kroku 2/2 uzavření je palivo.
+
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js
