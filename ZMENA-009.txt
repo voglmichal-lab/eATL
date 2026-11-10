@@ -1,0 +1,33 @@
+eTechLog – změna Z-009
+Verze: 0.5.0 (navazuje na Z-008 / 0.4.3)
+Datum: 2026-11-10
+
+Co se mění
+- Přihlášení na iPadu: letadlo → „Kdo jste?“ → PIN. Posádka se při přihlášení už nevybírá.
+- Úvodní obrazovka: na prvním místě OFP (Nahrát OFP, Otevřít OFP). „Let bez OFP“ zůstává jako záloha.
+- OFP má tři záložky:
+  1 Před letem – posádka, plán a palivo z OFP, clearance, ATIS, výškoměry, vzletová data; na konci
+    security search, palivo, předletová prohlídka a podpis „Začít let“ (let se založí v ATL).
+  2 Let – off-block, vzlet, navigační log, divert.
+  3 Přílet a uzavření – přistávací data, časy, palivo, přiblížení, PF, závady, „Uzavřít OFP a přenést do ATL“.
+- Posádka: předvolba podle předchozího letu toho dne na stejném letadle, jinak podle přihlášení na iPadech
+  letadla – vždy označená „zkontrolujte“. SIC, který není v seznamu, jde napsat (jméno, licence) – v ATL „ověřit“.
+- Let podepisuje jen PIC: pokud je na iPadu přihlášený někdo jiný, PIC zadá při uzavření svůj PIN
+  (platí v OFP, při uzavření bez OFP i v kanceláři).
+- Oprava: záznamy se stejným časem (na milisekundu) se řadí podle pořadí v zařízení.
+
+Nahrání
+- Obsah zipu (kromě ZMENA-009.txt) nahrát do kořene repozitáře eatl. config.js se nemění.
+
+Na co se podívat při testu
+- Přihlásit se na iPadu, nahrát OFP, projít záložky Před letem → Let → Přílet a uzavření.
+- Druhý let téhož dne: posádka se předvyplní z prvního letu.
+- Přihlásit se jako SIC a uzavřít let – musí chtít PIN kapitána.
+- SIC „není v seznamu – napsat“ → v ATL štítek „ověřit“.
+
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  version.js

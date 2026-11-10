@@ -332,3 +332,13 @@ table.defrect td{vertical-align:top}
 table.defrect td:nth-child(2),table.defrect td:nth-child(3){width:45%}
 table.defrect small{color:var(--muted)}
 table.defrect tr.open td:nth-child(3){background:var(--warn-soft)}
+
+/* OFP phases */
+.phase-tabs{position:sticky;top:0;z-index:5;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 0;background:var(--bg)}
+.phase-tabs .ph{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:600 1rem/1.1 var(--f-display);letter-spacing:.02em;padding:6px 8px;cursor:pointer}
+.phase-tabs .ph .ph-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--line);font-size:.86rem}
+.phase-tabs .ph.on{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.phase-tabs .ph.on .ph-n{background:var(--accent);color:var(--accent-ink)}
+.phase-tabs .ph.done .ph-n{background:var(--ok);color:#fff}
+.ofp section[data-ph]{display:grid;gap:16px}
+.ofp section[data-ph][hidden]{display:none}

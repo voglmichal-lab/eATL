@@ -62,6 +62,22 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
 - **Správa → OFP – předvyplnění a limity**: výchozí hodnoty polí (např. Flaps 15, VFTO/VFS 160) a maxima (např. hmotnosti), i jen pro určitý typ letadla. Předvyplnění se uloží do OFP při nahrání.
 - **DIVERT**: v OFP tlačítko pod navigačním logem otevře route to alternate s ETO od začátku divertu; letiště přistání se do ATL přenese jako alternate.
 
+## Let na iPadu – postup
+1. **Přihlášení**: letadlo (iPad si ho pamatuje) → *Kdo jste?* → PIN. Přihlašuje se jen ten, kdo s iPadem pracuje.
+2. **Nahrát OFP** (PDF z NAVsystemu) → *Otevřít OFP*.
+3. OFP má tři záložky:
+   - **Před letem** – posádka (PIC, SIC, palubní průvodčí), plán a palivo z OFP, clearance, ATIS, výškoměry, vzletová data,
+     a na konci security search, palivo a podpis **Začít let** (let se založí v ATL, firma vidí security).
+   - **Let** – off-block, vzlet, navigační log, divert.
+   - **Přílet a uzavření** – přistávací data, časy, palivo, přiblížení, PF, závady → **Uzavřít OFP a přenést do ATL**.
+4. **Let podepisuje jen PIC.** Když je na iPadu přihlášený někdo jiný, PIC zadá svůj PIN při uzavření.
+
+Posádka se předvolí podle předchozího letu toho dne na stejném letadle, jinak podle přihlášení na iPadech letadla –
+vždy jen jako návrh ke kontrole. PIC se vybírá jen ze seznamu; SIC, který v systému není, jde napsat (jméno, licence)
+a v ATL je označený „ověřit“ pro CAMO. Palubní průvodčí se zakládají s rolí *Palubní průvodčí* (bez PINu).
+
+*Let bez OFP* (přelet, OFP nejde nahrát) zůstává jako záloha na úvodní obrazovce.
+
 ## Závady v ATL
 Na stránce deníku je u každé závady vedle sebe její odstranění (CRS) nebo odklad, i když proběhlo jiný den.
 

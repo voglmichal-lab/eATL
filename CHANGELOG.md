@@ -12,3 +12,5 @@ Zip změny obsahuje jen změněné soubory ve správných složkách a popis `ZM
 | Z-005 | 0.3.2 | 2026-11-09 | Offline start: odolná instalace, upozornění na Safari, stav „Spuštění bez signálu“. |
 | Z-006 | 0.4.0 | 2026-11-09 | Předání dat mezi iPady (QR kód, soubor/AirDrop); PDF z OFP pro tisk a archiv. |
 | Z-007 | 0.4.2 | 2026-11-09 | OFP: předvyplnění a limity polí v nastavení, zvýrazněný emergency return, divert (route to alternate). ATL: odstranění závady vedle závady na stránce letu. (Verze 0.4.1 nebyla dodána samostatně.) |
+| Z-008 | 0.4.3 | 2026-11-09 | Posádka v OFP (PIC, SIC, palubní průvodčí – nepovinně) s přenosem do ATL při uzavření; výběr PIC/SIC i při zahájení letu na iPadu; role Palubní průvodčí bez PINu. |
+| Z-009 | 0.5.0 | 2026-11-10 | Let řízený z OFP: přihlášení jednoho uživatele na iPad, OFP ve třech záložkách (Před letem / Let / Přílet a uzavření), zahájení letu v OFP, posádka s předvolbou, SIC rukou s ověřením CAMO, let podepisuje jen PIC (PIN PIC při uzavření). Opraveno řazení záznamů se stejným časem. |
