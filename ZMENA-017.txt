@@ -1,0 +1,24 @@
+eTechLog – změna Z-017
+Verze: 0.6.4 (navazuje na Z-016 / 0.6.3)
+Datum: 2026-11-10
+
+Co se mění
+- Krok 1 Posádka: místo výběru „Pilot Flying“ je pod kapitánem i druhým pilotem zaškrtávací pole „PF“.
+  Zaškrtnout jde vždy jen jedno; u letu bez druhého pilota je PF automaticky kapitán.
+- Shrnutí letu: posádka pod sebou (PIC, SIC, palubní průvodčí), vpravo u pilotů pole „PF“ – jde opravit.
+  Když PF chybí, je to pod posádkou červeně připomenuté.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-017.txt) do kořene repozitáře eatl. config.js se nemění.
+
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

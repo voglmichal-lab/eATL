@@ -945,8 +945,9 @@ function viewOfp(o,u){
   // one page, top to bottom in the order of the flight: crew and OFP check → fuel and security at the aircraft →
   // performance → before departure → departure and route → arrival → landing and closing
   const val2=k=>ofpVal(o,k);const cr=ofpCrew(o);
-  const done={crew:!!(cr.pic&&o.signed),land:!!(val2('x_on')&&val2('x_in')),fuel:!!(val2('f_blk')||(l&&l.fuelBlk!=null)),perf:!!(val2('to_w')&&val2('v1')&&val2('v2')),dep:!!((val2('atisDep')||val2('clr'))&&val2('rg_lh')),
-    route:!!((l&&parseHM(l.off)!=null)||val2('x_off')),arr:!!((val2('ld_w')||val2('vref'))&&val2('x_on')&&val2('x_in')),close:!!o.closed};
+  const done={crew:!!(cr.pic&&o.signed),land:!!(val2('x_on')&&val2('x_in')),fuel:!!(val2('f_blk')||(l&&l.fuelBlk!=null)),perf:!!(val2('to_w')&&val2('v1')&&val2('v2')),dep:!!(val2('atisDep')&&val2('clr')&&val2('rg_lh')&&val2('rg_rh')&&(val2('nonRvsm')||(val2('re_lh')&&val2('re_rh')))),
+    // the route is done when the flight is down: landing time, ATO at destination, or closed in the ATL
+    route:!!(((l&&parseHM(l.off)!=null)||val2('x_off'))&&(val2('x_on')||(o.wpts&&o.wpts.length&&parseHM(val2('w'+(o.wpts.length-1)+'_ato'))!=null)||(l&&l.state==='closed'))),arr:!!((val2('ld_w')||val2('vref'))&&val2('x_on')&&val2('x_in')),close:!!o.closed};
   let n=0;const stepH=(key,title,sub)=>{n++;return `<div class="ostep-h"><span class="ostep-n">${n}</span><div style="flex:1"><h2>${title}</h2>${sub?`<p class="muted">${sub}</p>`:''}</div>${done[key]?'<span class="ann ok">hotovo</span>':''}</div>`};
   const ph=ofpPhase(o);const sec=(k,html)=>`<div class="ophase" data-ph="${k}" ${ph===k?'':'hidden'}>${html}</div>`;
   const fUp=val2('f_up'),fBlk=val2('f_blk'),fMin=val2('f_min')||(f.rampMreq!=null?String(f.rampMreq):'');
@@ -1206,9 +1207,8 @@ function ofpCrewPanel(o,LK){const c=ofpCrew(o);const l=o.leg;
   const changed=l&&l.state==='closed'&&(c.pic!==l.pic||(c.sic||'')!==(l.sic||''));
   return `${c.guess&&!LK?`<div class="warnline caution" style="margin:0">Posádka předvolena podle: ${esc(c.guess)}. Zkontrolujte, kdo je PIC.</div>`:''}
     <div class="fgrid">
-      <label class="fld"><span>Kapitán (PIC)</span><select data-of="c_pic" ${LK?'disabled':''}><option value="">–</option>${opt(crewOpts(false),c.pic)}</select></label>
-      <label class="fld"><span>Druhý pilot (SIC)</span><select data-of="c_sic" ${LK?'disabled':''}><option value="">–</option>${opt(crewOpts(false).filter(x=>x[0]!==c.pic),sicCur)}<option value="-" ${sicCur==='-'?'selected':''}>bez druhého pilota</option><option value="?" ${sicCur==='?'?'selected':''}>Není v seznamu</option></select></label>
-      ${ofpPfField(o)}
+      <div class="fld"><span>Kapitán (PIC)</span><select data-of="c_pic" ${LK?'disabled':''}><option value="">–</option>${opt(crewOpts(false),c.pic)}</select>${ofpPfTog(o,'pic','crew')}</div>
+      <div class="fld"><span>Druhý pilot (SIC)</span><select data-of="c_sic" ${LK?'disabled':''}><option value="">–</option>${opt(crewOpts(false).filter(x=>x[0]!==c.pic),sicCur)}<option value="-" ${sicCur==='-'?'selected':''}>bez druhého pilota</option><option value="?" ${sicCur==='?'?'selected':''}>Není v seznamu</option></select>${ofpPfTog(o,'sic','crew')}</div>
       <label class="fld"><span>Palubní průvodčí (nepovinné)</span><select data-of="c_ca" ${LK?'disabled':''}><option value="">–</option><option value="-" ${caCur==='-'?'selected':''}>bez palubní průvodčí</option>${opt(cabinOpts(),caCur)}<option value="?" ${caCur==='?'?'selected':''}>Není v seznamu</option></select></label>
     </div>
     <div class="fgrid">
@@ -1287,6 +1287,9 @@ function ofpMissing(o){
 }
 function ofpLandTo(o){const l=o.leg;return String(ofpVal(o,'x_cto')||(ofpVal(o,'dv')?divTo(o):(l?l.to:o.des))||'').toUpperCase()}
 function ofpIsDivert(o){const pl=o.leg?o.leg.to:o.des;const t=ofpLandTo(o);return !!(ofpVal(o,'dv')||(t&&pl&&t!==pl))}
+function ofpPfTog(o,role,grp){const oc=ofpCrew(o);const hasSic=!!(oc.sic||oc.sicTxt);const LK=!!(o.closed||o.void);
+  if(role==='sic'&&!hasSic)return '';const cur=hasSic?ofpVal(o,'x_pf'):'pic';
+  return `<label class="pf-tog"><input type="radio" name="pf-${grp}-${esc(o.ofpId)}" data-of="x_pf" value="${role}" ${cur===role?'checked':''} ${LK||!hasSic?'disabled':''}><span>PF</span></label>`}
 function ofpPfField(o){const oc=ofpCrew(o);const pic=S.users[oc.pic],sic=oc.sic&&S.users[oc.sic];const v2=ofpVal(o,'x_pf');const LK=!!(o.closed||o.void);
   if(!sic&&!oc.sicTxt)return `<div class="fld"><span>Pilot Flying</span><b>${esc(pic?pic.name:'PIC')}</b></div>`;
   return `<label class="fld"><span>Pilot Flying</span><select data-of="x_pf" ${LK?'disabled':''}><option value="">– vyberte –</option><option value="pic" ${v2==='pic'?'selected':''}>${esc(pic?pic.name:'PIC')}</option><option value="sic" ${v2==='sic'?'selected':''}>${esc(sic?sic.name:oc.sicTxt)}</option></select></label>`}
@@ -1331,9 +1334,15 @@ function ofpClosePanel(o,u,atl){
       <p class="muted" style="font-size:.86rem;margin:4px 0 0">Plán: ramp EST ${fmtN(f.rampEst)} · used CALC ${fmtN(f.usedCalc)} lbs${burn!=null&&f.usedCalc?` · spáleno <b style="color:${burn>f.usedCalc?'var(--caution)':'var(--ok)'}">${burn>f.usedCalc?'+':''}${fmtN(burn-f.usedCalc)}</b> proti plánu`:''}</p></div>
     <dl class="kvgrid">
       <dt>Přiblížení · přistání</dt><dd>${esc(val('x_app')==='OTHER'?val('x_appOther'):val('x_app')||'–')} · ${esc(val('x_ldg')||'1')}× ${go('flight','arr')}</dd>
-      <dt>Posádka</dt><dd>PIC <b>${esc(pic?pic.name:'–')}</b> · SIC ${esc(sic?sic.name:oc.sicTxt?oc.sicTxt+' (ověřit)':'–')}${oc.caN?' · CA '+esc(oc.caN):''} · PF <b ${pfN?'':'style="color:var(--warn)"'}>${esc(pfN||'nevybrán')}</b> ${go('pre','crew')}</dd></dl>
+</dl>
+    <div><div class="panel-head" style="margin:0"><p class="label">Posádka</p>${go('pre','crew')}</div>
+      <table class="plain crew-sum"><tbody>
+        <tr><td class="muted">PIC</td><td><b>${esc(pic?pic.name:'– nevybrán')}</b></td><td class="r">${ofpPfTog(o,'pic','sum')}</td></tr>
+        <tr><td class="muted">SIC</td><td>${esc(sic?sic.name:oc.sicTxt?oc.sicTxt:'–')}${!sic&&oc.sicTxt?' <span class="ann caution" style="font-size:.62rem">ověřit</span>':''}</td><td class="r">${ofpPfTog(o,'sic','sum')}</td></tr>
+        ${oc.caN?`<tr><td class="muted">CA</td><td>${esc(oc.caN)}</td><td></td></tr>`:''}
+      </tbody></table>
+      ${(sic||oc.sicTxt)&&!pfN?'<p style="color:var(--warn);margin:4px 0 0;font-size:.9rem">Označte, kdo byl pilot letící (PF).</p>':''}</div>
     <div class="fgrid">
-      ${ofpPfField(o)}
       <label class="fld"><span>Olej doplněn L/P (qt)</span><input type="text" data-of="x_oil" value="${esc(val('x_oil'))}" placeholder="0 / 0"></label></div>
     <label class="fld"><span>Závada (prázdné = NIL)</span><textarea data-of="x_defText" placeholder="Jen pokud se během letu objevila závada">${esc(val('x_defText'))}</textarea></label>
     ${miss.length?`<div class="warnline caution" style="margin:0"><b>V OFP chybí:</b> ${esc(miss.join(', '))}. Uzavřít jde i tak – zůstane to zaznamenané.</div>`:''}

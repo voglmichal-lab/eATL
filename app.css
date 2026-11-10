@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.6.2"}
+:root{--etl-build:"0.6.4"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -365,3 +365,13 @@ table.defrect tr.open td:nth-child(3){background:var(--warn-soft)}
 .sec-line .label{margin:0}
 .divert-banner{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;padding:12px 14px;border:2px solid var(--warn);border-radius:8px;background:var(--warn-soft);font-size:1.1rem}
 .divert-banner b{color:var(--warn);letter-spacing:.06em}
+.pf-tog{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font:600 .9rem/1 var(--f-display);letter-spacing:.04em;cursor:pointer;user-select:none}
+.pf-tog input{width:22px;height:22px;margin:0;accent-color:var(--accent)}
+.pf-tog input:disabled+span{color:var(--muted)}
+table.crew-sum{width:auto;min-width:min(100%,420px)}
+table.crew-sum td{padding:8px 14px 8px 0;vertical-align:middle}
+table.crew-sum .pf-tog{margin:0}
+.pf-tog input{appearance:none;-webkit-appearance:none;display:inline-grid;place-items:center;width:26px;height:26px;border:2px solid var(--line-strong);border-radius:6px;background:var(--surface)}
+.pf-tog input:checked{background:var(--accent);border-color:var(--accent)}
+.pf-tog input:checked::after{content:'';width:7px;height:13px;border:solid var(--accent-ink);border-width:0 3px 3px 0;transform:translateY(-2px) rotate(45deg)}
+.pf-tog input:disabled{opacity:.7}
