@@ -69,8 +69,8 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
 3. **Security search** je v OFP úplně nahoře: výsledek (+ předletová prohlídka) → *Podepsat a odeslat security search*.
    Tím se let založí v ATL a firma vidí, že security je hotová. Pak je z karty jeden řádek a posádka pracuje jen v OFP.
 4. OFP je rozdělené podle fáze letu (otevře se na té aktuální); kroky jsou očíslované, hotový krok má štítek „hotovo“:
-   - **Před letem**: 1 Posádka a kontrola OFP · 2 Palivo před odletem (natankováno, na odlet, minimum – jde upravit až do
-     uzavření letu) · 3 Performance.
+   - **Před letem**: 1 Posádka a kontrola OFP · 2 Palivo a olej před odletem (natankováno, na odlet, minimum; olej
+     doplněný před letem v litrech, motor L a P – vše jde upravit až do uzavření letu) · 3 Performance.
    - **Let**: 4 Před odletem (ATIS, clearance, výškoměry) · 5 Odlet a trať (navigační log, divert) ·
      6 Přílet a přistání (ATIS ARR, přistávací data, čas přistání, on-block, palivo po přistání, přiblížení, počet přistání).
    - **Shrnutí a uzavření**: 7 Shrnutí letu – časy odletu a příletu i palivo jdou opravit, block/flight, posádka, PF,
@@ -84,6 +84,16 @@ vždy jen jako návrh ke kontrole. PIC se vybírá jen ze seznamu; SIC, který v
 a v ATL je označený „ověřit“ pro CAMO – v seznamu volba *Není v seznamu*, pak se objeví pole pro jméno (stejně u palubní průvodčí). Palubní průvodčí se zakládají s rolí *Palubní průvodčí* (bez PINu).
 
 *Let bez OFP* (přelet, OFP nejde nahrát) zůstává jako záloha na úvodní obrazovce.
+
+## Olej
+Olej se zapisuje v litrech, zvlášť motor L a P (APU se nepíše). V ATL patří k letu, před kterým byl doplněn.
+- **Posádka mezi lety** napíše doplněný olej do kroku 2 *Palivo a olej před odletem* dalšího letu.
+- **Mechanik na bázi** po letu: na iPadu letadla na úvodní obrazovce *Mechanik na bázi – doplnění oleje* → jméno a PIN →
+  litry L / P → podpis (z webu: letadlo → *Doplnění oleje*). Olej zapsaný při prohlídce se zapíše stejně.
+  Posádka dalšího letu ho vidí v přehledu letadla a na kartě security search a má ho **předvyplněný** v kroku 2
+  („Předvyplněno – doplnil(a) …“). Když posádka doplní ještě sama, přičte to. Při uzavření letu se zápis mechanika
+  připojí k tomuto letu (v detailu letu „z toho na zemi: …“) a dalšímu letu už se nenabízí.
+- Když posádka zapíše méně, než doplnil mechanik, potvrzení před podpisem na to upozorní.
 
 ## Závady v ATL
 Na stránce deníku je u každé závady vedle sebe její odstranění (CRS) nebo odklad, i když proběhlo jiný den.

@@ -1,0 +1,29 @@
+eTechLog – změna Z-018
+Verze: 0.6.5 (navazuje na Z-017 / 0.6.4)
+Datum: 2026-11-10
+
+Co se mění
+- Olej se zapisuje v litrech, zvlášť motor L a P (APU se nepíše). V ATL patří k letu, před kterým byl doplněn.
+- OFP, krok 2 se jmenuje „Palivo a olej před odletem“: pole Motor L / Motor P (litry). Ve Shrnutí jde olej opravit.
+- Mechanik na bázi zapíše doplnění oleje po letu:
+  iPad – úvodní obrazovka „Mechanik na bázi – doplnění oleje“ → jméno a PIN → litry L / P → podpis;
+  web – letadlo → „Doplnění oleje“. Olej zapsaný při prohlídce se zapíše stejně.
+- Posádka dalšího letu to vidí v přehledu letadla a na kartě security search a v kroku 2 má olej předvyplněný
+  („Předvyplněno – doplnil(a) …“). Pokud doplní i posádka, přičte. Při uzavření letu se zápis mechanika připojí
+  k tomuto letu a dalšímu letu se už nenabízí. Zapíše-li posádka méně, než doplnil mechanik, potvrzení upozorní.
+- Olej je vidět v řádku ATL (pod palivem), v potvrzení před podpisem, v detailu letu (včetně „z toho na zemi“),
+  v PDF z OFP a v CSV exportu.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-018.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js
