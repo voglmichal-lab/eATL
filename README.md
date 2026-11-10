@@ -65,16 +65,22 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
 ## Let na iPadu – postup
 1. **Přihlášení**: letadlo (iPad si ho pamatuje) → *Kdo jste?* → PIN. Přihlašuje se jen ten, kdo s iPadem pracuje.
 2. **Nahrát OFP** (PDF z NAVsystemu) → *Otevřít OFP*.
-3. OFP má tři záložky:
-   - **Před letem** – posádka (PIC, SIC, palubní průvodčí), plán a palivo z OFP, clearance, ATIS, výškoměry, vzletová data,
-     a na konci security search, palivo a podpis **Začít let** (let se založí v ATL, firma vidí security).
-   - **Let** – off-block, vzlet, navigační log, divert.
-   - **Přílet a uzavření** – přistávací data, časy, palivo, přiblížení, PF, závady → **Uzavřít OFP a přenést do ATL**.
+3. OFP je jedna stránka s očíslovanými kroky v pořadí letu (hotový krok má ✓):
+   1. **Posádka a kontrola OFP** – PIC, SIC, palubní průvodčí; plán, trať, palivo; „OFP zkontrolováno – podpis velitele“.
+   2. **U letadla: palivo a security search** – natankováno, palivo na odlet, security, předletová prohlídka →
+      *Potvrdit palivo a security – zahájit let* (let se založí v ATL).
+   3. **Performance** – vzletová data, emergency return.
+   4. **Před odletem** – ATIS, clearance, výškoměry on ground / RVSM.
+   5. **Odlet a trať** – off-block, vzlet, navigační log, divert.
+   6. **Přílet** – ATIS ARR, přistávací data.
+   7. **Přistání a uzavření** – časy, palivo, přiblížení, PF, závady → *Uzavřít OFP a přenést do ATL*:
+      krok 1/2 uzavření OFP, krok 2/2 kontrola záznamu v ATL a podpis kapitána.
+   Při otevření OFP aplikace skočí na první nehotový krok.
 4. **Let podepisuje jen PIC.** Když je na iPadu přihlášený někdo jiný, PIC zadá svůj PIN při uzavření.
 
 Posádka se předvolí podle předchozího letu toho dne na stejném letadle, jinak podle přihlášení na iPadech letadla –
 vždy jen jako návrh ke kontrole. PIC se vybírá jen ze seznamu; SIC, který v systému není, jde napsat (jméno, licence)
-a v ATL je označený „ověřit“ pro CAMO. Palubní průvodčí se zakládají s rolí *Palubní průvodčí* (bez PINu).
+a v ATL je označený „ověřit“ pro CAMO – v seznamu volba *Není v seznamu*, pak se objeví pole pro jméno (stejně u palubní průvodčí). Palubní průvodčí se zakládají s rolí *Palubní průvodčí* (bez PINu).
 
 *Let bez OFP* (přelet, OFP nejde nahrát) zůstává jako záloha na úvodní obrazovce.
 

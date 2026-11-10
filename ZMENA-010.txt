@@ -1,0 +1,33 @@
+eTechLog – změna Z-010
+Verze: 0.5.1 (navazuje na Z-009 / 0.5.0)
+Datum: 2026-11-10
+
+Co se mění
+- OFP už nemá záložky. Je to jedna stránka shora dolů, kroky očíslované v pořadí letu, hotový krok má ✓:
+  1 Posádka a kontrola OFP (posádka, plán, trať, palivo, „OFP zkontrolováno – podpis velitele“)
+  2 U letadla: palivo a security search → „Potvrdit palivo a security – zahájit let“ (let se založí v ATL)
+  3 Performance (vzletová data, emergency return)
+  4 Před odletem (ATIS, clearance, výškoměry on ground / RVSM)
+  5 Odlet a trať (off-block, vzlet, navigační log, divert)
+  6 Přílet (ATIS ARR, přistávací data)
+  7 Přistání a uzavření letu
+- Při otevření OFP aplikace skočí na první nehotový krok.
+- Uzavření ve dvou krocích: Krok 1/2 Uzavřít OFP → Krok 2/2 Záznam v ATL (náhled celého řádku ATL:
+  časy, block/flight, palivo, posádka, PF, závady) a podpis kapitána.
+- Posádka: pole pro ručně psané jméno SIC i palubní průvodčí je skryté; objeví se po volbě „Není v seznamu“.
+- Opravena hláška „Zahajte ho tlačítkem nahoře“ – teď odkazuje na krok U letadla.
+
+Nahrání
+- Obsah zipu (kromě ZMENA-010.txt) nahrát do kořene repozitáře eatl. config.js se nemění.
+
+Na co se podívat při testu
+- Projít jeden let celý shora dolů bez přepínání.
+- Uzavření: oba kroky, v kroku 2 zkontrolovat náhled záznamu v ATL.
+- SIC / palubní průvodčí „Není v seznamu“.
+
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  version.js
