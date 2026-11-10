@@ -60,22 +60,18 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
 
 ## OFP – předvyplnění, limity, divert
 - **Správa → OFP – předvyplnění a limity**: výchozí hodnoty polí (např. Flaps 15, VFTO/VFS 160) a maxima (např. hmotnosti), i jen pro určitý typ letadla. Předvyplnění se uloží do OFP při nahrání.
-- **DIVERT**: v OFP tlačítko pod navigačním logem otevře route to alternate s ETO od začátku divertu; letiště přistání se do ATL přenese jako alternate.
+- **DIVERT**: pod navigačním logem je tlačítko pro každé alternate z OFP (až dvě – každé má svou route to alternate s ETO od začátku divertu) a *DIVERT – jiné letiště* s ručním routingem (bod, čas přeletu, palivo). Letiště přistání se do ATL přenese jako letiště divertu.
 
 ## Let na iPadu – postup
 1. **Přihlášení**: letadlo (iPad si ho pamatuje) → *Kdo jste?* → PIN. Přihlašuje se jen ten, kdo s iPadem pracuje.
 2. **Nahrát OFP** (PDF z NAVsystemu) → *Otevřít OFP*.
-3. OFP je jedna stránka s očíslovanými kroky v pořadí letu (hotový krok má ✓):
-   1. **Posádka a kontrola OFP** – PIC, SIC, palubní průvodčí; plán, trať, palivo; „OFP zkontrolováno – podpis velitele“.
-   2. **U letadla: palivo a security search** – natankováno, palivo na odlet, security, předletová prohlídka →
-      *Potvrdit palivo a security – zahájit let* (let se založí v ATL).
-   3. **Performance** – vzletová data, emergency return.
-   4. **Před odletem** – ATIS, clearance, výškoměry on ground / RVSM.
-   5. **Odlet a trať** – off-block, vzlet, navigační log, divert.
-   6. **Přílet** – ATIS ARR, přistávací data.
-   7. **Přistání a uzavření** – časy, palivo, přiblížení, PF, závady → *Uzavřít OFP a přenést do ATL*:
-      krok 1/2 uzavření OFP, krok 2/2 kontrola záznamu v ATL a podpis kapitána.
-   Při otevření OFP aplikace skočí na první nehotový krok.
+3. OFP je rozdělené podle fáze letu – otevře se na té aktuální, kroky jsou očíslované a hotový krok je označený „hotovo“
+   (zůstává vidět):
+   - **Před letem**: 1 Posádka a kontrola OFP · 2 U letadla: palivo a security search (*Potvrdit palivo a security –
+     zahájit let*, let se založí v ATL) · 3 Performance.
+   - **Let**: 4 Před odletem (ATIS, clearance, výškoměry) · 5 Odlet a trať (navigační log, divert) · 6 Přílet (ATIS ARR, přistávací data).
+   - **Přistání a uzavření**: 7 časy, palivo, přiblížení, PF, závady → *Uzavřít OFP a přenést do ATL*
+     (krok 1/2 uzavření OFP, krok 2/2 kontrola záznamu v ATL a podpis kapitána).
 4. **Let podepisuje jen PIC.** Když je na iPadu přihlášený někdo jiný, PIC zadá svůj PIN při uzavření.
 
 Posádka se předvolí podle předchozího letu toho dne na stejném letadle, jinak podle přihlášení na iPadech letadla –

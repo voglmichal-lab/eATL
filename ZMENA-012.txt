@@ -1,0 +1,21 @@
+eTechLog – změna Z-012
+Verze: 0.5.3 (navazuje na Z-011 / 0.5.2)
+Datum: 2026-11-10
+
+Co se mění
+- Krok 4 Před odletem (ATIS DEP, ATC clearance, kontrola výškoměrů on ground / RVSM) je nově v sekci Let,
+  před krokem Odlet a trať. Performance zůstávají v sekci Před letem.
+    Před letem: 1 Posádka a kontrola OFP · 2 U letadla: palivo a security search · 3 Performance
+    Let:        4 Před odletem · 5 Odlet a trať · 6 Přílet
+    Přistání a uzavření: 7
+- Po zahájení letu a vyplnění performance (TO weight, V1, V2) se OFP otevře rovnou na sekci Let;
+  sekce Před letem je pak označená „hotovo“.
+
+Nahrání
+- Obsah zipu (kromě ZMENA-012.txt) nahrát do kořene repozitáře eatl. config.js se nemění.
+
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.js
+  version.js
