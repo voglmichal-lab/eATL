@@ -1,0 +1,27 @@
+eTechLog – změna Z-015
+Verze: 0.6.2 (navazuje na Z-014 / 0.6.1)
+Datum: 2026-11-10
+
+Co se mění
+- Divert ve Shrnutí letu: červený pruh „DIVERT → LEGE místo plánovaného LEBL · začátek divertu“,
+  letiště přistání zvýrazněné. Divert je vidět i v okně podpisu a v ATL u letu štítek „DIVERT · plán LEBL“.
+- Palivo: u letu zahájeného dřívějším způsobem (palivo zapsané rovnou do letu) se natankováno / na odlet /
+  minimum ukazují v kroku 2 i ve shrnutí a jdou upravit. Krok 2 je vždy editovatelný.
+- Pilot Flying: nově i v kroku 1 Posádka (vybere se před letem); ve shrnutí je vždy vidět
+  (bez SIC = kapitán, jinak výběr) a v řádku Posádka.
+- Při divertu se do „V OFP chybí“ nepočítají body hlavní trati za posledním přeletěným bodem.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-015.txt) do kořene repozitáře eatl. config.js se nemění.
+
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

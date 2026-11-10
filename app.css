@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.6.1"}
+:root{--etl-build:"0.6.2"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -363,3 +363,5 @@ table.defrect tr.open td:nth-child(3){background:var(--warn-soft)}
 .sec-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:10px 14px;border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:8px;background:var(--surface)}
 .sec-line.found{border-left-color:var(--warn)}
 .sec-line .label{margin:0}
+.divert-banner{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;padding:12px 14px;border:2px solid var(--warn);border-radius:8px;background:var(--warn-soft);font-size:1.1rem}
+.divert-banner b{color:var(--warn);letter-spacing:.06em}
