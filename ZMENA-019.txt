@@ -1,0 +1,31 @@
+eTechLog – změna Z-019
+Verze: 0.6.6 (navazuje na Z-018 / 0.6.5)
+Datum: 2026-11-13
+
+Co se mění – prozatímní testovací režim: mazání záznamů
+- Zapnutí: Kancelář → Správa → „Testovací režim: mazání záznamů“ → Zapnout (PIN správce).
+  Na všech zařízeních pak svítí červený pruh TESTOVACÍ REŽIM. Mazat může jen správce v Kanceláři.
+- Jednotlivě: záložka „Mazání (test)“ u letadla – lety, OFP, závady, CRS, uzemnění, prohlídky, olej, security,
+  přihlášení. Také odkaz „… (test)“ v detailu letu, u OFP, v historii závady (celá / jen odstranění / jen odklad) a u CRS.
+  U letu se nabídnou související záznamy (OFP, závady z letu, CRS po letu, olej, předletová prohlídka) – dají se odškrtnout.
+- Hromadně (napsat SMAZAT + PIN): všechny záznamy jednoho letadla; všechny provozní záznamy (letadla, uživatelé
+  a nastavení zůstanou, nálet a cykly se vrátí na počáteční); „Začít úplně od nuly“ (vše včetně letadel a uživatelů –
+  zařízení se vrátí na první spuštění).
+- Smazání se rozešle na všechna zařízení. V Supabase se fyzicky nic nemaže; pro úplně prázdnou databázi postup v README
+  (truncate + „Vymazat data v tomto zařízení“).
+- Před ostrým provozem testovací režim vypnout.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-019.txt) do kořene repozitáře eatl. config.js se nemění.
+- Pokud máte v repozitáři soubor psycopg-3.3.8-py3-none-any.whl, můžete ho smazat (nepatří k aplikaci).
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

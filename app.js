@@ -104,8 +104,13 @@ function emit(items,asId){
 
 function rebuild(){
   // time, then for one device its own sequence (two records can share a millisecond), then the order inside one signature
-  const list=Object.values(EV).sort((a,b)=>a.at<b.at?-1:a.at>b.at?1:(a.dev&&a.dev===b.dev?(a.seq||0)-(b.seq||0):0)||((a.n||0)-(b.n||0))||(a.id<b.id?-1:1));
-  const s={ac:{},users:{},legs:{},defects:{},crs:[],daily:{},logins:{},oilAdds:{},grounds:[],secs:[],ofps:{},cfg:Object.assign({},CFG_DEFAULT),list,out:new Set(OUT)};
+  const all=Object.values(EV).sort((a,b)=>a.at<b.at?-1:a.at>b.at?1:(a.dev&&a.dev===b.dev?(a.seq||0)-(b.seq||0):0)||((a.n||0)-(b.n||0))||(a.id<b.id?-1:1));
+  // test mode: deleted records and everything before a reset are left out (the signatures stay in the log, so every device agrees)
+  let cutAll=-1,cutOps=-1;const dead=new Set();
+  all.forEach((e,i)=>{if(e.type==='rec.reset'){if(e.p&&e.p.scope==='all')cutAll=i;else cutOps=i}});
+  all.forEach((e,i)=>{if(e.type==='rec.del'&&i>cutAll)((e.p&&e.p.keys)||[]).forEach(k=>dead.add(k))});
+  const list=all.filter((e,i)=>!(i<cutAll||(i<cutOps&&!REC_CFG.has(e.type))||(dead.size&&evKeys(e).some(k=>dead.has(k)))));
+  const s={ac:{},users:{},legs:{},defects:{},crs:[],daily:{},logins:{},loginEv:[],oilAdds:{},grounds:[],secs:[],ofps:{},cfg:Object.assign({},CFG_DEFAULT),list,all,out:new Set(OUT)};
   for(const e of list){
     const p=e.p||{};const who={id:e.by,name:e.bn,at:e.at,ev:e.id,dev:e.dev};
     switch(e.type){
@@ -124,7 +129,7 @@ function rebuild(){
       case 'ac.ground':s.grounds.push(Object.assign({},p,who));break;
       case 'sec.sign':s.secs.push(Object.assign({},p,who));break;
       case 'cfg.set':Object.assign(s.cfg,p);s.cfgSet=who;break;
-      case 'crew.login':{const k=p.acId+'|'+p.date;const a=s.logins[k]||(s.logins[k]=[]);if(e.by&&!a.includes(e.by))a.push(e.by);break}
+      case 'crew.login':{const k=p.acId+'|'+p.date;const a=s.logins[k]||(s.logins[k]=[]);if(e.by&&!a.includes(e.by))a.push(e.by);s.loginEv.push(Object.assign({acId:p.acId,date:p.date},who));break}
       case 'ofp.import':if(!s.ofps[p.ofpId])s.ofps[p.ofpId]=Object.assign({},p.data,{ofpId:p.ofpId,acId:p.acId,file:p.file,imported:who,fill:{},defs:p.defs||null,signed:null,void:null});break;
       case 'ofp.fill':{const o=s.ofps[p.ofpId];if(o)Object.assign(o.fill,p.data);break}
       case 'ofp.sign':{const o=s.ofps[p.ofpId];if(o&&!o.signed)o.signed=who;break}
@@ -140,7 +145,16 @@ function rebuild(){
   s.liveList=s.acList.filter(a=>a.isLive);
   S=s;
   if(!UI.acId||!s.ac[UI.acId])UI.acId=s.acList[0]?s.acList[0].acId:null;
+  // a record that was just deleted must not stay open on screen
+  if(UI.ofpId&&!s.ofps[UI.ofpId])UI.ofpId=null;
+  if(UI.closeLeg&&!s.legs[UI.closeLeg])UI.closeLeg=null;
+  if(cutAll>=0&&BIND&&!s.ac[BIND]){BIND=null;store.set('etl.bind',null)}
 }
+const REC_CFG=new Set(['ac.upsert','user.upsert','cfg.set','rec.del','rec.reset']);
+// which record an event belongs to: deleting the record drops all its events
+function evKeys(e){const p=e.p||{},t=e.type||'',k=['ev:'+e.id];
+  if(t.startsWith('leg.'))k.push('leg:'+p.legId);else if(t.startsWith('defect.'))k.push('def:'+p.defId);else if(t==='crs.issue')k.push('crs:'+p.crsId);
+  else if(t.startsWith('ofp.'))k.push('ofp:'+p.ofpId);else if(t==='oil.add')k.push('oil:'+p.svcId);return k}
 
 function deriveAc(s,ac){
   const sk=l=>{const t=[l.out,l.std,l.sec&&l.sec.time].map(parseHM).find(x=>x!=null);return t==null?0:t};
@@ -364,7 +378,7 @@ function header(){
     <div class="brand"><span class="brand-mark">ATL</span><div><b>${S.cfg.opName?esc(S.cfg.opName)+' ':''}eTechLog</b><small>${crew&&bac?'iPad · '+esc(bac.reg):S.cfg.aoc?esc(S.cfg.aoc):'nenastaveno'} · testovací verze</small></div></div>
     <button class="pill" id="syncpill" data-act="sync-panel" aria-label="Stav synchronizace"></button>
     ${right}
-  </div></header>`;
+  </div></header>${testOn()?`<div class="testband">TESTOVACÍ REŽIM – záznamy jde mazat (Kancelář → Správa). Před ostrým provozem vypnout.</div>`:''}`;
 }
 
 let renderPending=false;
@@ -465,6 +479,7 @@ function renderApp(){
   const nOpen=ac.open.length,nDef=ac.deferred.length;
   const tabs=[['log','Technický deník'],['ofp','OFP'],['defects','Závady',nOpen+nDef,nOpen?'warn':nDef?'caution':''],['crs','Uvolnění'],['reports','Výkazy'],['search','Hledat'],['audit','Audit']];
   if(can.admin(u)){if(!setupState().done)tabs.unshift(['setup','Úvodní nastavení']);tabs.push(['admin','Správa'])}
+  if(canDel(u))tabs.push(['testdel','Mazání (test)','!','warn']);
   if(!ac.isLive&&['log','ofp','crs'].includes(UI.tab))UI.tab=can.admin(u)?'setup':'defects';
   if(!tabs.some(t=>t[0]===UI.tab))UI.tab='log';
   const tabHtml=`<div class="wrap"><div class="actions">${acts.join('')}</div>${oilPendingNote(ac.acId)}<nav class="tabs" role="tablist">${tabs.map(t=>`<button class="tab ${UI.tab===t[0]?'on':''}" role="tab" aria-selected="${UI.tab===t[0]}" data-act="tab" data-id="${t[0]}">${t[1]}${t[2]?`<span class="cnt ${t[3]||''}">${t[2]}</span>`:''}</button>`).join('')}</nav></div>`;
@@ -478,6 +493,7 @@ function renderApp(){
     case 'ofp':{const o=UI.ofpId&&ofpOf(UI.ofpId);view=o&&o.acId===ac.acId?`<div class="chips"><button class="btn" data-act="ofp-back">‹ Seznam OFP</button></div>${viewOfp(o,u)}`:viewOfpList(ac);break}
     case 'audit':view=viewAudit(ac);break;
     case 'admin':view=viewAdmin(u);break;
+    case 'testdel':view=viewTestDel(ac,u);break;
     case 'setup':view=viewSetup(u);break;
   }
   return fleet+tabHtml+`<div class="wrap view">${view}</div>`;
@@ -596,9 +612,9 @@ function viewCrs(ac,u){
   ac.defects.filter(d=>d.rect).forEach(d=>items.push({at:d.rect.at,kind:'rect',c:d}));
   items.sort((a,b)=>a.at<b.at?1:-1);
   const row=it=>{
-    if(it.kind==='crs')return `<div class="defect closed"><div class="stripe"></div><div class="body"><div class="top-row"><span class="ann ok">CRS</span><span class="mono">WO ${esc(it.c.wo||'–')}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(crsTitle(it.c))}</p>${it.c.wo?'<p class="meta">Rozsah a dílčí podpisy viz workpack '+esc(it.c.wo)+'</p>':''}<p class="meta">${esc(it.c.name)} · ${esc(it.c.licence||'–')} · ${esc(it.c.org||'')} · TTAF ${hm(it.c.acAir)} / ${esc(it.c.acCyc)} cyklů</p></div></div>`;
-    if(it.kind==='ground')return `<div class="defect open"><div class="stripe"></div><div class="body"><div class="top-row"><span class="ann warn">Uzemněno</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.reason)}</p><p class="meta">${esc(it.c.name)}${it.c.wo?' · WO '+esc(it.c.wo):''}</p></div></div>`;
-    return `<div class="defect closed"><div class="stripe"></div><div class="body"><div class="top-row"><span class="ann ok">CRS k závadě</span><span class="mono">${esc(it.c.no)}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.text)}</p><p class="meta">${esc(it.c.rect.action)} · ${esc(it.c.rect.name)} (${esc(it.c.rect.licence||'–')})</p></div></div>`;
+    if(it.kind==='crs')return `<div class="defect closed"><div class="stripe"></div><div class="body">${delLink('crs:'+it.c.crsId,'Smazat',true)}<div class="top-row"><span class="ann ok">CRS</span><span class="mono">WO ${esc(it.c.wo||'–')}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(crsTitle(it.c))}</p>${it.c.wo?'<p class="meta">Rozsah a dílčí podpisy viz workpack '+esc(it.c.wo)+'</p>':''}<p class="meta">${esc(it.c.name)} · ${esc(it.c.licence||'–')} · ${esc(it.c.org||'')} · TTAF ${hm(it.c.acAir)} / ${esc(it.c.acCyc)} cyklů</p></div></div>`;
+    if(it.kind==='ground')return `<div class="defect open"><div class="stripe"></div><div class="body">${delLink('ev:'+it.c.ev,'Smazat',true)}<div class="top-row"><span class="ann warn">Uzemněno</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.reason)}</p><p class="meta">${esc(it.c.name)}${it.c.wo?' · WO '+esc(it.c.wo):''}</p></div></div>`;
+    return `<div class="defect closed"><div class="stripe"></div><div class="body">${delLink('ev:'+it.c.rect.ev,'Smazat odstranění',true)}<div class="top-row"><span class="ann ok">CRS k závadě</span><span class="mono">${esc(it.c.no)}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.text)}</p><p class="meta">${esc(it.c.rect.action)} · ${esc(it.c.rect.name)} (${esc(it.c.rect.licence||'–')})</p></div></div>`;
   };
   return `<div class="panel"><div class="panel-head"><div><p class="label">Aktuální stav</p><h2>${esc(ac.reg)} · <span class="ann ${ac.status}">${STATUS_LABEL[ac.status]}</span></h2></div>${can.crs(u)?`<button class="btn primary" data-act="crs-form">${ICON.check}Vydat CRS</button>`:''}</div>
   <p class="muted">${ac.lastCrs?`Poslední samostatné CRS ${fmtTs(ac.lastCrs.at)} – ${esc(ac.lastCrs.name)}, WO ${esc(ac.lastCrs.wo||'–')}.`:'Zatím žádné samostatné CRS.'} Otevřené závady se uzavírají přes „Odstranit a uvolnit“ v záložce Závady, uzemnění ruší vydání CRS.</p></div>
@@ -618,6 +634,117 @@ function viewReports(ac){
   <p class="muted">Tohle je podklad, který dnes CAMO ručně přepisuje z papírových stránek. Zneplatněné lety se nepočítají.</p></div>${viewOil(ac)}`;
 }
 
+
+/* --- TEST MODE: delete records (temporary, for testing only – remove before live operation) ---
+   Nothing is erased from the log: a signed "rec.del" / "rec.reset" tells every device to leave those records out. */
+function testOn(){return !!(S&&S.cfg&&S.cfg.testDel)}
+function canDel(u){return testOn()&&mode()==='office'&&has(u,'admin')}
+function delLink(key,label,small){if(!canDel(me()))return '';return `<div class="del-test${small?' sm':''}"><button type="button" class="linkbtn" data-act="rec-del" data-id="${esc(key)}">${esc(label)} (test)</button></div>`}
+function recSplit(key){const i=key.indexOf(':');return [key.slice(0,i),key.slice(i+1)]}
+function recAc(key){const [t,id]=recSplit(key);
+  const r=t==='leg'?S.legs[id]:t==='ofp'?S.ofps[id]:t==='def'?S.defects[id]:t==='crs'?S.crs.find(c=>c.crsId===id):t==='oil'?S.oilAdds[id]:null;
+  if(r)return r.acId;if(t==='ev'&&EV[id])return evAc(EV[id]);return null}
+function recDesc(key){const [t,id]=recSplit(key);
+  if(t==='leg'){const l=S.legs[id];return l?`Let ${l.page?l.page+'/'+l.idx+' · ':''}${fmtDate(l.date)} · ${l.from} → ${l.to}${l.fno?' · '+l.fno:''}${l.state==='open'?' · otevřený':''}${l.void?' · zneplatněný':''}`:'Let'}
+  if(t==='ofp'){const o=S.ofps[id];return o?`OFP ${o.ofpId} · ${o.flt||''} ${o.dep} → ${o.des} · ${fmtDate(o.date)}${o.void?' · zrušený':''}`:'OFP'}
+  if(t==='def'){const d=S.defects[id];return d?`Závada ${d.no} – ${d.text}`:'Závada'}
+  if(t==='crs'){const c=S.crs.find(x=>x.crsId===id);return c?`CRS ${crsTitle(c)}${c.wo?' · WO '+c.wo:''} · ${c.name} ${fmtTs(c.at)}`:'CRS'}
+  if(t==='oil'){const x=S.oilAdds[id];return x?`Doplnění oleje L ${x.l} / P ${x.r} l · ${x.who.name} ${fmtDate(x.date)} ${x.time}Z`:'Doplnění oleje'}
+  const e=EV[id];if(!e)return 'Záznam';const p=e.p||{};
+  switch(e.type){
+    case 'daily.sign':return `${DAILY[p.kind]||'Prohlídka'} ${fmtDate(p.date)} · ${e.bn}`;
+    case 'ac.ground':return `Uzemnění ${fmtTs(e.at)} – ${p.reason||''}`;
+    case 'sec.sign':return `Security search ${p.from||''} ${fmtTs(e.at)} · ${e.bn}`;
+    case 'crew.login':return `Přihlášení na iPadu ${fmtDate(p.date)} · ${e.bn}`;
+    case 'defect.rectify':{const d=S.defects[p.defId];return `Odstranění závady ${d?d.no:''} (CRS k závadě) – závada se znovu otevře`}
+    case 'defect.defer':{const d=S.defects[p.defId];return `Odklad závady ${d?d.no:''} dle MEL ${p.melItem||''} – závada bude zase otevřená`}
+    default:return String(evText(e)).replace(/<[^>]+>/g,'')}
+}
+// records that only make sense together with this one (pre-ticked in the delete sheet)
+function recDeps(key){const [t,id]=recSplit(key);const out=[];
+  if(t==='leg'){const l=S.legs[id];if(!l)return out;
+    if(l.ofpId&&S.ofps[l.ofpId])out.push('ofp:'+l.ofpId);
+    Object.values(S.defects).forEach(d=>{if(d.legId===id)out.push('def:'+d.defId)});
+    S.crs.forEach(c=>{if(c.legId===id&&c.crsId)out.push('crs:'+c.crsId)});
+    (l.oilSvc||[]).forEach(x=>{if(S.oilAdds[x])out.push('oil:'+x)});
+    const oe=l.openEv&&EV[l.openEv];if(oe)S.list.forEach(e=>{if(e.dev===oe.dev&&e.at===oe.at&&(e.type==='daily.sign'||e.type==='sec.sign'))out.push('ev:'+e.id)})}
+  if(t==='ofp')Object.values(S.legs).forEach(l=>{if(l.ofpId===id)out.push('leg:'+l.legId)});
+  return out}
+function recRelated(key){const seen=new Set([key]),q=[key];while(q.length){for(const r of recDeps(q.shift()))if(!seen.has(r)){seen.add(r);q.push(r)}}seen.delete(key);return [...seen]}
+// every record of one aircraft, grouped for the test tab
+const REC_GROUPS=[['leg','Lety v ATL'],['ofp','OFP'],['def','Závady'],['crs','Uvolnění (CRS)'],['ground','Uzemnění'],['daily','Prohlídky'],['oil','Doplnění oleje'],['sec','Security search (samostatné)'],['login','Přihlášení na iPadu']];
+function recList(acId){const r=[];const A=(g,k,at)=>r.push({g,k,at:at||''});
+  Object.values(S.legs).filter(l=>l.acId===acId).forEach(l=>A('leg','leg:'+l.legId,legDepIso(l)));
+  Object.values(S.ofps).filter(o=>o.acId===acId).forEach(o=>A('ofp','ofp:'+o.ofpId,(o.date||'')+'T'+(o.std||'')));
+  Object.values(S.defects).filter(d=>d.acId===acId).forEach(d=>A('def','def:'+d.defId,d.reported.at));
+  S.crs.filter(c=>c.acId===acId&&c.crsId).forEach(c=>A('crs','crs:'+c.crsId,c.at));
+  S.grounds.filter(g=>g.acId===acId).forEach(g=>A('ground','ev:'+g.ev,g.at));
+  Object.values(S.daily).flat().filter(x=>x.acId===acId).forEach(x=>A('daily','ev:'+x.ev,x.at));
+  Object.values(S.oilAdds).filter(x=>x.acId===acId).forEach(x=>A('oil','oil:'+x.svcId,x.at));
+  S.secs.filter(x=>x.acId===acId).forEach(x=>A('sec','ev:'+x.ev,x.at));
+  S.loginEv.filter(x=>x.acId===acId).forEach(x=>A('login','ev:'+x.ev,x.at));
+  return r.sort((a,b)=>a.at<b.at?1:-1)}
+function viewTestDel(ac,u){
+  const list=recList(ac.acId);
+  return `<div class="panel test-panel"><div class="panel-head"><div><p class="label">Testovací režim</p><h2>Mazání záznamů – ${esc(ac.reg)}</h2></div>${list.length?`<button class="btn danger" data-act="rec-del-ac" data-id="${esc(ac.acId)}">Smazat všechny záznamy ${esc(ac.reg)}</button>`:''}</div>
+    <p class="muted">Smazaný záznam zmizí z deníku, výkazů i z ostatních zařízení. Letadlo, uživatelé a nastavení zůstávají; počáteční nálet a cykly se nemění. U letu se nabídnou i související záznamy (OFP, závady z letu, CRS po letu, olej, předletová prohlídka).</p></div>
+  ${REC_GROUPS.map(([g,lab])=>{const rows=list.filter(x=>x.g===g);if(!rows.length)return '';
+    return `<div class="panel"><p class="label">${lab} · ${rows.length}</p><div class="del-list">${rows.map(x=>`<div class="del-row"><span>${esc(recDesc(x.k))}</span><button type="button" class="btn sm danger" data-act="rec-del" data-id="${esc(x.k)}">Smazat</button></div>`).join('')}</div></div>`}).join('')||'<div class="panel"><p class="muted">U tohoto letadla nejsou žádné záznamy.</p></div>'}`;
+}
+function delWarn(){return `<div class="warnline warn">Prozatímní funkce pro testování. Smazání se rozešle na všechna zařízení a zpět nejde vrátit (jen ze zálohy stažené předem).</div>`}
+function openRecDel(key){
+  const u=me();if(!canDel(u))return;const rel=recRelated(key);const acId=recAc(key);
+  openSheet('Smazat záznam (test)',`${delWarn()}<p class="txt"><b>${esc(recDesc(key))}</b></p>
+    ${rel.length?`<div><p class="label">Spolu s tím smazat</p><div style="display:grid;gap:8px">${rel.map(k=>`<label class="check"><input type="checkbox" data-del-k="${esc(k)}" checked><span>${esc(recDesc(k))}</span></label>`).join('')}</div></div>`:''}`,
+    {submit:'Smazat',sign:true,onSubmit:async()=>{await checkPin();
+      const keys=[key,...[...document.querySelectorAll('#sheet [data-del-k]')].filter(x=>x.checked).map(x=>x.dataset.delK)];
+      emit([['rec.del',{keys,what:recDesc(key),n:keys.length,acId}]]);closeSheet();toast(keys.length>1?`Smazáno ${keys.length} záznamů`:'Záznam smazán')}});
+}
+const confirmField=()=>F.text('f-confirm','Pro potvrzení napište SMAZAT','',{attrs:'autocapitalize="characters" autocomplete="off"'});
+const confirmOk=()=>{if(v('f-confirm').toUpperCase()!=='SMAZAT')fail('Pro potvrzení napište do pole SMAZAT.')};
+function openRecDelAc(acId){
+  const u=me();const ac=S.ac[acId];if(!canDel(u)||!ac)return;const list=recList(acId);
+  openSheet('Smazat všechny záznamy '+ac.reg+' (test)',`${delWarn()}<p>Smaže se ${list.length} záznamů letadla <b>${esc(ac.reg)}</b>: ${REC_GROUPS.map(([g,lab])=>{const n=list.filter(x=>x.g===g).length;return n?`${lab.toLowerCase()} ${n}`:''}).filter(Boolean).join(', ')}.
+    Letadlo zůstane s počátečním náletem a cykly.</p>${confirmField()}`,
+    {submit:'Smazat vše u '+ac.reg,sign:true,onSubmit:async()=>{confirmOk();await checkPin();
+      emit([['rec.del',{keys:list.map(x=>x.k),what:'všechny záznamy '+ac.reg,n:list.length,acId,all:true}]]);closeSheet();toast('Záznamy '+ac.reg+' smazány')}});
+}
+function openRecReset(scope){
+  const u=me();if(!canDel(u))return;const all=scope==='all';
+  openSheet(all?'Začít úplně od nuly (test)':'Smazat všechny provozní záznamy (test)',`${delWarn()}
+    ${all?`<p>Smaže se <b>úplně vše</b>: lety, OFP, závady, CRS, prohlídky, olej, uzemnění, ale i <b>letadla, uživatelé a nastavení</b>. Všechna zařízení se vrátí na první spuštění – založí se znovu správce a projde úvodní nastavení.</p>`
+      :`<p>Smažou se všechny lety, OFP, závady, CRS, prohlídky, doplnění oleje, uzemnění, security search a přihlášení – <b>u všech letadel</b>. Letadla (s počátečním náletem a cykly), uživatelé, PINy a nastavení zůstanou.</p>`}
+    <p class="muted" style="font-size:.86rem">Doporučení: předtím Správa → <i>Stáhnout úplnou zálohu (JSON)</i>.</p>${confirmField()}`,
+    {submit:all?'Smazat úplně vše':'Smazat provozní záznamy',sign:true,onSubmit:async()=>{confirmOk();await checkPin();
+      emit([['rec.reset',{scope:all?'all':'ops'}]]);closeSheet();
+      if(all){SESSION=null;store.set('etl.session',null);CREW=null;store.set('etl.crew',null);BIND=null;store.set('etl.bind',null);UI.draft={};saveDraft();UI.tab='log';render();window.scrollTo(0,0);toast('Vše smazáno – založte správce')}
+      else toast('Provozní záznamy smazány')}});
+}
+function openTestToggle(){
+  const u=me();if(!has(u,'admin'))return;const on=testOn();
+  openSheet(on?'Vypnout testovací mazání':'Zapnout testovací mazání',on?`<p>Mazání záznamů se vypne na všech zařízeních. Už smazané záznamy zůstanou smazané.</p>`
+    :`<p>Zapne prozatímní funkci pro testování: správce v Kanceláři může mazat jednotlivé záznamy (lety, OFP, závady, CRS, prohlídky, olej…) i vše najednou.
+      Na všech zařízeních pak svítí pruh <b>TESTOVACÍ REŽIM</b>. Před ostrým provozem se musí vypnout.</p>`,
+    {submit:on?'Vypnout':'Zapnout',sign:true,onSubmit:async()=>{await checkPin();emit([['cfg.set',{testDel:!on}]]);closeSheet();toast(on?'Testovací mazání vypnuto':'Testovací mazání zapnuto')}});
+}
+function openDevWipe(){
+  const u=me();if(!canDel(u))return;const n=OUT.length;
+  openSheet('Vymazat data v tomto zařízení',`<p>Smaže záznamy uložené v tomto zařízení a znovu je stáhne ze serveru. Přihlášení k databázi a vazba iPadu na účet zůstanou.
+    Hodí se po úplném vyčištění databáze v Supabase (viz README), aby si zařízení nedrželo staré záznamy.</p>
+    ${n?`<div class="warnline warn"><b>${n} záznamů z tohoto zařízení ještě není odeslaných</b> – smazáním se ztratí.</div>`:'<div class="warnline ok">Vše z tohoto zařízení je odeslané.</div>'}
+    ${db?'':'<div class="warnline caution">Zařízení není napojené na databázi – data se nebudou mít odkud stáhnout.</div>'}${confirmField()}`,
+    {submit:'Vymazat toto zařízení',sign:true,onSubmit:async()=>{confirmOk();await checkPin();
+      for(const k of ['etl.ev','etl.out','etl.cursor','etl.session','etl.crew','etl.bind','etl.draft','etl.ac'])store.set(k,k==='etl.ev'?{}:k==='etl.out'?[]:k==='etl.draft'?{}:null);
+      closeSheet();setTimeout(()=>location.reload(),300)}});
+}
+function testPanel(u){
+  if(!has(u,'admin'))return '';const on=testOn();
+  return `<div class="panel test-panel"><div class="panel-head"><div><p class="label">Prozatímní – jen pro testování</p><h2>Testovací režim: mazání záznamů</h2></div><button class="btn ${on?'':'danger'}" data-act="test-toggle">${on?'Vypnout':'Zapnout'}</button></div>
+    ${on?`<p class="muted">Jednotlivé záznamy se mažou v záložce <b>Mazání (test)</b> u letadla nebo odkazem „… (test)“ u letu, OFP, závady a CRS.</p>
+    <div class="chips"><button class="btn danger" data-act="rec-reset" data-id="ops">Smazat všechny provozní záznamy</button><button class="btn danger" data-act="rec-reset" data-id="all">Začít úplně od nuly</button><button class="btn" data-act="dev-wipe">Vymazat data v tomto zařízení</button></div>
+    <p class="muted" style="font-size:.86rem">Provozní záznamy = lety, OFP, závady, CRS, prohlídky, olej, uzemnění, security, přihlášení (letadla, uživatelé a nastavení zůstanou). „Od nuly“ smaže i je.</p>`
+    :`<p class="muted">Vypnuto. Po zapnutí jde mazat jednotlivé záznamy i začít s čistou databází; na všech zařízeních pak svítí pruh TESTOVACÍ REŽIM.</p>`}</div>`;
+}
 
 /* --- oil added on the ground: shown to the next flight's crew pre-filled, written to that flight in the ATL --- */
 // records not yet attached to a flight, made before `before` (ISO) – i.e. before that flight was opened
@@ -1034,7 +1161,7 @@ function viewOfp(o,u){
     ${ofpClosePanel(o,u,atl)}
   </section>`)}
   <div class="panel">${ofpIn(o,'notes','Poznámky',{area:true,full:true})}<p class="muted" style="font-size:.86rem">Vyplněné údaje se ukládají samy a každá změna zůstává v auditu.</p>
-    ${!o.void&&!l&&can.leg(u)?`<div class="links"><button type="button" class="linkbtn" data-act="ofp-void" data-id="${esc(o.ofpId)}">Zrušit tento OFP (špatný soubor, nahrazen novějším)</button></div>`:''}</div>
+    ${!o.void&&!l&&can.leg(u)?`<div class="links"><button type="button" class="linkbtn" data-act="ofp-void" data-id="${esc(o.ofpId)}">Zrušit tento OFP (špatný soubor, nahrazen novějším)</button></div>`:''}${delLink('ofp:'+o.ofpId,'Smazat tento OFP')}</div>
   </div>`;
 }
 
@@ -1455,7 +1582,9 @@ function evText(e){
     case 'ofp.void':return `${reg}OFP ${esc(p.ofpId)} zrušen: ${esc(p.reason)}`;
     case 'ofp.close':return `${reg}OFP ${esc(p.ofpId)} uzavřen${p.toAtl?' a přenesen do ATL':''}${p.missing&&p.missing.length?' – chybělo: '+esc(p.missing.join(', ')):''}`;
     case 'ofp.reopen':return `${reg}OFP ${esc(p.ofpId)} znovu otevřen: ${esc(p.reason)}`;
-    case 'cfg.set':return `Nastavení provozovatele změněno – pravidla ${esc(FTL_RULES[p.ftlRules]||p.ftlRules||'')}${p.omRef?', '+esc(p.omRef):''}, základny ${esc((p.bases||[]).join(', '))}`;
+    case 'rec.del':return `${reg}<b>Smazáno v testovacím režimu</b> – ${esc(p.what||'')}${p.n>1?` (celkem ${p.n} záznamů)`:''}`;
+    case 'rec.reset':return `<b>Testovací režim – ${p.scope==='all'?'smazáno úplně vše (začátek od nuly)':'smazány všechny provozní záznamy'}</b>`;
+    case 'cfg.set':if(Object.keys(p).length===1&&'testDel' in p)return `Testovací režim mazání záznamů ${p.testDel?'zapnut':'vypnut'}`;return `Nastavení provozovatele změněno – pravidla ${esc(FTL_RULES[p.ftlRules]||p.ftlRules||'')}${p.omRef?', '+esc(p.omRef):''}, základny ${esc((p.bases||[]).join(', '))}`;
     case 'user.upsert':return `Uživatel ${esc(p.name||(S.users[p.userId]||{}).name||'')} – údaje uloženy`;
   }
   return esc(e.type);
@@ -1495,7 +1624,7 @@ function viewAdmin(u){
     <label class="fld"><span>Obnovit ze zálohy</span><input type="file" id="import-file" accept=".json,application/json"></label>
     <p class="muted" style="font-size:.86rem">Obnova jen doplní záznamy, které chybí. Nic nepřepíše ani nesmaže.</p></div>
   <div class="panel"><h2>Synchronizace tohoto zařízení</h2>${syncDetails()}</div>
-  </div>`;
+  </div>${testPanel(u)}`;
 }
 function syncDetails(){
   const s=syncInfo();
@@ -2111,7 +2240,7 @@ function defRowHtml(){
 
 /* --- leg detail / amend / void --- */
 function openLegDetail(id){
-  const l=S.legs[id];const u=me();const ac=S.ac[l.acId];
+  const l=S.legs[id];if(!l)return;const u=me();const ac=S.ac[l.acId];
   const pic=S.users[l.pic],sic=S.users[l.sic];
   const hist=l.history.map(h=>`<li><b>${esc(h.name)}</b> ${fmtTs(h.at)} – ${esc(h.reason)}<br><span class="muted">${Object.keys(h.changes).map(k=>`${esc(k)}: ${esc(h.prev[k])} → ${esc(h.changes[k])}`).join('; ')}</span></li>`).join('');
   const isOpen=l.state==='open';const s=l.sec;
@@ -2141,7 +2270,7 @@ function openLegDetail(id){
     ${l.void?`<dt>Zneplatněno</dt><dd>${esc(l.void.name)} · ${fmtTs(l.void.at)} – ${esc(l.void.reason)}</dd>`:''}
   </dl>${hist?`<div><p class="label">Historie oprav</p><ul>${hist}</ul></div>`:''}
   ${lc.length?`<div><p class="label">Uvolnění do provozu po tomto letu</p><ul>${lc.map(c=>`<li><b>${esc(crsTitle(c))}</b>${c.wo?' · WO '+esc(c.wo):''} – ${esc(c.name)} (${esc(c.licence||'–')}), ${fmtTs(c.at)}</li>`).join('')}</ul></div>`:''}
-  ${btns.length?`<div class="chips">${btns.join('')}</div>`:''}`;
+  ${btns.length?`<div class="chips">${btns.join('')}</div>`:''}${delLink('leg:'+l.legId,'Smazat tento let')}`;
   openSheet(`${ac.reg} · ${l.from}–${l.to} · ${fmtDate(l.date)}`,html,{focus:false});
 }
 function openAmend(id){
@@ -2196,8 +2325,9 @@ function openRectify(id){
   }});
 }
 function openDefectDetail(id){
-  const d=S.defects[id];
-  openSheet('Historie závady '+d.no,`<p class="txt">${esc(d.text)}</p><ul>${d.trail.map(t=>`<li><b>${esc(t.t)}</b> – ${esc(t.name)}, ${fmtTs(t.at)} <span class="mono muted">${esc(t.dev)}</span></li>`).join('')}</ul>`,{focus:false});
+  const d=S.defects[id];if(!d)return;
+  openSheet('Historie závady '+d.no,`<p class="txt">${esc(d.text)}</p><ul>${d.trail.map(t=>`<li><b>${esc(t.t)}</b> – ${esc(t.name)}, ${fmtTs(t.at)} <span class="mono muted">${esc(t.dev)}</span></li>`).join('')}</ul>
+    ${d.rect?delLink('ev:'+d.rect.ev,'Smazat jen odstranění (závada se znovu otevře)'):''}${d.deferral?delLink('ev:'+d.deferral.ev,'Smazat jen odklad'):''}${delLink('def:'+id,'Smazat celou závadu')}`,{focus:false});
 }
 
 /* --- CRS, ground, daily --- */
@@ -2556,7 +2686,7 @@ function exportMonth(){
   saveFile(`ATL_${ac.reg}_vykaz_${todayISO()}.csv`,'﻿'+csv(rows));
 }
 function exportJson(){
-  const data={format:'silesia-etechlog-backup',version:1,exportedAt:new Date().toISOString(),device:DEV,events:S.list};
+  const data={format:'silesia-etechlog-backup',version:1,exportedAt:new Date().toISOString(),device:DEV,events:S.all};
   saveFile(`ATL_zaloha_${todayISO()}.json`,JSON.stringify(data,null,1));
 }
 function importJson(file){
@@ -2634,6 +2764,11 @@ document.addEventListener('click',e=>{
     case 'crew-start':crewStart();break;
     case 'ofp-sec':ofpSecSign(id);break;
     case 'oil-form':openOilForm();break;
+    case 'rec-del':openRecDel(id);break;
+    case 'rec-del-ac':openRecDelAc(id);break;
+    case 'rec-reset':openRecReset(id);break;
+    case 'test-toggle':openTestToggle();break;
+    case 'dev-wipe':openDevWipe();break;
     case 'crew-close':crewClose();break;
     case 'cdate-edit':UI.draft.cdateEdit=true;saveDraft();render();break;
     case 'pf':UI.draft.pf=id;saveDraft();render();break;

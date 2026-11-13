@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.6.5"}
+:root{--etl-build:"0.6.6"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -375,3 +375,15 @@ table.crew-sum .pf-tog{margin:0}
 .pf-tog input:checked{background:var(--accent);border-color:var(--accent)}
 .pf-tog input:checked::after{content:'';width:7px;height:13px;border:solid var(--accent-ink);border-width:0 3px 3px 0;transform:translateY(-2px) rotate(45deg)}
 .pf-tog input:disabled{opacity:.7}
+/* test mode – record deletion (temporary) */
+.testband{background:var(--warn);color:#fff;text-align:center;font-weight:600;font-size:.86rem;letter-spacing:.02em;padding:6px 16px}
+.test-panel{border-color:var(--warn);border-style:dashed}
+.del-test{margin-top:10px}
+.del-test .linkbtn{color:var(--warn)}
+.del-test.sm{float:right;margin:0 0 4px 8px}
+.del-test.sm .linkbtn{min-height:0;padding:0;font-size:.86rem}
+.del-list{display:grid;gap:0}
+.del-row{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line)}
+.del-row:first-child{border-top:0}
+.del-row span{overflow-wrap:anywhere;min-width:0}
+.del-row .btn{flex:none}

@@ -95,6 +95,24 @@ Olej se zapisuje v litrech, zvlášť motor L a P (APU se nepíše). V ATL patř
   připojí k tomuto letu (v detailu letu „z toho na zemi: …“) a dalšímu letu už se nenabízí.
 - Když posádka zapíše méně, než doplnil mechanik, potvrzení před podpisem na to upozorní.
 
+## Testovací režim – mazání záznamů (prozatímní)
+Jen pro testování, před ostrým provozem se vypne (a z aplikace později zmizí).
+- **Zapnutí:** Kancelář → *Správa* → *Testovací režim: mazání záznamů* → *Zapnout* (PIN správce). Na všech zařízeních
+  pak svítí červený pruh TESTOVACÍ REŽIM. Mazat může jen správce v Kanceláři, v režimu posádky se mazání nenabízí.
+- **Jednotlivé záznamy:** záložka *Mazání (test)* u letadla (lety, OFP, závady, CRS, uzemnění, prohlídky, olej,
+  security, přihlášení), nebo odkaz „… (test)“ v detailu letu, u OFP, v historii závady (celá závada, jen odstranění,
+  jen odklad) a u CRS. U letu se nabídnou i související záznamy (jeho OFP, závady zapsané u letu, CRS vydané po tomto
+  letu, olej zapsaný k letu, předletová prohlídka podepsaná se security) – zaškrtnuté, jde je odškrtnout.
+- **Najednou:** *Smazat všechny záznamy OK-XXX* (v záložce u letadla), *Smazat všechny provozní záznamy* (všechna
+  letadla; letadla, uživatelé a nastavení zůstanou) a *Začít úplně od nuly* (i letadla, uživatelé, nastavení – všechna
+  zařízení se vrátí na první spuštění). Hromadné mazání chce napsat SMAZAT a PIN.
+- Smazání je podepsaný záznam, který se rozešle na všechna zařízení (i přes QR / soubor); v databázi se nic fyzicky
+  nemaže, záznamy se jen přestanou zobrazovat a počítat. Úplná záloha (JSON) obsahuje i smazané, takže doporučuji ji
+  před větším mazáním stáhnout.
+- **Fyzicky prázdná databáze** (volitelné, např. před ostrým provozem): ověřte, že všechna zařízení mají vše odeslané →
+  Supabase → SQL Editor → `truncate table public.events;` → na každém zařízení Kancelář → Správa →
+  *Vymazat data v tomto zařízení* (jinak by si zařízení drželo staré záznamy).
+
 ## Závady v ATL
 Na stránce deníku je u každé závady vedle sebe její odstranění (CRS) nebo odklad, i když proběhlo jiný den.
 
