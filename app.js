@@ -4,7 +4,7 @@
 
 /* ---------- constants ---------- */
 const ROLE={admin:'Správce',crew:'Posádka',mech:'Mechanik',camo:'CAMO',cabin:'Palubní průvodčí'};
-const CFG_DEFAULT={opName:'',aoc:'',bases:['LKPR'],ftlBy:'fl3xx',ftlRules:'EASA',omRef:'',reportMin:60,postMin:30,splitDuty:false,pageFmt:'seq',crsQuick:['Daily check','Weekly check','50 FH','100 FH','Phase inspection','Výměna kola','Výměna brzd'],
+const CFG_DEFAULT={opName:'',aoc:'',bases:['LKPR'],ftlBy:'fl3xx',ftlRules:'EASA',omRef:'',reportMin:60,reportMinAway:null,postMin:30,splitDuty:false,pageFmt:'seq',crsQuick:['Daily check','Weekly check','50 FH','100 FH','Phase inspection','Výměna kola','Výměna brzd'],
   ofpRules:[{k:'to_flaps',type:'',def:'15',max:''},{k:'vfto',type:'',def:'160',max:''},{k:'vfs',type:'',def:'160',max:''}]};
 // OFP fields the operator can pre-fill or limit
 const OFP_FIELDS=[['to_w','TO weight',1],['to_dist','TO dist',1],['to_pwr','Power',0],['to_flaps','Flaps (vzlet)',0],['v1','V1',1],['vr','VR',1],['v2','V2',1],['vfto','VFTO',1],['emr_vref','EMR VREF',1],['emr_vapp','EMR VAPP',1],['ld_w','LD weight',1],['ld_dist','LD dist',1],['vref','VREF',1],['vapp','VAPP',1],['vfs','VFS',1],['magrad','MA grad',0],['ld167','LD × 1,67',1]];
@@ -110,7 +110,7 @@ function rebuild(){
   all.forEach((e,i)=>{if(e.type==='rec.reset'){if(e.p&&e.p.scope==='all')cutAll=i;else cutOps=i}});
   all.forEach((e,i)=>{if(e.type==='rec.del'&&i>cutAll)((e.p&&e.p.keys)||[]).forEach(k=>dead.add(k))});
   const list=all.filter((e,i)=>!(i<cutAll||(i<cutOps&&!REC_CFG.has(e.type))||(dead.size&&evKeys(e).some(k=>dead.has(k)))));
-  const s={ac:{},users:{},legs:{},defects:{},crs:[],daily:{},logins:{},loginEv:[],oilAdds:{},grounds:[],secs:[],ofps:{},cfg:Object.assign({},CFG_DEFAULT),list,all,out:new Set(OUT)};
+  const s={ac:{},users:{},legs:{},defects:{},crs:[],preps:{},daily:{},logins:{},loginEv:[],oilAdds:{},grounds:[],secs:[],ofps:{},cfg:Object.assign({},CFG_DEFAULT),list,all,out:new Set(OUT)};
   for(const e of list){
     const p=e.p||{};const who={id:e.by,name:e.bn,at:e.at,ev:e.id,dev:e.dev};
     switch(e.type){
@@ -124,8 +124,10 @@ function rebuild(){
       case 'daily.sign':{const k=p.acId+'|'+p.date;(s.daily[k]=s.daily[k]||[]).push(Object.assign({},p,who));break}
       case 'defect.report':s.defects[p.defId]=Object.assign({},p,{status:'open',reported:who,trail:[Object.assign({t:p.src==='paper'?'Převzato z papírového deníku'+(p.paperPage?', str. '+p.paperPage:''):'Zapsáno'},who)]});break;
       case 'defect.defer':{const d=s.defects[p.defId];if(!d)break;d.status='deferred';d.deferral=Object.assign({},p,who);d.trail.push(Object.assign({t:'Odloženo dle MEL '+(p.melItem||'')+' kat. '+p.cat},who));break}
-      case 'defect.rectify':{const d=s.defects[p.defId];if(!d)break;d.status='closed';d.rect=Object.assign({},p,who);d.trail.push(Object.assign({t:'Odstraněno, CRS vydáno'},who));break}
-      case 'crs.issue':s.crs.push(Object.assign({},p,who));break;
+      case 'defect.rectify':{if(p.prepId&&s.preps[p.prepId])s.preps[p.prepId].used=who;const d=s.defects[p.defId];if(!d)break;d.status='closed';d.rect=Object.assign({},p,who);d.trail.push(Object.assign({t:'Odstraněno, CRS vydáno'},who));break}
+      case 'crs.issue':s.crs.push(Object.assign({},p,who));if(p.prepId&&s.preps[p.prepId])s.preps[p.prepId].used=who;break;
+      case 'crs.prep':s.preps[p.prepId]=Object.assign({},p,{who,at:e.at,used:null,dropped:null});break;
+      case 'crs.prep.drop':{const x=s.preps[p.prepId];if(x)x.dropped=Object.assign({},who,{reason:p.reason});break}
       case 'ac.ground':s.grounds.push(Object.assign({},p,who));break;
       case 'sec.sign':s.secs.push(Object.assign({},p,who));break;
       case 'cfg.set':Object.assign(s.cfg,p);s.cfgSet=who;break;
@@ -153,7 +155,7 @@ function rebuild(){
 const REC_CFG=new Set(['ac.upsert','user.upsert','cfg.set','rec.del','rec.reset']);
 // which record an event belongs to: deleting the record drops all its events
 function evKeys(e){const p=e.p||{},t=e.type||'',k=['ev:'+e.id];
-  if(t.startsWith('leg.'))k.push('leg:'+p.legId);else if(t.startsWith('defect.'))k.push('def:'+p.defId);else if(t==='crs.issue')k.push('crs:'+p.crsId);
+  if(t.startsWith('leg.'))k.push('leg:'+p.legId);else if(t.startsWith('defect.'))k.push('def:'+p.defId);else if(t==='crs.issue')k.push('crs:'+p.crsId);else if(t.startsWith('crs.prep'))k.push('prep:'+p.prepId);
   else if(t.startsWith('ofp.'))k.push('ofp:'+p.ofpId);else if(t==='oil.add')k.push('oil:'+p.svcId);return k}
 
 function deriveAc(s,ac){
@@ -348,7 +350,9 @@ const can={
   leg:u=>has(u,'crew')||has(u,'camo'),
   defer:u=>has(u,'crew')||has(u,'mech')||has(u,'camo'),
   rectify:u=>has(u,'mech'),
-  crs:u=>has(u,'mech'),
+  // CRS only by certifying staff (set per user); any mechanic can prepare one for them
+  crs:u=>has(u,'mech')&&!!u.crsAuth,
+  prepCrs:u=>has(u,'mech'),
   ground:u=>has(u,'mech')||has(u,'camo'),
   daily:u=>has(u,'crew')||has(u,'mech'),
   // CAME: corrections only by the PIC of that flight or by CAMO
@@ -471,7 +475,7 @@ function renderApp(){
   }
   if(can.daily(u)&&has(u,'mech'))acts.push(`<button class="btn" data-act="daily-form">${ICON.clip}Prohlídka</button>`);
   acts.push(`<button class="btn" data-act="defect-form">${ICON.alert}Zapsat závadu</button>`);
-  if(can.crs(u))acts.push(`<button class="btn" data-act="crs-form">${ICON.check}Uvolnit do provozu (CRS)</button>`);
+  if(can.crs(u))acts.push(`<button class="btn" data-act="crs-form">${ICON.check}Uvolnit do provozu (CRS)</button>`);else if(can.prepCrs(u))acts.push(`<button class="btn" data-act="crs-form">${ICON.check}Připravit uvolnění (CRS)</button>`);
   if(has(u,'mech')||has(u,'camo')||has(u,'crew'))acts.push(`<button class="btn" data-act="oil-form">Doplnění oleje</button>`);
   if(can.ground(u)&&!ac.grounded)acts.push(`<button class="btn danger" data-act="ground-form">${ICON.stop}Uzemnit</button>`);
   }
@@ -482,7 +486,7 @@ function renderApp(){
   if(canDel(u))tabs.push(['testdel','Mazání (test)','!','warn']);
   if(!ac.isLive&&['log','ofp','crs'].includes(UI.tab))UI.tab=can.admin(u)?'setup':'defects';
   if(!tabs.some(t=>t[0]===UI.tab))UI.tab='log';
-  const tabHtml=`<div class="wrap"><div class="actions">${acts.join('')}</div>${oilPendingNote(ac.acId)}<nav class="tabs" role="tablist">${tabs.map(t=>`<button class="tab ${UI.tab===t[0]?'on':''}" role="tab" aria-selected="${UI.tab===t[0]}" data-act="tab" data-id="${t[0]}">${t[1]}${t[2]?`<span class="cnt ${t[3]||''}">${t[2]}</span>`:''}</button>`).join('')}</nav></div>`;
+  const tabHtml=`<div class="wrap"><div class="actions">${acts.join('')}</div>${oilPendingNote(ac.acId)}${prepNote(ac.acId)}<nav class="tabs" role="tablist">${tabs.map(t=>`<button class="tab ${UI.tab===t[0]?'on':''}" role="tab" aria-selected="${UI.tab===t[0]}" data-act="tab" data-id="${t[0]}">${t[1]}${t[2]?`<span class="cnt ${t[3]||''}">${t[2]}</span>`:''}</button>`).join('')}</nav></div>`;
   let view='';
   switch(UI.tab){
     case 'log':view=viewLog(ac,u);break;
@@ -561,7 +565,7 @@ function viewLog(ac,u){
     <section class="sheet-sec"><span class="label">Prohlídky ${fmtDate(pg.date)}</span>
       ${dailies.length?`<div class="list">${dailies.map(d=>`<div class="line-item"><span class="ann ok">${esc(DAILY[d.kind]||d.kind)}</span><span>${esc(d.name)}</span><span class="mono muted">${fmtTs(d.at)}</span>${d.tyres?`<span class="muted">Pneu N/L/P ${esc(d.tyres)} psi</span>`:''}${d.oil?`<span class="muted">Olej ${esc(d.oil)}</span>`:''}${d.brakes?'<span class="muted">Brzdy OK</span>':''}${d.notes?`<span>${esc(d.notes)}</span>`:''}</div>`).join('')}</div>`:`<p class="muted">Na tento den není podepsaná žádná prohlídka.</p>`}
     </section>
-    ${(()=>{const cr=pg.legs.flatMap(l=>crsOf(l).map(c=>({c,l})));return `<section class="sheet-sec"><span class="label">Uvolnění do provozu na této stránce</span>${cr.length?`<div class="list">${cr.map(({c,l})=>`<div class="line-item"><span class="ann ok">CRS</span><span>po letu ${l.idx} ${esc(l.from)} → ${esc(l.to)}</span><span>${esc(crsTitle(c))}${c.wo?' · WO '+esc(c.wo):''}</span><span class="muted">${esc(c.name)} · ${esc(c.licence||'')} · ${fmtTs(c.at)}</span></div>`).join('')}</div>`:'<p class="muted">Na této stránce zatím žádné CRS.</p>'}</section>`})()}
+    ${(()=>{const cr=pg.legs.flatMap(l=>crsOf(l).map(c=>({c,l})));return `<section class="sheet-sec"><span class="label">Uvolnění do provozu na této stránce</span>${cr.length?`<div class="list">${cr.map(({c,l})=>`<div class="line-item tap" data-act="crs-detail" data-id="crs|${esc(c.crsId)}" role="button" tabindex="0"><span class="ann ok">CRS</span><span>po letu ${l.idx} ${esc(l.from)} → ${esc(l.to)}</span><span>${esc(crsTitle(c))}${c.wo?' · WO '+esc(c.wo):''}</span><span class="muted">${esc(c.name)} · ${esc(c.licence||'')} · ${fmtTs(c.at)}</span></div>`).join('')}</div>`:'<p class="muted">Na této stránce zatím žádné CRS.</p>'}</section>`})()}
     <section class="sheet-sec"><span class="label">Závady a jejich odstranění</span>
       ${pageDefs.length?`<div class="scroll-x"><table class="plain defrect"><thead><tr><th>Let</th><th>Závada</th><th>Odstranění závady / odklad</th></tr></thead><tbody>${pageDefs.map(d=>defRectRow(d,pg)).join('')}</tbody></table></div>`:`<p class="muted">NIL – žádné závady.</p>`}
     </section>
@@ -588,7 +592,11 @@ function defectCard(d,u,ac){
   if(d.rect)extra+=`<div class="box"><b>Odstranění · ATA ${esc(d.rect.ata||'–')} · WO ${esc(d.rect.wo||'–')}</b><span>${esc(d.rect.action)}</span>${d.rect.parts?`<span class="muted">Díly: ${esc(d.rect.parts)}</span>`:''}<span class="muted">CRS: ${esc(d.rect.name)} (${esc(d.rect.licence||'–')}) · ${fmtTs(d.rect.at)} · TTAF ${hm(d.rect.acAir)} / ${esc(d.rect.acCyc)} cyklů</span></div>`;
   const btns=[];
   if(st==='open'&&can.defer(u))btns.push(`<button class="btn sm" data-act="defer-form" data-id="${esc(d.defId)}">Odložit dle MEL</button>`);
-  if(st!=='closed'&&can.rectify(u))btns.push(`<button class="btn sm primary" data-act="rectify-form" data-id="${esc(d.defId)}">Odstranit a uvolnit (CRS)</button>`);
+  const pr=st!=='closed'?prepFor(d.defId):null;
+  if(pr)extra+=`<div class="box prep"><b>Odstranění připraveno – čeká na podpis CRS</b><span>${esc(pr.action)}${pr.wo?' · WO '+esc(pr.wo):''}</span><span class="muted">Připravil ${esc(pr.who.name)} · ${fmtTs(pr.at)}</span></div>`;
+  if(st!=='closed'&&pr&&can.crs(u))btns.push(`<button class="btn sm primary" data-act="prep-sign" data-id="${esc(pr.prepId)}">Zkontrolovat a podepsat CRS</button>`);
+  else if(st!=='closed'&&!pr&&can.rectify(u))btns.push(`<button class="btn sm primary" data-act="rectify-form" data-id="${esc(d.defId)}">${can.crs(u)?'Odstranit a uvolnit (CRS)':'Odstranit – připravit k podpisu CRS'}</button>`);
+  if(pr&&canDropPrep(u,pr))btns.push(`<button class="btn sm ghost" data-act="prep-drop" data-id="${esc(pr.prepId)}">Zrušit přípravu</button>`);
   btns.push(`<button class="btn sm ghost" data-act="defect-detail" data-id="${esc(d.defId)}">Historie</button>`);
   return `<div class="defect ${st}"><div class="stripe"></div><div class="body">
     <div class="top-row"><span class="mono">${esc(d.no)}</span><span class="ann ${st==='open'?'warn':st==='deferred'?'caution':'ok'}">${lbl}</span>${d.pageRef?`<span class="muted mono">str. ${esc(d.pageRef)}</span>`:d.src==='paper'?`<span class="ann mute">z papíru${d.paperPage?' str. '+esc(d.paperPage):''}</span>`:`<span class="muted">mimo let</span>`}${S.out.has(d.reported.ev)?'<span class="ann caution">neodesláno</span>':''}</div>
@@ -612,11 +620,11 @@ function viewCrs(ac,u){
   ac.defects.filter(d=>d.rect).forEach(d=>items.push({at:d.rect.at,kind:'rect',c:d}));
   items.sort((a,b)=>a.at<b.at?1:-1);
   const row=it=>{
-    if(it.kind==='crs')return `<div class="defect closed"><div class="stripe"></div><div class="body">${delLink('crs:'+it.c.crsId,'Smazat',true)}<div class="top-row"><span class="ann ok">CRS</span><span class="mono">WO ${esc(it.c.wo||'–')}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(crsTitle(it.c))}</p>${it.c.wo?'<p class="meta">Rozsah a dílčí podpisy viz workpack '+esc(it.c.wo)+'</p>':''}<p class="meta">${esc(it.c.name)} · ${esc(it.c.licence||'–')} · ${esc(it.c.org||'')} · TTAF ${hm(it.c.acAir)} / ${esc(it.c.acCyc)} cyklů</p></div></div>`;
-    if(it.kind==='ground')return `<div class="defect open"><div class="stripe"></div><div class="body">${delLink('ev:'+it.c.ev,'Smazat',true)}<div class="top-row"><span class="ann warn">Uzemněno</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.reason)}</p><p class="meta">${esc(it.c.name)}${it.c.wo?' · WO '+esc(it.c.wo):''}</p></div></div>`;
-    return `<div class="defect closed"><div class="stripe"></div><div class="body">${delLink('ev:'+it.c.rect.ev,'Smazat odstranění',true)}<div class="top-row"><span class="ann ok">CRS k závadě</span><span class="mono">${esc(it.c.no)}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.text)}</p><p class="meta">${esc(it.c.rect.action)} · ${esc(it.c.rect.name)} (${esc(it.c.rect.licence||'–')})</p></div></div>`;
+    if(it.kind==='crs')return `<div class="defect closed tap" data-act="crs-detail" data-id="crs|${esc(it.c.crsId)}" role="button" tabindex="0"><div class="stripe"></div><div class="body"><div class="top-row">${delLink('crs:'+it.c.crsId,'Smazat',true)}<span class="ann ok">CRS</span><span class="mono">WO ${esc(it.c.wo||'–')}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(crsTitle(it.c))}</p>${(()=>{const L=it.c.legId&&S.legs[it.c.legId];return L?`<p class="meta">Po letu ${esc(L.page)}/${L.idx} · ${fmtDate(L.date)} · ${esc(L.from)} → ${esc(L.to)}</p>`:'<p class="meta">Nepřiřazeno k letu</p>'})()}${it.c.wo?'<p class="meta">Rozsah a dílčí podpisy viz workpack '+esc(it.c.wo)+'</p>':''}<p class="meta">${esc(it.c.name)} · ${esc(it.c.licence||'–')} · ${esc(it.c.org||'')} · TTAF ${hm(it.c.acAir)} / ${esc(it.c.acCyc)} cyklů</p></div></div>`;
+    if(it.kind==='ground')return `<div class="defect open tap" data-act="crs-detail" data-id="ground|${esc(it.c.ev)}" role="button" tabindex="0"><div class="stripe"></div><div class="body"><div class="top-row">${delLink('ev:'+it.c.ev,'Smazat',true)}<span class="ann warn">Uzemněno</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.reason)}</p><p class="meta">${esc(it.c.name)}${it.c.wo?' · WO '+esc(it.c.wo):''}</p></div></div>`;
+    return `<div class="defect closed tap" data-act="crs-detail" data-id="rect|${esc(it.c.defId)}" role="button" tabindex="0"><div class="stripe"></div><div class="body"><div class="top-row">${delLink('ev:'+it.c.rect.ev,'Smazat odstranění',true)}<span class="ann ok">CRS k závadě</span><span class="mono">${esc(it.c.no)}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.text)}</p><p class="meta">${esc(it.c.rect.action)} · ${esc(it.c.rect.name)} (${esc(it.c.rect.licence||'–')})</p></div></div>`;
   };
-  return `<div class="panel"><div class="panel-head"><div><p class="label">Aktuální stav</p><h2>${esc(ac.reg)} · <span class="ann ${ac.status}">${STATUS_LABEL[ac.status]}</span></h2></div>${can.crs(u)?`<button class="btn primary" data-act="crs-form">${ICON.check}Vydat CRS</button>`:''}</div>
+  return prepPanel(ac,u)+`<div class="panel"><div class="panel-head"><div><p class="label">Aktuální stav</p><h2>${esc(ac.reg)} · <span class="ann ${ac.status}">${STATUS_LABEL[ac.status]}</span></h2></div>${can.prepCrs(u)?`<button class="btn primary" data-act="crs-form">${ICON.check}${can.crs(u)?'Vydat CRS':'Připravit CRS'}</button>`:''}</div>
   <p class="muted">${ac.lastCrs?`Poslední samostatné CRS ${fmtTs(ac.lastCrs.at)} – ${esc(ac.lastCrs.name)}, WO ${esc(ac.lastCrs.wo||'–')}.`:'Zatím žádné samostatné CRS.'} Otevřené závady se uzavírají přes „Odstranit a uvolnit“ v záložce Závady, uzemnění ruší vydání CRS.</p></div>
   ${items.length?`<div class="grid-list">${items.map(row).join('')}</div>`:`<div class="empty"><p>Zatím žádná uvolnění ani uzemnění.</p></div>`}`;
 }
@@ -642,13 +650,14 @@ function canDel(u){return testOn()&&mode()==='office'&&has(u,'admin')}
 function delLink(key,label,small){if(!canDel(me()))return '';return `<div class="del-test${small?' sm':''}"><button type="button" class="linkbtn" data-act="rec-del" data-id="${esc(key)}">${esc(label)} (test)</button></div>`}
 function recSplit(key){const i=key.indexOf(':');return [key.slice(0,i),key.slice(i+1)]}
 function recAc(key){const [t,id]=recSplit(key);
-  const r=t==='leg'?S.legs[id]:t==='ofp'?S.ofps[id]:t==='def'?S.defects[id]:t==='crs'?S.crs.find(c=>c.crsId===id):t==='oil'?S.oilAdds[id]:null;
+  const r=t==='leg'?S.legs[id]:t==='ofp'?S.ofps[id]:t==='def'?S.defects[id]:t==='crs'?S.crs.find(c=>c.crsId===id):t==='oil'?S.oilAdds[id]:t==='prep'?S.preps[id]:null;
   if(r)return r.acId;if(t==='ev'&&EV[id])return evAc(EV[id]);return null}
 function recDesc(key){const [t,id]=recSplit(key);
   if(t==='leg'){const l=S.legs[id];return l?`Let ${l.page?l.page+'/'+l.idx+' · ':''}${fmtDate(l.date)} · ${l.from} → ${l.to}${l.fno?' · '+l.fno:''}${l.state==='open'?' · otevřený':''}${l.void?' · zneplatněný':''}`:'Let'}
   if(t==='ofp'){const o=S.ofps[id];return o?`OFP ${o.ofpId} · ${o.flt||''} ${o.dep} → ${o.des} · ${fmtDate(o.date)}${o.void?' · zrušený':''}`:'OFP'}
   if(t==='def'){const d=S.defects[id];return d?`Závada ${d.no} – ${d.text}`:'Závada'}
   if(t==='crs'){const c=S.crs.find(x=>x.crsId===id);return c?`CRS ${crsTitle(c)}${c.wo?' · WO '+c.wo:''} · ${c.name} ${fmtTs(c.at)}`:'CRS'}
+  if(t==='prep'){const x=S.preps[id];return x?`Příprava: ${prepTitle(x)} · ${x.who.name} ${fmtTs(x.at)}${x.used?' · podepsáno':x.dropped?' · zrušeno':''}`:'Příprava uvolnění'}
   if(t==='oil'){const x=S.oilAdds[id];return x?`Doplnění oleje L ${x.l} / P ${x.r} l · ${x.who.name} ${fmtDate(x.date)} ${x.time}Z`:'Doplnění oleje'}
   const e=EV[id];if(!e)return 'Záznam';const p=e.p||{};
   switch(e.type){
@@ -672,7 +681,7 @@ function recDeps(key){const [t,id]=recSplit(key);const out=[];
   return out}
 function recRelated(key){const seen=new Set([key]),q=[key];while(q.length){for(const r of recDeps(q.shift()))if(!seen.has(r)){seen.add(r);q.push(r)}}seen.delete(key);return [...seen]}
 // every record of one aircraft, grouped for the test tab
-const REC_GROUPS=[['leg','Lety v ATL'],['ofp','OFP'],['def','Závady'],['crs','Uvolnění (CRS)'],['ground','Uzemnění'],['daily','Prohlídky'],['oil','Doplnění oleje'],['sec','Security search (samostatné)'],['login','Přihlášení na iPadu']];
+const REC_GROUPS=[['leg','Lety v ATL'],['ofp','OFP'],['def','Závady'],['crs','Uvolnění (CRS)'],['ground','Uzemnění'],['daily','Prohlídky'],['oil','Doplnění oleje'],['prep','Připravená uvolnění'],['sec','Security search (samostatné)'],['login','Přihlášení na iPadu']];
 function recList(acId){const r=[];const A=(g,k,at)=>r.push({g,k,at:at||''});
   Object.values(S.legs).filter(l=>l.acId===acId).forEach(l=>A('leg','leg:'+l.legId,legDepIso(l)));
   Object.values(S.ofps).filter(o=>o.acId===acId).forEach(o=>A('ofp','ofp:'+o.ofpId,(o.date||'')+'T'+(o.std||'')));
@@ -681,6 +690,7 @@ function recList(acId){const r=[];const A=(g,k,at)=>r.push({g,k,at:at||''});
   S.grounds.filter(g=>g.acId===acId).forEach(g=>A('ground','ev:'+g.ev,g.at));
   Object.values(S.daily).flat().filter(x=>x.acId===acId).forEach(x=>A('daily','ev:'+x.ev,x.at));
   Object.values(S.oilAdds).filter(x=>x.acId===acId).forEach(x=>A('oil','oil:'+x.svcId,x.at));
+  Object.values(S.preps).filter(x=>x.acId===acId).forEach(x=>A('prep','prep:'+x.prepId,x.at));
   S.secs.filter(x=>x.acId===acId).forEach(x=>A('sec','ev:'+x.ev,x.at));
   S.loginEv.filter(x=>x.acId===acId).forEach(x=>A('login','ev:'+x.ev,x.at));
   return r.sort((a,b)=>a.at<b.at?1:-1)}
@@ -942,9 +952,66 @@ async function importOfp(file){
     const items=[];UI.ofpImport.forEach((o,i)=>{if(!chk('oi-'+i))return;const acId=v('oa-'+i);if(!acId)return;const ac2=S.ac[acId];const dd=ofpDefsNow({acId,type:o.type});items.push(['ofp.import',{ofpId:o.ofpId,acId,file:file.name,data:o,defs:dd}])});
     if(!items.length)fail('Nevybrali jste žádný OFP.');
     emit(items);closeSheet();toast(`Nahráno OFP: ${items.length}`);
+    // started from "Začít let": go straight to the OFP of this aircraft that is next to fly
+    if(UI.ofpAfter&&mode()==='office'){UI.ofpAfter=false;const ac=S.ac[UI.acId];const nx=ac&&plannedOfps(ac).sort((a,b)=>(a.date+a.std)<(b.date+b.std)?-1:1)[0];UI.tab='ofp';UI.ofpId=nx?nx.ofpId:null;render();window.scrollTo(0,0)}
   }});
 }
 function ofpOf(id){return S.ofps[id]||null}
+// departure ATO = takeoff, destination ATO = landing – typed in one place, shown in the other (a typed value always wins)
+/* --- nav log notes: quick entries for level, frequency, heading, or free text --- */
+const NOTE_SEP=' · ';
+function noteParts(t){return String(t||'').split(NOTE_SEP).map(x=>x.trim()).filter(Boolean)}
+function noteBtn(o,key,wpt,LK){const t=ofpVal(o,key);
+  return `<button type="button" class="ofp-notebtn${t?'':' empty'}" data-act="ofp-note" data-id="${esc(o.ofpId)}|${esc(key)}|${esc(wpt)}" aria-label="Poznámka ${esc(wpt)}" ${LK?'disabled':''}>${t?noteParts(t).map(x=>`<span>${esc(x)}</span>`).join(''):'+ pozn.'}</button>`}
+// 133355 → 133,355 · 13335 → 133,35 · also accepts 133.355 / 133,355
+function fmtFreq(x){const t=String(x||'').trim().replace(/\s/g,'');const m=t.match(/^(\d{3})[.,]?(\d{1,3})$/);if(!m)return null;const mhz=+m[1];if(mhz<108||mhz>137)return null;return m[1]+','+m[2]}
+function fmtLevel(x,fl){const t=String(x||'').replace(/\s/g,'');if(!/^\d+$/.test(t))return null;const n=+t;
+  if(fl){if(n<10||n>600)return null;return 'FL'+String(n).padStart(3,'0')}
+  if(n<100||n>60000)return null;return String(n)}
+function fmtHdg(x){const t=String(x||'').trim();if(!/^\d{1,3}$/.test(t))return null;const n=+t;if(n>360)return null;return 'HDG '+String(n===0?360:n).padStart(3,'0')}
+function openNoteEditor(ofpId,key,wpt){
+  const o=ofpOf(ofpId);if(!o||o.closed||o.void)return;UI.noteEd={ofpId,key,wpt,fl:false,tab:'alt'};
+  const tabs=[['alt','FL / ALT'],['freq','FREQ'],['hdg','HDG'],['txt','Text']];
+  openSheet('Poznámka – '+wpt,`<div id="note-cur"></div>
+    <div class="ntabs" role="tablist">${tabs.map(([k,l])=>`<button type="button" class="ntab${k==='alt'?' on':''}" data-act="note-tab" data-id="${k}">${l}</button>`).join('')}</div>
+    <div class="note-pane" data-pane="alt"><div class="note-in"><button type="button" class="nfl" id="n-flbtn" data-act="note-fl" aria-pressed="false">FL</button><input type="text" id="n-alt" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="výška ft, např. 4000"></div>
+      <div class="note-acts"><button type="button" class="btn big" data-act="note-add" data-id="alt|up">CLB ↑</button><button type="button" class="btn big" data-act="note-add" data-id="alt|down">DESC ↓</button></div></div>
+    <div class="note-pane" data-pane="freq" hidden><div class="note-in"><input type="text" id="n-freq" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="např. 133355 → 133,355"></div>
+      <div class="note-acts"><button type="button" class="btn big" data-act="note-add" data-id="freq|">Přidat frekvenci</button></div></div>
+    <div class="note-pane" data-pane="hdg" hidden><div class="note-in"><span class="nfl static">HDG</span><input type="text" id="n-hdg" inputmode="numeric" maxlength="3" autocomplete="off" placeholder="0–360"></div>
+      <div class="note-acts three"><button type="button" class="btn big" data-act="note-add" data-id="hdg|left">← vlevo</button><button type="button" class="btn big" data-act="note-add" data-id="hdg|">Přidat</button><button type="button" class="btn big" data-act="note-add" data-id="hdg|right">vpravo →</button></div></div>
+    <div class="note-pane" data-pane="txt" hidden><div class="note-in"><input type="text" id="n-txt" maxlength="60" autocomplete="off" placeholder="libovolná poznámka"></div>
+      <div class="note-acts"><button type="button" class="btn big" data-act="note-add" data-id="txt|">Přidat poznámku</button></div></div>
+    <p class="form-err" id="n-err" hidden></p>`,{submit:'Hotovo',focus:false,onSubmit:async()=>{UI.noteEd=null;closeSheet();render()}});
+  noteCur();setTimeout(()=>{const i=document.getElementById('n-alt');if(i)i.focus()},50);
+}
+function noteCur(){const e=UI.noteEd;if(!e)return;const o=ofpOf(e.ofpId);const parts=noteParts(ofpVal(o,e.key));const el=document.getElementById('note-cur');if(!el)return;
+  el.innerHTML=parts.length?`<p class="label">Zapsáno u ${esc(e.wpt)}</p><div class="note-chips">${parts.map((x,i)=>`<span class="note-chip">${esc(x)}<button type="button" data-act="note-del" data-id="${i}" aria-label="Smazat ${esc(x)}">×</button></span>`).join('')}</div>`:'<p class="muted" style="margin:0">Zatím bez poznámky.</p>'}
+function noteSave(parts){const e=UI.noteEd;ofpSet(e.ofpId,e.key,parts.join(NOTE_SEP));noteCur()}
+function noteAction(act,id){const e=UI.noteEd;if(!e)return;const o=ofpOf(e.ofpId);const err=document.getElementById('n-err');const bad=m=>{if(err){err.textContent=m;err.hidden=false}};if(err)err.hidden=true;
+  if(act==='note-tab'){document.querySelectorAll('#sheet .ntabs .ntab').forEach(b=>b.classList.toggle('on',b.dataset.id===id));document.querySelectorAll('#sheet .note-pane').forEach(p=>p.hidden=p.dataset.pane!==id);e.tab=id;
+    const inp=document.querySelector(`#sheet .note-pane[data-pane="${id}"] input`);if(inp)inp.focus();return}
+  if(act==='note-fl'){e.fl=!e.fl;const b=document.getElementById('n-flbtn');b.classList.toggle('on',e.fl);b.setAttribute('aria-pressed',String(e.fl));const i=document.getElementById('n-alt');i.placeholder=e.fl?'hladina, např. 240':'výška ft, např. 4000';i.maxLength=e.fl?3:5;i.focus();return}
+  const parts=noteParts(ofpVal(o,e.key));
+  if(act==='note-del'){parts.splice(+id,1);noteSave(parts);return}
+  const [kind,dir]=id.split('|');let t=null;
+  if(kind==='alt'){t=fmtLevel(v('n-alt'),e.fl);if(!t)return bad(e.fl?'Hladinu zadejte číslem, např. 240.':'Výšku zadejte ve stopách, např. 4000 (pro hladinu stiskněte FL).');t+=dir==='up'?' ↑':' ↓';document.getElementById('n-alt').value=''}
+  if(kind==='freq'){t=fmtFreq(v('n-freq'));if(!t)return bad('Frekvenci zadejte číslicemi, např. 133355 (= 133,355).');document.getElementById('n-freq').value=''}
+  if(kind==='hdg'){t=fmtHdg(v('n-hdg'));if(!t)return bad('Kurz zadejte jako 0–360.');if(dir==='left')t+=' ←';if(dir==='right')t+=' →';document.getElementById('n-hdg').value=''}
+  if(kind==='txt'){t=v('n-txt').replace(/\s*·\s*/g,' ');if(!t)return bad('Napište poznámku.');document.getElementById('n-txt').value=''}
+  parts.push(t);noteSave(parts);toast('Přidáno: '+t)}
+function ofpTimeLink(o,k,d){
+  if(!o.wpts||!o.wpts.length||!/^(w\d+_ato|[ab]\d*_?\d+_ato|x_off|x_on)$/.test(k))return '';
+  const raw=x=>{const v=x in d?d[x]:o.fill[x];return v!=null&&parseHM(v)!=null?normHM(v):''};
+  const lastIdx=A=>{let r=-1;A.forEach((p,i)=>{if(!p.rvsm)r=i});return r};
+  const dv=!!raw('dv')||!!(d.dv!=null?d.dv:o.fill.dv);
+  const destKey=()=>{if(!dv)return 'w'+lastIdx(o.wpts)+'_ato';const r=divRoute(o);if(!r)return '';const pre=r.i>0?'b'+r.i+'_':'a';return pre+lastIdx(r.wpts)+'_ato'};
+  const l=o.leg;
+  if(k==='w0_ato')return raw('x_off')||raw('atd')||(l&&parseHM(l.off)!=null?normHM(l.off):'');
+  if(k==='x_off')return raw('w0_ato');
+  if(k==='x_on'){const dk=destKey();return dk?raw(dk):''}
+  if(k===destKey())return raw('x_on')||(l&&l.state==='closed'&&parseHM(l.on)!=null?normHM(l.on):'');
+  return ''}
 function ofpDateTxt(o){const l=o.leg;if(l&&l.date&&l.date!==o.date)return `${fmtDate(l.date)} <span class="muted" style="font-size:.85em">(plán ${fmtDate(o.date)})</span>`;return fmtDate(o.date)}
 function parsePos(p){const m=String(p||'').match(/([NS])(\d{2})(\d{2}\.\d)\s+([EW])(\d{3})(\d{2}\.\d)/);if(!m)return null;const la=(+m[2]+ +m[3]/60)*(m[1]==='S'?-1:1),lo=(+m[5]+ +m[6]/60)*(m[4]==='W'?-1:1);return {la,lo}}
 function gcNm(a,b){const r=x=>x*Math.PI/180;const dla=r(b.la-a.la),dlo=r(b.lo-a.lo);const h=Math.sin(dla/2)**2+Math.cos(r(a.la))*Math.cos(r(b.la))*Math.sin(dlo/2)**2;return 2*3440.065*Math.asin(Math.sqrt(h))}
@@ -957,6 +1024,7 @@ function ofpDefsNow(o){const r=ofpRules(ofpType(o));const d={};for(const k in r)
 function ofpDefs(o){return o.defs||(o.closed||o.void?{}:ofpDefsNow(o))}
 const OFP_LEGFUEL={f_up:'fuelUp',f_blk:'fuelBlk',f_min:'fuelMin'};
 function ofpVal(o,k){const d=UI.ofpDirty&&UI.ofpDirty.id===o.ofpId?UI.ofpDirty.data:{};if(k in d)return d[k];if(o.fill[k]!=null)return o.fill[k];
+  {const t=ofpTimeLink(o,k,d);if(t)return t}
   if(k==='o_oilL'||k==='o_oilR'){const pd=ofpOilPending(o);if(pd)return String(k==='o_oilL'?pd.l:pd.r);const lo=o.leg&&parseOil(o.leg.oil);if(lo)return String(k==='o_oilL'?lo.l:lo.r);const xo=parseOil(o.fill.x_oil);if(xo)return String(k==='o_oilL'?xo.l:xo.r)}
   if(OFP_LEGFUEL[k]&&o.leg&&o.leg[OFP_LEGFUEL[k]]!=null)return String(o.leg[OFP_LEGFUEL[k]]);
   const df=ofpDefs(o)[k];return df==null?'':df}
@@ -1089,7 +1157,7 @@ function viewOfp(o,u){
       <td><input type="text" class="t4 ofp-t" data-of="w${i}_ato" value="${esc(ofpVal(o,'w'+i+'_ato'))}" inputmode="numeric" maxlength="5" placeholder="––:––" aria-label="ATO ${esc(p.wpt)}" ${sk||LK?'disabled':''}></td>
       <td class="r mono">${fmtN(p.mreq)}</td><td><input type="text" class="ofp-n" data-of="w${i}_fuel" value="${esc(ofpVal(o,'w'+i+'_fuel'))}" inputmode="numeric" aria-label="Palivo ${esc(p.wpt)}" ${sk||LK?'disabled':''}></td>
       <td class="r mono" id="wd-${i}" style="color:${diff==null?'inherit':diff<0?'var(--warn)':'var(--ok)'}">${diff==null?'':(diff>0?'+':'')+fmtN(diff)}</td>
-      <td><input type="text" class="ofp-note" data-of="w${i}_note" value="${esc(ofpVal(o,'w'+i+'_note'))}" aria-label="Poznámka ${esc(p.wpt)}" placeholder="FL / pozn." ${LK?'disabled':''}></td></tr>`}).join('');
+      <td>${noteBtn(o,'w'+i+'_note',p.wpt,LK)}</td></tr>`}).join('');
   const dctSum=dcts.length?`<div class="warnline info">${dcts.map(d=>`DCT <b class="mono">${esc(W[d.from].wpt)} → ${esc(W[d.to].wpt)}</b>: zkráceno o ${d.saved} NM, ~${d.min} min`).join('<br>')}. ETO dalších bodů je posunuté. Plánované palivo (MREQ) zůstává podle OFP.</div>`:'';
   const atl=l?`<dl class="kvgrid"><dt>Ramp ACT (palivo na odlet)</dt><dd class="mono">${fmtN(l.fuelBlk)} lbs <span class="muted">plán ${fmtN(f.rampEst)} · MREQ ${fmtN(f.rampMreq)}</span></dd>
       <dt>Used ACT (spáleno)</dt><dd class="mono">${l.state==='closed'?fmtN(l.fuelBurn)+' lbs':'–'} <span class="muted">plán ${fmtN(f.usedCalc)}</span>${l.state==='closed'&&l.fuelBurn!=null&&f.usedCalc?` <b style="color:${l.fuelBurn>f.usedCalc?'var(--caution)':'var(--ok)'}">${l.fuelBurn>f.usedCalc?'+':''}${fmtN(l.fuelBurn-f.usedCalc)}</b>`:''}</dd>
@@ -1184,12 +1252,12 @@ async function ofpPdf(o){
   const C={ink:rgb(.08,.11,.15),mute:rgb(.42,.46,.52),line:rgb(.80,.83,.87),soft:rgb(.95,.96,.97),ok:rgb(.09,.47,.29),caut:rgb(.60,.36,.02),warn:rgb(.69,.16,.13)};
   const PW=595.28,PH=841.89,M=34,CW=PW-2*M,BOT=48;
   let page,y;const pages=[];
-  const clean=v=>String(v==null?'':v).replace(/[   ]/g,' ').replace(/→/g,'-').replace(/[^\S\n ]+/g,' ');
-  const tw=(t,f,sz)=>F[f].widthOfTextAtSize(clean(t),sz);
-  const T=(t,x,yy,f='b',sz=9,c=C.ink)=>{t=clean(t);if(t)page.drawText(t,{x,y:yy,size:sz,font:F[f],color:c})};
+  const clean=(v,f)=>{let t=String(v==null?'':v).replace(/[   ]/g,' ').replace(/[^\S\n ]+/g,' ');if(f!=='m'&&f!=='ms')t=t.replace(/[→←]/g,'-').replace(/↑/g,'^').replace(/↓/g,'v');return t};
+  const tw=(t,f,sz)=>F[f].widthOfTextAtSize(clean(t,f),sz);
+  const T=(t,x,yy,f='b',sz=9,c=C.ink)=>{t=clean(t,f);if(t)page.drawText(t,{x,y:yy,size:sz,font:F[f],color:c})};
   const TR=(t,xr,yy,f='m',sz=8.5,c=C.ink)=>T(t,xr-tw(t,f,sz),yy,f,sz,c);
-  const fit=(t,f,sz,w)=>{t=clean(t);if(tw(t,f,sz)<=w)return t;while(t.length>1&&tw(t+'…',f,sz)>w)t=t.slice(0,-1);return t+'…'};
-  const wrap=(t,f,sz,w)=>{const out=[];for(const para of clean(t).split('\n')){let line='';for(let word of para.split(' ')){
+  const fit=(t,f,sz,w)=>{t=clean(t,f);if(tw(t,f,sz)<=w)return t;while(t.length>1&&tw(t+'…',f,sz)>w)t=t.slice(0,-1);return t+'…'};
+  const wrap=(t,f,sz,w)=>{const out=[];for(const para of clean(t,f).split('\n')){let line='';for(let word of para.split(' ')){
       while(tw(word,f,sz)>w){let k=word.length;while(k>1&&tw(word.slice(0,k),f,sz)>w)k--;if(line){out.push(line);line=''}out.push(word.slice(0,k));word=word.slice(k)}
       const cand=line?line+' '+word:word;if(tw(cand,f,sz)>w&&line){out.push(line);line=word}else line=cand}
     out.push(line)}return out};
@@ -1241,7 +1309,7 @@ async function ofpPdf(o){
     if(p.rvsm){if(nonR)return;if(need(14))head();
       T(`RVSM ALT DIFF (ft)   LH ${dash(val('r'+i+'_lh'))}   SBY ${dash(val('r'+i+'_sb'))}   RH ${dash(val('r'+i+'_rh'))}`,M+3,y,'m',8,C.ink);y-=6;HL(y);y-=9;return}
     const sk=skip.has(i);const isD=!!val('w'+i+'_dct');const d=dcts.find(x=>x.to===i);
-    const note=val('w'+i+'_note');const noteL=note?wrap(note,'b',7.5,cols[10][1]-6):[];
+    const note=val('w'+i+'_note');const noteL=note?wrap(note,'ms',7,cols[10][1]-6):[];
     const rh=Math.max(20,8+Math.max(2,noteL.length)*9);if(need(rh))head();
     const act=num(val('w'+i+'_fuel'));const diff=act!=null&&p.mreq!=null?act-p.mreq:null;
     const cc=sk?C.mute:C.ink;let x=M;
@@ -1249,7 +1317,7 @@ async function ofpPdf(o){
     T(fit(p.awy||'','m',7.5,cols[1][1]-4),x+3,y,'m',7.5,cc);T(fit(p.fl||'','m',7.5,cols[1][1]-4),x+3,y-9,'m',7.5,C.mute);x+=cols[1][1];
     const rv=[p.distInt??'',p.distAcc??'',p.tAcc||'',sk?'–':(etoAdj(p.tAcc,i)||'–'),sk?'–':dash(val('w'+i+'_ato')),fmtN(p.mreq),sk?'–':(act!=null?fmtN(act):'–'),diff==null?'':(diff>0?'+':'')+fmtN(diff)];
     rv.forEach((t,k)=>{const c=cols[k+2];const col=k===4&&t!=='–'?C.ink:k===7&&diff!=null?(diff<0?C.warn:C.ok):cc;TR(String(t),x+c[1]-3,y,k===4||k===6?'ms':'m',8,col);x+=c[1]});
-    noteL.forEach((ln,k)=>T(ln,x+3,y-k*9,'b',7.5));
+    noteL.forEach((ln,k)=>T(ln,x+3,y-k*9,'ms',7));
     y-=rh-8;HL(y);y-=9;
   });
   if(nonR){need(14);T('Let není prováděn v RVSM.',M+3,y,'b',8,C.mute);y-=12}
@@ -1262,12 +1330,12 @@ async function ofpPdf(o){
       if(rows.length){need(30);T('BOD',M+3,y,'bs',7,C.mute);T('ČAS PŘELETU',M+160,y,'bs',7,C.mute);T('PALIVO',M+280,y,'bs',7,C.mute);y-=12;
         for(const r of rows){need(14);T(r.wpt||'–',M+3,y,'ms',8.5);T(r.ato||'–',M+160,y,'ms',8.5);T(r.fuel?fmtN(num(r.fuel)):'–',M+280,y,'m',8.5);y-=6;HL(y);y-=9}}}
     else{const R=divRows(o).filter(r=>!r.rvsm);if(R.length){need(40);head();
-      for(const {p,i,eto,act,diff,pre} of R){const note=val(pre+i+'_note');const noteL=note?wrap(note,'b',7.5,cols[10][1]-6):[];
+      for(const {p,i,eto,act,diff,pre} of R){const note=val(pre+i+'_note');const noteL=note?wrap(note,'ms',7,cols[10][1]-6):[];
         const rh=Math.max(20,8+Math.max(2,noteL.length)*9);if(need(rh))head();let x=M;
         T(fit(p.wpt,'ms',8.5,cols[0][1]-4),x+3,y,'ms',8.5);T(fit(p.name||'','b',6.8,cols[0][1]-4),x+3,y-9,'b',6.8,C.mute);x+=cols[0][1];
         T(fit(p.awy||'','m',7.5,cols[1][1]-4),x+3,y,'m',7.5);T(fit(p.fl||'','m',7.5,cols[1][1]-4),x+3,y-9,'m',7.5,C.mute);x+=cols[1][1];
         [p.distInt??'',p.distAcc??'',p.tAcc||'',eto||'–',dash(val(pre+i+'_ato')),fmtN(p.mreq),act!=null?fmtN(act):'–',diff==null?'':(diff>0?'+':'')+fmtN(diff)].forEach((t,k)=>{const c=cols[k+2];TR(String(t),x+c[1]-3,y,k===4||k===6?'ms':'m',8,k===7&&diff!=null?(diff<0?C.warn:C.ok):C.ink);x+=c[1]});
-        noteL.forEach((ln,k)=>T(ln,x+3,y-k*9,'b',7.5));y-=rh-8;HL(y);y-=9}}}
+        noteL.forEach((ln,k)=>T(ln,x+3,y-k*9,'ms',7));y-=rh-8;HL(y);y-=9}}}
   }
   // --- arrival ---
   section('Přílet'+(val('dv')?' – divert '+divTo(o):''));
@@ -1424,7 +1492,7 @@ function ofpDivertPanel(o,LK){
       <td><input type="text" class="t4 ofp-t" data-of="${pre}${i}_ato" value="${esc(ofpVal(o,pre+i+'_ato'))}" inputmode="numeric" maxlength="5" placeholder="––:––" aria-label="ATO ${esc(p.wpt)}" ${LK?'disabled':''}></td>
       <td class="r mono">${fmtN(p.mreq)}</td><td><input type="text" class="ofp-n" data-of="${pre}${i}_fuel" value="${esc(ofpVal(o,pre+i+'_fuel'))}" inputmode="numeric" aria-label="Palivo ${esc(p.wpt)}" ${LK?'disabled':''}></td>
       <td class="r mono" style="color:${diff==null?'inherit':diff<0?'var(--warn)':'var(--ok)'}">${diff==null?'':(diff>0?'+':'')+fmtN(diff)}</td>
-      <td><input type="text" class="ofp-note" data-of="${pre}${i}_note" value="${esc(ofpVal(o,pre+i+'_note'))}" aria-label="Poznámka ${esc(p.wpt)}" placeholder="FL / pozn." ${LK?'disabled':''}></td></tr>`).join('')}</tbody></table></div></div>`;
+      <td>${noteBtn(o,pre+i+'_note',p.wpt,LK)}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
 function ofpMissing(o){
   const m=[];const v=k=>String(ofpVal(o,k)||'').trim();
@@ -1568,6 +1636,8 @@ function evText(e){
     case 'leg.amend':return `${reg}Oprava letu – ${esc(Object.keys(p.changes||{}).join(', '))}. Důvod: ${esc(p.reason)}`;
     case 'leg.void':return `${reg}Let zneplatněn. Důvod: ${esc(p.reason)}`;
     case 'crew.login':return `${reg}Přihlášení na iPadu letadla`;
+    case 'crs.prep':return `${reg}Připraveno k uvolnění (čeká na podpis osvědčujícího personálu): ${p.kind==='rect'?'odstranění závady '+esc((S.defects[p.defId]||{}).no||'')+' – '+esc(p.action):esc(p.scope||'WO '+(p.wo||''))}`;
+    case 'crs.prep.drop':return `${reg}Příprava uvolnění zrušena${p.reason?' – '+esc(p.reason):''}`;
     case 'oil.add':return `${reg}Doplněn olej L ${esc(p.l)} l · P ${esc(p.r)} l${p.note?' – '+esc(p.note):''}`;
     case 'defect.report':return `${reg}${p.src==='paper'?'Závada převzata z papírového deníku'+(p.paperPage?' (str. '+esc(p.paperPage)+')':''):'Závada zapsána'}: ${esc(p.text)}`;
     case 'defect.defer':return `${reg}Závada odložena dle MEL ${esc(p.melItem)} kat. ${esc(p.cat)} do ${fmtDate(p.due)}`;
@@ -1609,7 +1679,8 @@ function viewAdmin(u){
     <dl class="kvgrid"><dt>Domovské základny</dt><dd class="mono">${(c.bases||[]).map(esc).join(', ')||'–'}</dd>
     <dt>Doba letu a služby</dt><dd>${esc(FTL_BY[c.ftlBy]||c.ftlBy)}</dd>
     <dt>Pravidla</dt><dd>${esc(FTL_RULES[c.ftlRules]||c.ftlRules)}${c.omRef?` · <b>${esc(c.omRef)}</b>`:' · <span style="color:var(--caution)">chybí odkaz na OM</span>'}</dd>
-    <dt>Nástup / ukončení</dt><dd>${esc(c.reportMin)} min před 1. off-blockem · ${esc(c.postMin)} min po posledním on-blocku</dd>
+    <dt>Nástup do služby</dt><dd>na základně ${esc(c.reportMin)} min · mimo základnu ${esc(c.reportMinAway??c.reportMin)} min před 1. off-blockem</dd>
+    <dt>Ukončení služby</dt><dd>${esc(c.postMin)} min po posledním on-blocku</dd>
     <dt>Split duty</dt><dd>${c.splitDuty?'povolena dle OM':'nepoužívá se'}</dd>
     <dt>Číslování stránek</dt><dd>${esc(PAGE_FMT[c.pageFmt||'seq'])}</dd>
     <dt>Rychlé volby CRS</dt><dd>${(c.crsQuick||[]).length?(c.crsQuick||[]).map(esc).join(' · '):'žádné'}</dd></dl></div>
@@ -1617,7 +1688,7 @@ function viewAdmin(u){
   <div class="panel"><div class="panel-head"><h2>Letadla</h2><button class="btn sm" data-act="ac-form">${ICON.plus}Přidat</button></div>
     <div class="scroll-x"><table class="plain"><thead><tr><th>Registrace</th><th>Typ</th><th>První str.</th><th class="r">TTAF</th><th></th></tr></thead><tbody>${acs.map(a=>`<tr><td class="mono">${esc(a.reg)}${a.archived?' <span class="ann mute">archiv</span>':!a.isLive?' <span class="ann caution">nastavuje se</span>':''}</td><td>${esc(a.type||'–')}</td><td class="mono">${esc(a.startPage)}</td><td class="r mono">${hm(a.air)}</td><td><button class="btn sm" data-act="ac-form" data-id="${esc(a.acId)}">Upravit</button></td></tr>`).join('')}</tbody></table></div></div>
   <div class="panel"><div class="panel-head"><h2>Uživatelé</h2><button class="btn sm" data-act="user-form">${ICON.plus}Přidat</button></div>
-    <div class="scroll-x"><table class="plain"><thead><tr><th>Jméno</th><th>Role</th><th>Licence / web</th><th></th></tr></thead><tbody>${users.map(x=>`<tr><td>${esc(x.name)}${x.active===false?' <span class="ann mute">neaktivní</span>':''}</td><td>${x.roles.map(r=>ROLE[r]).join(', ')}</td><td class="mono">${esc(x.licence||'–')}${x.email?`<br><span class="muted" style="font-size:.84rem">web: ${esc(x.email)}</span>`:''}</td><td><button class="btn sm" data-act="user-form" data-id="${esc(x.userId)}">Upravit</button></td></tr>`).join('')}</tbody></table></div></div>
+    <div class="scroll-x"><table class="plain"><thead><tr><th>Jméno</th><th>Role</th><th>Licence / web</th><th></th></tr></thead><tbody>${users.map(x=>`<tr><td>${esc(x.name)}${x.active===false?' <span class="ann mute">neaktivní</span>':''}</td><td>${x.roles.map(r=>ROLE[r]).join(', ')}${x.crsAuth&&has(x,'mech')?' <span class="ann ok">CRS</span>':''}</td><td class="mono">${esc(x.licence||'–')}${x.email?`<br><span class="muted" style="font-size:.84rem">web: ${esc(x.email)}</span>`:''}</td><td><button class="btn sm" data-act="user-form" data-id="${esc(x.userId)}">Upravit</button></td></tr>`).join('')}</tbody></table></div></div>
   <div class="panel"><h2>Záloha a obnova</h2>
     <p class="muted">Data leží ve sdílené databázi a zároveň v každém zařízení, které deník otevřelo. Úplná záloha je celý log podpisů – z něj se dá cokoliv obnovit.</p>
     <div class="chips"><button class="btn" data-act="export-json">Stáhnout úplnou zálohu (JSON)</button><button class="btn" data-act="export-legs">Lety vybraného letadla (CSV)</button></div>
@@ -1682,6 +1753,7 @@ function briefing(ac){
   ac.open.forEach(d=>it.push(`<li class="b-warn"><b>Otevřená závada:</b> ${esc(d.text)}</li>`));
   ac.deferred.forEach(d=>{const left=daysBetween(todayISO(),d.deferral.due);it.push(`<li class="b-caution"><b>MEL ${esc(d.deferral.melItem)} kat. ${esc(d.deferral.cat)}:</b> ${esc(d.text)} – ${left<0?'odklad prošlý':'platí ještě '+left+' d'}${d.deferral.rem?' · '+esc(d.deferral.rem):''}</li>`)});
   {const pd=oilPending(ac.acId,null);if(pd)it.push(`<li><b>Doplněn olej před dalším letem:</b> L ${pd.l} l · P ${pd.r} l (${pd.who})</li>`)}
+  sinceLastFlight(ac).forEach(x=>it.push(`<li class="b-ok"><b>Uvolněno do provozu od posledního letu:</b> ${esc(x.t)} – ${esc(x.name)}, ${fmtTs(x.at)}</li>`));
   return `<div class="panel"><p class="label">Stav letadla</p>${it.length?`<ul class="brief">${it.join('')}</ul>`:'<p>Bez otevřených závad a odkladů.</p>'}<p class="muted">${ac.lastLeg?`Stojí v <b class="mono">${esc(ac.lastLeg.to)}</b> ${isBase(ac.lastLeg.to)?'<span class="ann ok">základna</span>':'<span class="ann mute">mimo základnu</span>'}`:'Zatím bez letu'} · TTAF <span class="mono">${hm(ac.air)}</span> · ${ac.cyc} cyklů</p></div>`;
 }
 function renderCrewStart(ac){
@@ -1852,7 +1924,7 @@ function cardClose(ac,next){
       <label class="check"><input type="checkbox" data-k="defMel" ${d.defMel?'checked':''}><span>Odloženo podle MEL – štítek INOP umístěn</span></label>
       ${d.defMel?`<div class="fgrid"><label class="fld"><span>Položka MEL</span><input type="text" data-k="defItem" value="${esc(d.defItem||'')}" placeholder="např. 33-40-01"></label><label class="fld"><span>Kategorie</span><select data-k="defCat">${['C','B','D'].map(c=>`<option ${d.defCat===c?'selected':''}>${c}</option>`).join('')}</select></label></div>`:''}`:''}
     <div class="links"><button type="button" class="linkbtn" data-act="fuel-open">${d.fuelOpen?'Skrýt olej':'+ Olej doplněn (nepovinné)'}</button></div>
-    ${(()=>{const pd=oilPending(l.acId,l.opened&&l.opened.at);return d.fuelOpen||pd?`<div class="fgrid"><label class="fld"><span>Olej doplněn L/P (litry)</span><input type="text" data-k="oil" value="${esc(d.oil!=null&&d.oil!==''?d.oil:(pd?pd.txt:''))}" placeholder="0 / 0"></label></div>${pd&&!d.oil?`<p class="muted" style="font-size:.86rem;margin:0">Předvyplněno – doplnil(a) ${pd.who}.</p>`:''}`:''})()}
+    ${(()=>{const pd=oilPending(l.acId,l.opened&&l.opened.at);const val=(k,x)=>d[k]!=null&&d[k]!==''?d[k]:(pd?String(x):'');return d.fuelOpen||pd?`<div class="fgrid"><label class="fld"><span>Olej doplněn – motor L (litry)</span><input type="text" data-k="oilL" inputmode="decimal" value="${esc(val('oilL',pd&&pd.l))}" placeholder="0"></label><label class="fld"><span>Olej doplněn – motor P (litry)</span><input type="text" data-k="oilR" inputmode="decimal" value="${esc(val('oilR',pd&&pd.r))}" placeholder="0"></label></div>${pd&&d.oilL==null&&d.oilR==null?`<p class="muted" style="font-size:.86rem;margin:0">Předvyplněno – doplnil(a) ${pd.who}.</p>`:''}`:''})()}
     <div class="warns" id="c-warn"></div><p class="form-err" id="c-err" hidden></p>
     ${picPinField(l.pic,'c-picpin',true)}
     <button type="button" class="btn big primary" data-act="crew-close">${ICON.check}Uzavřít a podepsat let${l.pic&&l.pic!==crewUser()&&S.users[l.pic]?' – PIC '+esc(S.users[l.pic].name):''}</button>
@@ -1913,8 +1985,14 @@ async function picSign(picId,pinEl){
 function picPinField(picId,id,big){const u=me();const pic=S.users[picId];if(!pic||(u&&u.id===picId))return '';
   return `<label class="fld"><span>PIN kapitána – ${esc(pic.name)} (let podepisuje PIC)</span><input type="password" id="${id}" ${big?'class="big-in"':''} inputmode="numeric" autocomplete="off"></label>`}
 // cut-off for ground oil records: when the flight was opened (security search), else its off-block time
+// oil is always entered per engine (litres) and stored as "L / P"
+function oilFields(pfx,L,R){return `<div class="fgrid">${F.text(pfx+'l','Olej doplněn – motor L (litry)',L==null?'':String(L),{attrs:'inputmode="decimal" placeholder="0"'})}${F.text(pfx+'r','Olej doplněn – motor P (litry)',R==null?'':String(R),{attrs:'inputmode="decimal" placeholder="0"'})}</div>`}
+function oilJoin(L,R){const q=x=>{const t=String(x==null?'':x).replace(',','.').trim();if(t==='')return 0;if(!/^\d+(\.\d+)?$/.test(t))fail('Olej zadejte v litrech, např. 0,5.');return +t};
+  const a=q(L),b=q(R);if(a>10||b>10)fail('Tolik oleje se nedoplňuje – zkontrolujte hodnotu (zadává se v litrech).');return a||b?`${a} / ${b}`:''}
 function oilCut(l){return l.opened&&l.opened.at?l.opened.at:(l.date&&parseHM(l.out)!=null?l.date+'T'+normHM(l.out):null)}
-function oilOf(get,l){const pd=oilPending(l.acId,oilCut(l));let oil=String(get('oil')==null?'':get('oil')).trim();if(!oil&&pd)oil=pd.txt;
+function oilOf(get,l){const pd=oilPending(l.acId,oilCut(l));let oil=String(get('oil')==null?'':get('oil')).trim();
+  const gl=get('oilL'),gr=get('oilR');if(!oil&&(gl!=null||gr!=null))oil=oilJoin(gl!=null&&gl!==''?gl:(pd?pd.l:''),gr!=null&&gr!==''?gr:(pd?pd.r:''));
+  if(!oil&&pd)oil=pd.txt;
   if(oil){if(!/^\d+(?:[.,]\d+)?\s*\/\s*\d+(?:[.,]\d+)?$/.test(oil))fail('Olej zadejte v litrech pro motor L a P, např. 0,5 / 0.');oil=oil.replace(/,/g,'.').replace(/\s*\/\s*/,' / ');if(!parseOil(oil))oil=''}
   const svc=get('oilSvc');const ids=Array.isArray(svc)&&svc.length?svc:(pd?pd.ids:[]);
   const po=parseOil(oil)||{l:0,r:0};const warn=pd&&(po.l<pd.l||po.r<pd.r)?`Olej: zapsáno méně, než doplnil mechanik (L ${pd.l} / P ${pd.r} l). Zkontrolujte.`:'';
@@ -1953,6 +2031,14 @@ async function crewClose(){
 }
 
 /* --- start / close flight from the office view (same events, in a sheet) --- */
+function openStartChoice(){
+  const ac=S.ac[UI.acId];if(!ac)return;if(ac.openLeg){openCloseFlight();return}
+  const pl=plannedOfps(ac).sort((a,b)=>(a.date+a.std)<(b.date+b.std)?-1:1);
+  openSheet('Začít let – '+ac.reg,`<div class="start-choice">
+    ${pl.length?`<div><p class="label">Nahraná OFP – zatím nezahájená</p><div class="sres">${pl.map(o=>`<button type="button" data-act="ofp-open" data-id="${esc(o.ofpId)}"><span class="k">${esc(o.flt)}</span><span>${esc(o.dep)} → ${esc(o.des)} · ${fmtDate(o.date)} · STD ${esc(o.std)}Z</span></button>`).join('')}</div></div>`:''}
+    <label class="btn big primary choice">${ICON.plus}<span>Nahrát OFP (PDF)<small>let se pak vede podle OFP</small></span><input type="file" id="ofp-file-s" accept="application/pdf,.pdf" hidden></label>
+    <button type="button" class="btn big choice" data-act="start-noofp"><span>Let bez OFP<small>přelet, OFP nejde nahrát</small></span></button></div>`,{focus:false});
+}
 function openStartFlight(ofpId){
   const O=ofpId?ofpOf(ofpId):null;
   const u=me();const ac=S.ac[UI.acId];if(ac.openLeg){openCloseFlight();return}
@@ -2002,7 +2088,7 @@ function openCloseFlight(legId){
     <fieldset><legend class="label">Závady</legend><div class="tiles"><label class="tile"><input type="radio" name="s-def" value="0" checked>Žádné (NIL)</label><label class="tile found"><input type="radio" name="s-def" value="1">Zapsat závadu</label></div>
       <div id="s-defbox" style="display:grid;gap:10px" hidden><label class="fld"><span>Popis závady</span><textarea id="f-deftext"></textarea></label>${F.check('f-defmel','Odloženo podle MEL – štítek INOP umístěn',false)}
       <div class="fgrid">${F.text('f-defitem','Položka MEL','')}${F.sel('f-defcat','Kategorie',[['C','C'],['B','B'],['D','D']],'C')}</div></div></fieldset>
-    <details><summary class="linkbtn">+ Olej doplněn (nepovinné)</summary><div class="fgrid">${F.text('f-oil','Olej doplněn L/P (litry)','',{attrs:'placeholder="0 / 0"'})}</div></details>
+    ${(()=>{const pd=oilPending(l.acId,oilCut(l));return `<details ${pd?'open':''}><summary class="linkbtn">+ Olej doplněn (nepovinné)</summary>${oilFields('f-oil',pd?pd.l:'',pd?pd.r:'')}${pd?`<p class="muted" style="font-size:.86rem;margin:4px 0 0">Předvyplněno – doplnil(a) ${pd.who}. Pokud jste doplnili i vy, přičtěte.</p>`:''}</details>`})()}
     <div class="links"><button type="button" class="linkbtn" data-act="void-form" data-id="${esc(l.legId)}">Let se neuskutečnil – zrušit</button></div>`;
   const ipic=l.pic;const pinF=picPinField(ipic,'f-picpin');
   openSheet('Uzavřít let – '+ac.reg,html+pinF,{submit:'Uzavřít a podepsat let',sign:!pinF,live:()=>{
@@ -2011,7 +2097,7 @@ function openCloseFlight(legId){
     const ra=document.querySelector('input[name="s-app"]:checked');const oa=document.getElementById('s-app-other');if(oa)oa.hidden=!(ra&&ra.value==='OTHER');
   },onSubmit:async()=>{
     const r=document.querySelector('input[name="s-def"]:checked');
-    const ra=document.querySelector('input[name="s-app"]:checked');const rp=document.querySelector('input[name="s-pf"]:checked');const map={cdate:v('f-cdate'),pf:rp?rp.value:'',app:ra?ra.value:'',appOther:v('f-appother'),cto:v('f-to'),out:v('s-out'),off:v('s-off'),on:v('s-on'),in:v('s-in'),ldg:v('s-ldg'),defOn:r&&r.value==='1',defText:v('f-deftext'),defMel:chk('f-defmel'),defItem:v('f-defitem'),defCat:v('f-defcat'),fuelRem:v('s-frem'),fuelBurn:v('s-fburn'),oil:v('f-oil')};
+    const ra=document.querySelector('input[name="s-app"]:checked');const rp=document.querySelector('input[name="s-pf"]:checked');const map={cdate:v('f-cdate'),pf:rp?rp.value:'',app:ra?ra.value:'',appOther:v('f-appother'),cto:v('f-to'),out:v('s-out'),off:v('s-off'),on:v('s-on'),in:v('s-in'),ldg:v('s-ldg'),defOn:r&&r.value==='1',defText:v('f-deftext'),defMel:chk('f-defmel'),defItem:v('f-defitem'),defCat:v('f-defcat'),fuelRem:v('s-frem'),fuelBurn:v('s-fburn'),oilL:v('f-oill'),oilR:v('f-oilr')};
     const res=readClose(k=>map[k],l);const signer=await picSign(res.items[0][1].pic,'f-picpin');emit(res.items,signer);closeSheet();toast(`Let ${l.from} → ${res.to} uzavřen a podepsán`);
   }});
 }
@@ -2058,7 +2144,7 @@ function openSheet(title,html,opt){
   const first=el.querySelector('.sheet-body input:not([type=hidden]):not([readonly]),.sheet-body textarea,.sheet-body select');
   if(first&&opt.focus!==false&&matchMedia('(pointer:fine)').matches)first.focus();
 }
-function closeSheet(){hoStop();const el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.classList.remove('noscroll');sheetSubmit=null;sheetLive=null}
+function closeSheet(){hoStop();const el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.classList.remove('noscroll');sheetSubmit=null;sheetLive=null;if(UI.noteEd){UI.noteEd=null;render()}}
 function fail(msg){throw new Error(msg)}
 async function checkPin(){if(mode()==='crew'&&crewValid())return;const pin=v('f-pin');const u=me();if(!pin)fail('Pro podpis zadejte svůj PIN.');const h=await sha(u.id+':'+pin);if(h!==u.pinHash){const el=document.getElementById('f-pin');if(el){el.value='';el.classList.add('bad')}fail('Nesprávný PIN.')}}
 function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>{el.hidden=true},3200)}
@@ -2094,7 +2180,7 @@ function legFields(l,ac){
     ${F.sel('f-pic','PIC',crewOpts(false),l.pic||(has(u,'crew')?u.id:''))}${F.sel('f-sic','SIC',crewOpts(true),l.sic||'')}${F.sel('f-pf','Pilot Flying',[['pic','PIC'],['sic','SIC']],l.pf&&l.pf===l.sic?'sic':'pic')}
     ${F.text('f-fuelup','Natankováno (L)',l.fuelUp,{attrs:'inputmode="numeric"'})}${F.text('f-fuelblk','Palivo na odlet (lbs)',l.fuelBlk,{attrs:'inputmode="numeric"'})}${F.text('f-fuelmin','Min. required (lbs)',l.fuelMin,{attrs:'inputmode="numeric"'})}
   </div>${l.state==='open'?'':landFuelFields(l,'f-',k=>l[k],false)}<div class="fgrid">
-    ${F.text('f-oil','Olej doplněn L/P (litry)',l.oil,{attrs:'placeholder="0 / 0"'})}
+  </div>${(()=>{const po=parseOil(l.oil);return oilFields('f-oil',po?po.l:'',po?po.r:'')})()}<div class="fgrid">
     ${F.area('f-rem','Poznámka',l.rem,'')}
   </div></fieldset>`;
 }
@@ -2117,7 +2203,7 @@ function readLeg(amend){
   const ldg=parseInt(v('f-ldg'),10);if(!(ldg>=1&&ldg<=50))fail('Počet přistání musí být alespoň 1.');
   const app=readApp(k=>({app:v('f-app'),appOther:v('f-appother')})[k]);
   if(!v('f-pic'))fail('Vyberte PIC.');
-  return {date,kind:v('f-kind'),fno:v('f-fno').toUpperCase(),from,to,out:t.out,off:t.off,on:t.on,in:t.in,ldg,app,pic:v('f-pic'),sic:v('f-sic'),pf:v('f-pf')==='sic'&&v('f-sic')?v('f-sic'):v('f-pic'),...legFuel(amend),oil:v('f-oil'),rem:v('f-rem')};
+  return {date,kind:v('f-kind'),fno:v('f-fno').toUpperCase(),from,to,out:t.out,off:t.off,on:t.on,in:t.in,ldg,app,pic:v('f-pic'),sic:v('f-sic'),pf:v('f-pf')==='sic'&&v('f-sic')?v('f-sic'):v('f-pic'),...legFuel(amend),oil:oilJoin(v('f-oill'),v('f-oilr')),rem:v('f-rem')};
 }
 function legLive(ac,editingId){
   return ()=>{
@@ -2142,7 +2228,10 @@ function openLegForm(){
   const opd=oilPending(ac.acId,open?open.opened.at:null);
   const pre=open?Object.assign({},open,{ldg:1,oil:opd?opd.txt:''}):{date:todayISO(),from:ac.lastLeg?ac.lastLeg.to:'',ldg:1,oil:opd?opd.txt:''};
   const head=open?`<div class="warnline info">Předletový zápis podepsal ${esc(open.opened.name)} v ${fmtTs(open.opened.at)}${open.sec?` · bezpečnostní prohlídka ${esc(open.sec.time)}Z`:''}. Doplňte časy a přistání. Při odklonu přepište letiště „Kam“.</div>`:'';
-  const html=`${head}${opd?`<div class="warnline info">Olej předvyplněn – doplnil(a) ${opd.who}. Do ATL se zapíše u tohoto letu.</div>`:''}<div class="warns" id="legwarn"></div>${legFields(pre,ac)}
+  const paperTop=open?'':`<fieldset class="paper-top"><legend class="label">Přepis z papírového technického deníku</legend>
+    <div class="fgrid">${F.text('f-paperpg','Číslo stránky papírového deníku','',{attrs:'autocapitalize="characters" placeholder="např. 800155"'})}</div>
+    <p class="muted" style="font-size:.86rem;margin:4px 0 0">Při výpadku tabletu se let píše na papír a sem se přepíše. V ATL bude označený „z papíru“ s číslem stránky.</p></fieldset>`;
+  const html=`${paperTop}${head}${opd?`<div class="warnline info">Olej předvyplněn – doplnil(a) ${opd.who}. Do ATL se zapíše u tohoto letu.</div>`:''}<div class="warns" id="legwarn"></div>${legFields(pre,ac)}
   ${open?'':`<fieldset><legend class="label">Bezpečnostní prohlídka</legend>
     <div class="warnline caution">Při běžném provozu se prohlídka podepisuje před odletem přes „Před odletem + Security“, aby o ní firma věděla včas. Tady ji zapište jen zpětně.</div>
     ${F.check('f-sec','Bezpečnostní prohlídka letadla byla před letem provedena',false)}<div class="fgrid">${F.time('f-sectime','Čas prohlídky (UTC)','')}</div></fieldset>`}
@@ -2151,15 +2240,13 @@ function openLegForm(){
     <div class="chips"><button type="button" class="btn sm" data-act="add-defrow">${ICON.plus}Přidat závadu</button></div>
     <p class="muted" id="nil-note">Bez závad se let podepíše jako NIL.</p>
   </fieldset>
-  ${open?'':`<fieldset><legend class="label">Zpětný zápis</legend>
-    ${F.check('f-paper','Zápis přepisuji z papírového technického deníku (výpadek tabletu)',false)}
-    <div class="fgrid" id="paper-row" hidden>${F.text('f-paperpg','Číslo papírové stránky','')}</div>
-  </fieldset>`}`;
+`;
   openSheet((open?'Dokončení letu – ':'Zápis letu – ')+ac.reg,html,{sub:`Následuje stránka ${ac.pages.length&&ac.pages[ac.pages.length-1].date===todayISO()&&ac.pages[ac.pages.length-1].legs.length<PER_PAGE?ac.pages[ac.pages.length-1].no:(S.cfg.pageFmt==='date'?'nová':ac.nextPage)} · TTAF ${hm(ac.air)}`,submit:'Podepsat let',sign:true,live:legLive(ac,null),onSubmit:async()=>{
+    if(!open&&!v('f-paperpg'))fail('Uveďte číslo stránky papírového deníku, ze které let přepisujete.');
     const leg=readLeg();checkTimes(ac.acId,open?open.legId:null,leg,false);
     const rows=[...document.querySelectorAll('.def-row')].map(r=>{const q=s=>r.querySelector(s);return {text:q('.d-text').value.trim(),mel:q('.d-mel').checked,item:q('.d-item').value.trim(),cat:q('.d-cat').value,due:q('.d-due').value.trim()}}).filter(r=>r.text||r.mel);
     for(const r of rows){if(!r.text)fail('Každá závada musí mít popis.');if(r.mel){if(!r.item)fail('U odkladu dle MEL vyplňte číslo položky.');if(r.cat==='A'&&!parseDate(r.due))fail('Kategorie A potřebuje datum platnosti odkladu.')}}
-    const paper=chk('f-paper');if(paper&&!v('f-paperpg'))fail('Uveďte číslo papírové stránky, ze které zápis přepisujete.');
+    const paper=!open;if(paper&&!v('f-paperpg'))fail('Uveďte číslo stránky papírového deníku, ze které let přepisujete.');
     let sec;
     if(!open&&chk('f-sec')){const st=v('f-sectime');if(parseHM(st)==null)fail('Zadejte čas bezpečnostní prohlídky HH:MM UTC.');sec={time:normHM(st),place:'',result:'NIL',notes:'Zapsáno zpětně se zápisem letu',byName:u.name}}
     await checkPin();
@@ -2248,7 +2335,7 @@ function openLegDetail(id){
   const btns=[];
   if(l.ofpId&&ofpOf(l.ofpId))btns.push(`<button type="button" class="btn" data-act="ofp-open" data-id="${esc(l.ofpId)}">Otevřít OFP ${esc(ofpOf(l.ofpId).flt)}</button>`);
   if(s)btns.push(`<button type="button" class="btn" data-act="copy-sec" data-id="${esc(id)}">Kopírovat potvrzení (Fl3xx)</button>`);
-  if(!isOpen&&!l.void&&can.crs(u))btns.push(`<button type="button" class="btn" data-act="crs-leg" data-id="${esc(id)}">${ICON.check}Vydat CRS po tomto letu</button>`);
+  if(!isOpen&&!l.void&&can.prepCrs(u))btns.push(`<button type="button" class="btn" data-act="crs-leg" data-id="${esc(id)}">${ICON.check}${can.crs(u)?'Vydat CRS po tomto letu':'Připravit CRS po tomto letu'}</button>`);
   const lc=crsOf(l);
   if(!l.void&&isOpen&&can.leg(u))btns.push(`<button type="button" class="btn primary" data-act="complete-leg" data-id="${esc(id)}">Dokončit let</button>`,`<button type="button" class="btn danger" data-act="void-form" data-id="${esc(id)}">Zrušit – let se neuskutečnil</button>`);
   else if(!l.void&&can.amend(u,l))btns.push(`<button type="button" class="btn" data-act="amend-form" data-id="${esc(id)}">Opravit zápis</button>`,`<button type="button" class="btn danger" data-act="void-form" data-id="${esc(id)}">Zneplatnit (duplicita / omyl)</button>`);
@@ -2311,22 +2398,67 @@ function openDefer(id){
     await checkPin();emit([['defect.defer',{defId:id,melItem:item,cat:v('f-cat'),due,procO:chk('f-o'),procM:chk('f-m'),placard:true,rem:v('f-rem')}]]);closeSheet();toast('Odklad podepsán');
   }});
 }
-function openRectify(id){
-  const d=S.defects[id];const ac=S.ac[d.acId];const u=me();
-  openSheet('Odstranění závady a CRS – '+d.no,`<p class="txt">${esc(d.text)}</p><div class="fgrid">
-    ${F.text('f-ata','ATA kapitola',d.ata||'',{attrs:'inputmode="numeric" maxlength="2"'})}${F.text('f-wo','Číslo WO','')}
-    ${F.text('f-air','TTAF při odstranění',hm(ac.air).replace(/ /g,''),{attrs:'inputmode="numeric" class="mono"'})}${F.text('f-cyc','Cykly',String(ac.cyc),{attrs:'inputmode="numeric"'})}
-    ${F.text('f-lic','Číslo licence / oprávnění',u.licence||'')}</div>
-    ${F.area('f-action','Provedená opatření','','Co bylo provedeno, podle jakého dokumentu (AMM/IPC kapitola)')}
-    <div class="statement">${CRS_TEXT}</div>${F.check('f-stmt','Potvrzuji prohlášení o uvolnění do provozu',false)}`,{submit:'Podepsat CRS',sign:true,onSubmit:async()=>{
+function openRectify(id,prepId){
+  const pr=prepId&&S.preps[prepId];if(pr)id=pr.defId;
+  const d=S.defects[id];if(!d)return;const ac=S.ac[d.acId];const u=me();const auth=can.crs(u);if(!auth&&(pr||!can.rectify(u)))return;
+  const pv=(k,x)=>pr&&pr[k]!=null?pr[k]:x;
+  openSheet((auth?'Odstranění závady a CRS – ':'Odstranění závady – příprava – ')+d.no,`${auth?'':'<div class="warnline info">Podepsat CRS může jen osvědčující personál s oprávněním. Připravené odstranění uvidí u závady a v záložce Uvolnění.</div>'}${pr?`<div class="warnline info">Připravil ${esc(pr.who.name)} · ${fmtTs(pr.at)} – zkontrolujte a podepište.</div>`:''}<p class="txt">${esc(d.text)}</p><div class="fgrid">
+    ${F.text('f-ata','ATA kapitola',pv('ata',d.ata||''),{attrs:'inputmode="numeric" maxlength="2"'})}${F.text('f-wo','Číslo WO',pv('wo',''))}
+    ${F.text('f-air','TTAF při odstranění',hm(pv('acAir',ac.air)).replace(/\u2009/g,''),{attrs:'inputmode="numeric" class="mono"'})}${F.text('f-cyc','Cykly',String(pv('acCyc',ac.cyc)),{attrs:'inputmode="numeric"'})}
+    ${auth?F.text('f-lic','Číslo licence / oprávnění',u.licence||''):''}</div>
+    ${F.area('f-action','Provedená opatření',pv('action',''),'Co bylo provedeno, podle jakého dokumentu (AMM/IPC kapitola)')}
+    ${auth?`<div class="statement">${CRS_TEXT}</div>${F.check('f-stmt','Potvrzuji prohlášení o uvolnění do provozu',false)}`:''}`,{submit:auth?'Podepsat CRS':'Připravit k podpisu',sign:true,onSubmit:async()=>{
     const action=v('f-action');if(action.length<4)fail('Popište provedená opatření.');const air=parseDur(v('f-air'));if(air==null)fail('TTAF zadejte jako hodiny:minuty, např. 3455:40.');
+    const base={defId:id,ata:v('f-ata'),wo:v('f-wo'),acAir:air,acCyc:parseInt(v('f-cyc'),10)||0,action};
+    if(!auth){if(prepFor(id))fail('Odstranění této závady už je připravené k podpisu.');await checkPin();emit([['crs.prep',Object.assign({prepId:rid('prep'),kind:'rect',acId:d.acId},base)]]);closeSheet();toast('Odstranění připraveno – čeká na podpis CRS');return}
     if(!v('f-lic'))fail('Vyplňte číslo licence.');if(!chk('f-stmt'))fail('Potvrďte prohlášení CRS.');
-    await checkPin();emit([['defect.rectify',{defId:id,ata:v('f-ata'),wo:v('f-wo'),acAir:air,acCyc:parseInt(v('f-cyc'),10)||0,licence:v('f-lic'),action}]]);closeSheet();toast('Závada uzavřena, CRS podepsáno');
+    if(pr&&(pr.used||pr.dropped))fail('Tato příprava už byla podepsaná nebo zrušená.');
+    await checkPin();emit([['defect.rectify',Object.assign({},base,{licence:v('f-lic')},pr?{prepId:pr.prepId,prepBy:pr.who.name}:{})]]);closeSheet();toast('Závada uzavřena, CRS podepsáno');
   }});
 }
+/* --- prepared releases: any mechanic prepares, certifying staff signs --- */
+function prepsOf(acId){return Object.values(S.preps).filter(x=>x.acId===acId&&!x.used&&!x.dropped&&(x.kind!=='rect'||(S.defects[x.defId]&&S.defects[x.defId].status!=='closed'))).sort((a,b)=>a.at<b.at?-1:1)}
+function prepFor(defId){const d=S.defects[defId];return d?prepsOf(d.acId).find(x=>x.kind==='rect'&&x.defId===defId)||null:null}
+function canDropPrep(u,x){return !!u&&(x.who.id===u.id||can.crs(u)||has(u,'camo'))}
+function prepTitle(x){if(x.kind==='rect'){const d=S.defects[x.defId];return `Odstranění závady ${d?d.no+' – '+d.text:''}`}return x.scope||'Uvolnění dle WO '+(x.wo||'')}
+function prepPanel(ac,u){const list=prepsOf(ac.acId);if(!list.length)return '';
+  return `<div class="panel prep-panel"><p class="label">Připraveno k uvolnění – čeká na podpis osvědčujícího personálu · ${list.length}</p>${list.map(x=>`<div class="prep-row"><div><b>${esc(prepTitle(x))}</b><br><span class="muted">${x.kind==='rect'?esc(x.action)+' · ':''}WO ${esc(x.wo||'–')} · připravil ${esc(x.who.name)} ${fmtTs(x.at)}</span></div>
+    <div class="chips">${can.crs(u)?`<button class="btn sm primary" data-act="prep-sign" data-id="${esc(x.prepId)}">Zkontrolovat a podepsat</button>`:''}${canDropPrep(u,x)?`<button class="btn sm ghost" data-act="prep-drop" data-id="${esc(x.prepId)}">Zrušit</button>`:''}</div></div>`).join('')}
+    ${can.crs(u)?'':'<p class="muted" style="font-size:.86rem;margin:6px 0 0">Podepsat může jen mechanik s oprávněním k uvolnění do provozu.</p>'}</div>`}
+function prepNote(acId){const n=prepsOf(acId).length;return n?`<div class="warnline caution" style="margin:0"><b>Připraveno k uvolnění: ${n}</b> – čeká na podpis osvědčujícího personálu (záložka Uvolnění).</div>`:''}
+// releases signed after the last flight's on-block: the next crew should see them before departure
+function sinceLastFlight(ac){const l=ac.lastLeg;const cut=l&&l.signed?l.signed.at:'';
+  const out=S.crs.filter(c=>c.acId===ac.acId&&(c.at>=cut||(l&&c.legId===l.legId))).map(c=>({t:'CRS '+crsTitle(c)+(c.wo?' (WO '+c.wo+')':''),name:c.name,at:c.at}));
+  ac.defects.filter(d=>d.rect&&d.rect.at>=cut).forEach(d=>out.push({t:'odstranění závady '+d.no+' – '+d.text,name:d.rect.name,at:d.rect.at}));
+  return out.sort((a,b)=>a.at<b.at?-1:1)}
+function openCrsDetail(id){
+  const [k,x]=String(id).split('|');
+  if(k==='rect'){openDefectDetail(x);return}
+  if(k==='ground'){const g=S.grounds.find(y=>y.ev===x);if(!g)return;const ac=S.ac[g.acId];
+    const rel=S.crs.filter(c=>c.acId===g.acId&&c.at>g.at).sort((a,b)=>a.at<b.at?-1:1)[0];
+    openSheet('Uzemnění – '+(ac?ac.reg:''),`<dl class="kvgrid"><dt>Důvod</dt><dd>${esc(g.reason)}</dd><dt>WO</dt><dd class="mono">${esc(g.wo||'–')}</dd><dt>Uzemnil</dt><dd>${esc(g.name)} · ${fmtTs(g.at)}</dd>
+      <dt>Ukončeno</dt><dd>${rel?`CRS ${esc(crsTitle(rel))} · ${esc(rel.name)} · ${fmtTs(rel.at)}`:'<b style="color:var(--warn)">Stále uzemněno – čeká na CRS</b>'}</dd></dl>`,{focus:false});return}
+  const c=S.crs.find(y=>y.crsId===x);if(!c)return;const ac=S.ac[c.acId];const L=c.legId&&S.legs[c.legId];const signer=S.users[c.id];
+  openSheet('Uvolnění do provozu – '+(ac?ac.reg:''),`<p class="txt"><b>${esc(crsTitle(c))}</b></p>
+    <dl class="kvgrid"><dt>WO / workpack</dt><dd class="mono">${esc(c.wo||'–')}</dd>
+    <dt>Přiřazeno k letu</dt><dd>${L?`<button type="button" class="linkbtn" style="display:inline;min-height:0;padding:0" data-act="leg-detail" data-id="${esc(L.legId)}">po letu ${esc(L.page)}/${L.idx} · ${fmtDate(L.date)} · ${esc(L.from)} → ${esc(L.to)}</button>`:'nepřiřazeno'}</dd>
+    <dt>TTAF / cykly</dt><dd class="mono">${c.acAir!=null?hm(c.acAir):'–'} · ${esc(c.acCyc??'–')}</dd>
+    <dt>Organizace Part-145</dt><dd class="mono">${esc(c.org||'–')}</dd>
+    <dt>Podepsal</dt><dd>${esc(c.name)} · licence <span class="mono">${esc(c.licence||'–')}</span>${signer&&signer.crsAuth?'':''}</dd>
+    <dt>Čas podpisu</dt><dd class="mono">${fmtTs(c.at)}</dd>
+    ${c.prepBy?`<dt>Připravil</dt><dd>${esc(c.prepBy)}</dd>`:''}
+    <dt>Zařízení</dt><dd class="mono muted">${esc(c.dev||'')}</dd></dl>
+    <div class="statement">Údržba byla provedena v rozsahu uvedeného workpacku. ${CRS_TEXT}</div>${delLink('crs:'+c.crsId,'Smazat toto CRS')}`,{focus:false});
+}
+function openPrepDrop(id){const x=S.preps[id];const u=me();if(!x||!canDropPrep(u,x))return;
+  openSheet('Zrušit přípravu uvolnění',`<p><b>${esc(prepTitle(x))}</b></p>${F.text('f-reason','Důvod (nepovinné)','')}`,{submit:'Zrušit přípravu',sign:true,onSubmit:async()=>{await checkPin();emit([['crs.prep.drop',{prepId:id,acId:x.acId,reason:v('f-reason')}]]);closeSheet();toast('Příprava zrušena')}})}
 function openDefectDetail(id){
   const d=S.defects[id];if(!d)return;
-  openSheet('Historie závady '+d.no,`<p class="txt">${esc(d.text)}</p><ul>${d.trail.map(t=>`<li><b>${esc(t.t)}</b> – ${esc(t.name)}, ${fmtTs(t.at)} <span class="mono muted">${esc(t.dev)}</span></li>`).join('')}</ul>
+  const R=d.rect,D=d.deferral;
+  openSheet('Závada '+d.no,`<p class="txt">${esc(d.text)}</p>
+    ${R?`<div><p class="label">Odstranění a CRS</p><dl class="kvgrid"><dt>Opatření</dt><dd>${esc(R.action)}</dd><dt>ATA / WO</dt><dd class="mono">${esc(R.ata||'–')} · ${esc(R.wo||'–')}</dd><dt>TTAF / cykly</dt><dd class="mono">${R.acAir!=null?hm(R.acAir):'–'} · ${esc(R.acCyc??'–')}</dd><dt>CRS podepsal</dt><dd>${esc(R.name)} · licence <span class="mono">${esc(R.licence||'–')}</span> · ${fmtTs(R.at)}</dd>${R.prepBy?`<dt>Připravil</dt><dd>${esc(R.prepBy)}</dd>`:''}</dl><div class="statement">${CRS_TEXT}</div></div>`:''}
+    ${D?`<div><p class="label">Odklad</p><dl class="kvgrid"><dt>MEL</dt><dd class="mono">${esc(D.melItem||'–')} · kat. ${esc(D.cat)}</dd><dt>Platí do</dt><dd>${fmtDate(D.due)}</dd><dt>Odložil</dt><dd>${esc(D.name)} · ${fmtTs(D.at)}</dd></dl></div>`:''}
+    <p class="label">Historie</p><ul>${d.trail.map(t=>`<li><b>${esc(t.t)}</b> – ${esc(t.name)}, ${fmtTs(t.at)} <span class="mono muted">${esc(t.dev)}</span></li>`).join('')}</ul>
     ${d.rect?delLink('ev:'+d.rect.ev,'Smazat jen odstranění (závada se znovu otevře)'):''}${d.deferral?delLink('ev:'+d.deferral.ev,'Smazat jen odklad'):''}${delLink('def:'+id,'Smazat celou závadu')}`,{focus:false});
 }
 
@@ -2334,19 +2466,30 @@ function openDefectDetail(id){
 const CRS_KIND={SCHED:'Pravidelná prohlídka',WP:'Plánovaná údržba',UNSCHED:'Neplánovaná údržba'};
 function crsTitle(c){return c.scope||(c.kind&&CRS_KIND[c.kind])||'Údržba dle workpacku'}
 function crsOf(l){return S.crs.filter(c=>c.legId&&c.legId===l.legId)}
-function openCrs(legId){
-  const L=legId&&S.legs[legId];const ac=S.ac[L?L.acId:UI.acId];const u=me();
+function openCrs(legId,prepId){
+  const pr=prepId&&S.preps[prepId];if(pr)legId=pr.legId;
+  const L=legId&&S.legs[legId];const ac=S.ac[pr?pr.acId:L?L.acId:UI.acId];const u=me();const auth=can.crs(u);if(!auth&&(pr||!can.prepCrs(u)))return;
   const tAir=L?L.ttaf:ac.air,tCyc=L?L.tcyc:ac.cyc;const last=[...S.crs].reverse().find(c=>c.licence&&c.id===u.id);
-  openSheet('Uvolnění do provozu – '+ac.reg,`${L?`<div class="warnline info">Po letu <b class="mono">${esc(L.from)} → ${esc(L.to)}</b> · ${fmtDate(L.date)} · stránka ${esc(L.page)}/${L.idx} · on-block ${esc(L.in)}Z</div>`:''}${ac.open.length?`<div class="warnline caution">Otevřené závady (${ac.open.length}) se samostatným CRS neuzavřou – uzavřete je v záložce Závady.</div>`:''}
-    <div class="fgrid">${F.text('f-wo','Číslo WO / workpacku','',{attrs:'autocapitalize="characters" placeholder="např. WO-2026-0142"'})}</div>
-    <div class="fgrid wide">${F.text('f-scope','Krátké označení (nepovinné)','',{attrs:'placeholder="např. 50 FH + výměna kola NLG"'})}</div>
+  const pv=(k,d)=>pr&&pr[k]!=null?pr[k]:d;
+  // the release belongs to a flight's ATL page so the crew sees it – by default after the last flight
+  const flown=ac.legs.filter(l=>l.state==='closed'&&!l.void).slice(-12).reverse();const selLeg=pr?(pr.legId||''):(L?L.legId:(ac.lastLeg?ac.lastLeg.legId:''));
+  const legSel=`<label class="fld full"><span>Přiřadit k letu – uvidí ho posádka v ATL</span><select id="f-crsleg">${flown.map(l=>`<option value="${esc(l.legId)}" ${l.legId===selLeg?'selected':''}>po letu ${esc(l.page)}/${l.idx} · ${fmtDate(l.date)} · ${esc(l.from)} → ${esc(l.to)} · on-block ${esc(l.in||'–')}Z</option>`).join('')}<option value="" ${selLeg?'':'selected'}>nepřiřazovat k letu</option></select></label>`;
+  openSheet((auth?'Uvolnění do provozu – ':'Příprava uvolnění – ')+ac.reg,`${auth?'':'<div class="warnline info">Podepsat CRS může jen osvědčující personál s oprávněním. Připravené uvolnění uvidí v záložce Uvolnění, zkontroluje a podepíše.</div>'}${pr?`<div class="warnline info">Připravil ${esc(pr.who.name)} · ${fmtTs(pr.at)} – zkontrolujte a podepište.</div>`:''}${L?`<div class="warnline info">Po letu <b class="mono">${esc(L.from)} → ${esc(L.to)}</b> · ${fmtDate(L.date)} · stránka ${esc(L.page)}/${L.idx} · on-block ${esc(L.in)}Z</div>`:''}${ac.open.length?`<div class="warnline caution">Otevřené závady (${ac.open.length}) se samostatným CRS neuzavřou – uzavřete je v záložce Závady.</div>`:''}
+    <div class="fgrid wide">${legSel}</div>
+    <div class="fgrid">${F.text('f-wo','Číslo WO / workpacku',pv('wo',''),{attrs:'autocapitalize="characters" placeholder="např. WO-2026-0142"'})}</div>
+    <div class="fgrid wide">${F.text('f-scope','Krátké označení (nepovinné)',pv('scope',''),{attrs:'placeholder="např. 50 FH + výměna kola NLG"'})}</div>
     <div class="airchips">${(S.cfg.crsQuick||[]).map(q=>`<button type="button" class="chip" data-act="crs-quick" data-id="${esc(q)}">${esc(q)}</button>`).join('')}</div>
-    <div class="fgrid">${F.text('f-air','TTAF',hm(tAir).replace(/\u2009/g,''),{attrs:'inputmode="numeric"'})}${F.text('f-cyc','Cykly',String(tCyc),{attrs:'inputmode="numeric"'})}
-    ${F.text('f-org','Organizace Part-145',last?last.org:'',{attrs:'placeholder="CZ.145.xxxx"'})}${F.text('f-lic','Číslo licence / oprávnění',u.licence||'')}</div>
-    <div class="statement">Údržba byla provedena v rozsahu uvedeného workpacku. Jednotlivé úkoly, dílčí podpisy a použité podklady jsou ve workpacku. ${CRS_TEXT}</div>${F.check('f-stmt','Potvrzuji prohlášení o uvolnění do provozu',false)}`,{submit:'Podepsat CRS',sign:true,onSubmit:async()=>{
+    <div class="fgrid">${F.text('f-air','TTAF',hm(pv('acAir',tAir)).replace(/\u2009/g,''),{attrs:'inputmode="numeric"'})}${F.text('f-cyc','Cykly',String(pv('acCyc',tCyc)),{attrs:'inputmode="numeric"'})}
+    ${F.text('f-org','Organizace Part-145',pv('org',last?last.org:''),{attrs:'placeholder="CZ.145.xxxx"'})}${auth?F.text('f-lic','Číslo licence / oprávnění',u.licence||''):''}</div>
+    ${auth?`<div class="statement">Údržba byla provedena v rozsahu uvedeného workpacku. Jednotlivé úkoly, dílčí podpisy a použité podklady jsou ve workpacku. ${CRS_TEXT}</div>${F.check('f-stmt','Potvrzuji prohlášení o uvolnění do provozu',false)}`:''}`,{submit:auth?'Podepsat CRS':'Připravit k podpisu',sign:true,onSubmit:async()=>{
     const wo=v('f-wo').toUpperCase();if(wo.length<2)fail('Doplňte číslo WO / workpacku – rozsah práce je v něm.');
-    const air=parseDur(v('f-air'));if(air==null)fail('TTAF zadejte jako hodiny:minuty.');if(!v('f-lic'))fail('Vyplňte číslo licence.');if(!chk('f-stmt'))fail('Potvrďte prohlášení CRS.');
-    await checkPin();emit([['crs.issue',{crsId:rid('crs'),acId:ac.acId,legId:L?L.legId:null,page:L?L.page:null,wo,scope:v('f-scope'),org:v('f-org'),acAir:air,acCyc:parseInt(v('f-cyc'),10)||0,licence:v('f-lic')}]]);UI.tab='crs';closeSheet();toast('CRS podepsáno');
+    const air=parseDur(v('f-air'));if(air==null)fail('TTAF zadejte jako hodiny:minuty.');
+    const LL=v('f-crsleg')?S.legs[v('f-crsleg')]:null;
+    const base={acId:ac.acId,legId:LL?LL.legId:null,page:LL?LL.page:null,wo,scope:v('f-scope'),org:v('f-org'),acAir:air,acCyc:parseInt(v('f-cyc'),10)||0};
+    if(!auth){await checkPin();emit([['crs.prep',Object.assign({prepId:rid('prep'),kind:'crs'},base)]]);UI.tab='crs';closeSheet();toast('Uvolnění připraveno – čeká na podpis osvědčujícího personálu');return}
+    if(!v('f-lic'))fail('Vyplňte číslo licence.');if(!chk('f-stmt'))fail('Potvrďte prohlášení CRS.');
+    if(pr&&(pr.used||pr.dropped))fail('Tato příprava už byla podepsaná nebo zrušená.');
+    await checkPin();emit([['crs.issue',Object.assign({crsId:rid('crs')},base,{licence:v('f-lic')},pr?{prepId:pr.prepId,prepBy:pr.who.name}:{})]]);UI.tab='crs';closeSheet();toast('CRS podepsáno');
   }});
 }
 function openGround(){
@@ -2360,12 +2503,12 @@ function openDaily(){
   openSheet('Prohlídka – '+ac.reg,`<div class="fgrid">${F.date('f-date','Datum (UTC)',todayISO())}${F.sel('f-kind','Druh',Object.entries(DAILY),has(u,'mech')?'DAILY':'PRE')}</div>
     <fieldset><legend class="label">Měření (nepovinné)</legend><div class="fgrid">
     ${F.text('f-tn','Pneu příďová (psi)','',{attrs:'inputmode="numeric"'})}${F.text('f-tl','Pneu hlavní L (psi)','',{attrs:'inputmode="numeric"'})}${F.text('f-tr','Pneu hlavní P (psi)','',{attrs:'inputmode="numeric"'})}
-    ${F.text('f-oil','Olej doplněn L/P (litry)','',{attrs:'placeholder="0 / 0"'})}</div>
+</div>${oilFields('f-oil','','')}
     ${F.check('f-brk','Indikátory opotřebení brzd v limitu',false)}</fieldset>
     ${F.area('f-notes','Poznámka','','')}`,{submit:'Podepsat prohlídku',sign:true,onSubmit:async()=>{
     const date=parseDate(v('f-date'));if(!date)fail('Datum musí být ve tvaru dd/mm/rrrr.');
     const ty=[v('f-tn'),v('f-tl'),v('f-tr')];
-    const po=parseOil(v('f-oil'));
+    const po=parseOil(oilJoin(v('f-oill'),v('f-oilr')));
     await checkPin();emit([['daily.sign',{acId:ac.acId,date,kind:v('f-kind'),tyres:ty.some(Boolean)?ty.map(x=>x||'–').join('/'):'',oil:'',brakes:chk('f-brk'),notes:v('f-notes')}]].concat(po?[['oil.add',{svcId:rid('oil'),acId:ac.acId,date,time:nowHM(),l:po.l,r:po.r,note:'při '+(DAILY[v('f-kind')]||'prohlídce')}]]:[]));closeSheet();toast('Prohlídka podepsána');
   }});
 }
@@ -2420,7 +2563,7 @@ function viewSetup(u){
   const s2=step(2,st.live,'Letadla a počáteční stav',`<p class="muted">U každého letadla opište z poslední podepsané stránky papírového deníku hodiny a cykly, číslo stránky a všechny otevřené a odložené závady. Posádky letadlo uvidí, až počáteční stav podepíšete.</p>
     ${acs.length?`<div class="grid-list">${acs.map(acCard).join('')}</div>`:''}`,`<button class="btn ${acs.length?'sm':'primary'}" data-act="ac-form">${ICON.plus}Přidat letadlo</button>`);
   const s3=step(3,st.ppl,'Posádky a mechanici',`<p class="muted">Každý pilot a mechanik má vlastní jméno a PIN, kterým podepisuje zápisy. ${st.mech?'':'<span style="color:var(--caution)">Zatím tu není mechanik s licencí – bez něj nejde vydat CRS.</span>'}</p>
-    <div class="scroll-x"><table class="plain"><thead><tr><th>Jméno</th><th>Role</th><th>Licence / web</th><th></th></tr></thead><tbody>${users.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.roles.map(r=>ROLE[r]).join(', ')}</td><td class="mono">${esc(x.licence||'–')}${x.email?`<br><span class="muted" style="font-size:.84rem">web: ${esc(x.email)}</span>`:''}</td><td><button class="btn sm" data-act="user-form" data-id="${esc(x.userId)}">Upravit</button></td></tr>`).join('')}</tbody></table></div>`,
+    <div class="scroll-x"><table class="plain"><thead><tr><th>Jméno</th><th>Role</th><th>Licence / web</th><th></th></tr></thead><tbody>${users.map(x=>`<tr><td>${esc(x.name)}</td><td>${x.roles.map(r=>ROLE[r]).join(', ')}${x.crsAuth&&has(x,'mech')?' <span class="ann ok">CRS</span>':''}</td><td class="mono">${esc(x.licence||'–')}${x.email?`<br><span class="muted" style="font-size:.84rem">web: ${esc(x.email)}</span>`:''}</td><td><button class="btn sm" data-act="user-form" data-id="${esc(x.userId)}">Upravit</button></td></tr>`).join('')}</tbody></table></div>`,
     `<button class="btn ${st.ppl?'sm':'primary'}" data-act="user-form">${ICON.plus}Přidat</button>`);
   const s4=step(4,st.done,'iPady v letadlech',`<ol class="muted" style="margin:0;padding-left:1.2em"><li>Na iPadu otevřete adresu deníku v Safari (se signálem).</li><li>Sdílet → Přidat na plochu, dál spouštějte jen z ikony.</li><li>Přihlaste zařízení jeho účtem a vyberte letadlo – iPad si ho zapamatuje.</li><li>Zkuste zahájit a uzavřít cvičný let v režimu letadlo.</li></ol>
     ${st.done?'<p style="margin-top:10px"><b>Úvodní nastavení je hotové.</b> Další letadla a uživatele přidáte ve Správě.</p>':''}`);
@@ -2469,7 +2612,7 @@ function openGoLive(acId){
    The package is a set of signed records. Records only ever get added and each has its own id,
    so taking over the same data twice, or in both directions, never duplicates or overwrites anything.
    Records taken over are queued for upload here too: whichever iPad gets signal first sends them. */
-const HO_TYPES=new Set(['oil.add','crew.login','user.upsert','ac.upsert','cfg.set','leg.open','leg.sign','leg.amend','leg.void','defect.report','defect.defer','defect.rectify','crs.issue','ac.ground','daily.sign','sec.sign','ofp.import','ofp.fill','ofp.sign','ofp.void','ofp.close','ofp.reopen']);
+const HO_TYPES=new Set(['rec.del','rec.reset','crs.prep','crs.prep.drop','oil.add','crew.login','user.upsert','ac.upsert','cfg.set','leg.open','leg.sign','leg.amend','leg.void','defect.report','defect.defer','defect.rectify','crs.issue','ac.ground','daily.sign','sec.sign','ofp.import','ofp.fill','ofp.sign','ofp.void','ofp.close','ofp.reopen']);
 const HO_HOURS=36,HO_CHUNK=900;
 let hoRun=null;
 function hoAcId(){return mode()==='crew'?BIND:UI.acId}
@@ -2610,16 +2753,17 @@ function hoReadFile(file){
 
 /* --- admin forms --- */
 function openAcForm(id){
-  const a=id?S.ac[id]:{};const hasLegs=id&&a.legs&&a.legs.length;
-  openSheet(id?'Upravit '+a.reg:'Nové letadlo',`${hasLegs?'<div class="warnline caution">Letadlo už má zapsané lety. Změna počátečních hodin, cyklů nebo prvního čísla stránky přepočítá všechny navazující součty.</div>':''}<div class="fgrid wide">
+  const a=id?S.ac[id]:{};const hasLegs=id&&a.legs&&a.legs.length;const byDate=S.cfg.pageFmt==='date';
+  openSheet(id?'Upravit '+a.reg:'Nové letadlo',`${hasLegs?`<div class="warnline caution">Letadlo už má zapsané lety. Změna počátečních hodin, cyklů${byDate?'':' nebo prvního čísla stránky'} přepočítá všechny navazující součty.</div>`:''}<div class="fgrid wide">
     ${F.text('f-reg','Registrace',a.reg,{attrs:'autocapitalize="characters" placeholder="OK-ABC"'})}${F.text('f-type','Typ',a.type,{attrs:'placeholder="C560XLS+"'})}${F.text('f-msn','Výrobní číslo',a.msn)}
-    ${F.text('f-start','Číslo první elektronické stránky',a.startPage,{attrs:'inputmode="numeric"'})}
+    ${byDate?'':F.text('f-start','Číslo první elektronické stránky',a.startPage,{attrs:'inputmode="numeric"'})}
     ${F.text('f-oair','TTAF při přechodu (h:mm)',a.openAir!=null?hm(a.openAir).replace(/ /g,''):'',{attrs:'inputmode="numeric" placeholder="3412:15"'})}${F.text('f-ocyc','Cykly při přechodu',a.openCyc!=null?String(a.openCyc):'',{attrs:'inputmode="numeric"'})}
     ${F.date('f-odate','Datum přechodu z papíru',a.openDate||todayISO())}${F.text('f-lastpaper','Poslední papírová stránka',a.lastPaper)}</div>
     ${id?F.check('f-arch','Archivovat (letadlo už neprovozujeme)',!!a.archived):''}
+    ${byDate?`<p class="muted">Stránky se číslují registrací a datem (např. <span class="mono">${esc(String(a.reg||'OK-ABC').split('-').pop())}-${todayISO().slice(2).replace(/-/g,'')}</span>), číslo první stránky se proto nezadává. Mění se v Nastavení provozovatele.</p>`:''}
     <p class="muted">Přechodový bod z papíru – poslední papírová stránka, TTAF a cykly – je údaj, který patří i do CAME.</p>`,{submit:'Uložit',sign:true,onSubmit:async()=>{
     const reg=v('f-reg').toUpperCase();if(!/^[A-Z0-9]{1,2}-?[A-Z0-9]{2,5}$/.test(reg))fail('Registrace ve tvaru OK-ABC.');
-    const start=parseInt(v('f-start'),10);if(!(start>0))fail('Zadejte číslo první stránky.');
+    const start=byDate?(parseInt(a.startPage,10)||1):parseInt(v('f-start'),10);if(!(start>0))fail('Zadejte číslo první stránky.');
     const oa=parseDur(v('f-oair'));if(oa==null)fail('TTAF ve tvaru hodiny:minuty.');const oc=parseInt(v('f-ocyc'),10);if(!(oc>=0))fail('Zadejte cykly.');
     await checkPin();const acId=id||rid('ac');emit([['ac.upsert',{acId,reg,type:v('f-type'),msn:v('f-msn'),startPage:start,openAir:oa,openCyc:oc,openDate:parseDate(v('f-odate'))||todayISO(),lastPaper:v('f-lastpaper'),archived:id?chk('f-arch'):false}]]);if(!id)UI.acId=acId;closeSheet();toast('Letadlo uloženo');
   }});
@@ -2632,7 +2776,7 @@ function openSettings(){
     <fieldset><legend class="label">Doba letu a doba služby posádek</legend>
     <div class="fgrid wide">${F.sel('f-ftlby','Kdo počítá službu',Object.entries(FTL_BY),c.ftlBy)}${F.sel('f-rules','Pravidla',Object.entries(FTL_RULES),c.ftlRules)}
     ${F.text('f-om','Odkaz na provozní příručku',c.omRef,{attrs:'placeholder="např. OM-A 7, rev. 14"'})}
-    ${F.text('f-rep','Nástup před 1. off-blockem (min)',String(c.reportMin),{attrs:'inputmode="numeric"'})}${F.text('f-post','Ukončení po posledním on-blocku (min)',String(c.postMin),{attrs:'inputmode="numeric"'})}</div>
+    </div><div class="fgrid wide">${F.text('f-rep','Nástup na základně – před 1. off-blockem (min)',String(c.reportMin),{attrs:'inputmode="numeric"'})}${F.text('f-repaway','Nástup mimo základnu – před 1. off-blockem (min)',String(c.reportMinAway??c.reportMin),{attrs:'inputmode="numeric"'})}${F.text('f-post','Ukončení po posledním on-blocku (min)',String(c.postMin),{attrs:'inputmode="numeric"'})}</div>
     ${F.check('f-split','Provozní příručka povoluje split duty',!!c.splitDuty)}</fieldset>
     <fieldset><legend class="label">Technický deník</legend>${F.sel('f-pfmt','Číslování stránek',Object.entries(PAGE_FMT),c.pageFmt||'seq')}<p class="muted" style="font-size:.88rem">Změna formátu přečísluje zobrazení všech stránek – udělejte ji jen při přechodu z papíru a zapište ji do CAME.</p>
     <label class="fld full"><span>Rychlé volby pro CRS (jedna na řádek, nepovinné)</span><textarea id="f-crsq" placeholder="Daily check&#10;50 FH">${esc((c.crsQuick||[]).join('\n'))}</textarea></label></fieldset>
@@ -2640,9 +2784,9 @@ function openSettings(){
     const op=v('f-op');if(op.length<2)fail('Vyplňte název provozovatele.');
     const bases=v('f-bases').toUpperCase().split(/[\s,;]+/).filter(Boolean);
     if(!bases.length||bases.some(b=>!/^[A-Z]{4}$/.test(b)))fail('Domovské základny zadejte jako 4písmenné ICAO kódy, např. LKPR.');
-    const rep=num(v('f-rep')),post=num(v('f-post'));if(rep==null||post==null||rep>240||post>240)fail('Nástup a ukončení zadejte v minutách (0–240).');
+    const rep=num(v('f-rep')),repA=num(v('f-repaway')),post=num(v('f-post'));if(rep==null||repA==null||post==null||rep>240||repA>240||post>240)fail('Nástup a ukončení zadejte v minutách (0–240).');
     await checkPin();
-    emit([['cfg.set',{opName:op,aoc:v('f-aoc'),bases,ftlBy:v('f-ftlby'),ftlRules:v('f-rules'),omRef:v('f-om'),reportMin:rep,postMin:post,splitDuty:chk('f-split'),pageFmt:v('f-pfmt')||'seq',crsQuick:v('f-crsq').split(/\n/).map(x=>x.trim()).filter(Boolean).slice(0,20)}]]);closeSheet();toast('Nastavení uloženo');
+    emit([['cfg.set',{opName:op,aoc:v('f-aoc'),bases,ftlBy:v('f-ftlby'),ftlRules:v('f-rules'),omRef:v('f-om'),reportMin:rep,reportMinAway:repA,postMin:post,splitDuty:chk('f-split'),pageFmt:v('f-pfmt')||'seq',crsQuick:v('f-crsq').split(/\n/).map(x=>x.trim()).filter(Boolean).slice(0,20)}]]);closeSheet();toast('Nastavení uloženo');
   }});
 }
 function openUserForm(id){
@@ -2650,19 +2794,20 @@ function openUserForm(id){
   openSheet(id?'Upravit uživatele':'Nový uživatel',`<div class="fgrid wide">${F.text('f-name','Jméno',x.name)}${F.text('f-lic','Licence / oprávnění (mechanik)',x.licence)}
     ${F.text('f-email','Osobní e-mail pro přihlášení z webu (nepovinné)',x.email||'',{attrs:'inputmode="email" autocapitalize="off" autocomplete="off" placeholder="jmeno@firma.cz"'})}
     <label class="fld"><span>${id?'Nový PIN (nepovinné)':'PIN (4–6 číslic)'}</span><input type="password" id="f-upin" inputmode="numeric" autocomplete="off"></label></div>
-    <fieldset><legend class="label">Role</legend>${F.check('r-crew','Posádka – zápis letů, závad a odkladů',x.roles.includes('crew'))}${F.check('r-mech','Mechanik – CRS, odstranění závad, uzemnění',x.roles.includes('mech'))}${F.check('r-camo','CAMO – opravy zápisů, správa, zálohy',x.roles.includes('camo'))}${F.check('r-cabin','Palubní průvodčí – jen výběr do OFP, bez přihlášení a PINu',x.roles.includes('cabin'))}${can.settings(me())?F.check('r-admin','Správce – nastavení provozovatele, pravidla služby, základny',x.roles.includes('admin')):''}</fieldset>
+    <fieldset><legend class="label">Role</legend>${F.check('r-crew','Posádka – zápis letů, závad a odkladů',x.roles.includes('crew'))}${F.check('r-mech','Mechanik – závady, olej, příprava uvolnění, uzemnění',x.roles.includes('mech'))}<div class="sub-check">${F.check('f-crsauth','Oprávnění k uvolnění do provozu (osvědčující personál – podepisuje CRS)',!!x.crsAuth)}</div>${F.check('r-camo','CAMO – opravy zápisů, správa, zálohy',x.roles.includes('camo'))}${F.check('r-cabin','Palubní průvodčí – jen výběr do OFP, bez přihlášení a PINu',x.roles.includes('cabin'))}${can.settings(me())?F.check('r-admin','Správce – nastavení provozovatele, pravidla služby, základny',x.roles.includes('admin')):''}</fieldset>
     ${(S.cfg.bases||[]).length>1?F.sel('f-hb','Domovská základna',S.cfg.bases.map(b=>[b,b]),x.homeBase||S.cfg.bases[0]):''}
     ${id?F.check('f-active','Aktivní',x.active!==false):''}`,{submit:'Uložit',sign:true,onSubmit:async()=>{
     const name=v('f-name');if(name.length<3)fail('Vyplňte jméno.');const roles=['admin','crew','mech','camo','cabin'].filter(r=>chk('r-'+r)||(r==='admin'&&!can.settings(me())&&x.roles.includes('admin')));if(!roles.length)fail('Vyberte alespoň jednu roli.');
     const pin=v('f-upin');const cabinOnly=roles.every(r=>r==='cabin');if(!id&&!cabinOnly&&!/^\d{4,6}$/.test(pin))fail('PIN musí mít 4–6 číslic.');if(id&&!cabinOnly&&!x.pinHash&&!pin)fail('Pro tuto roli nastavte PIN (4–6 číslic).');if(pin&&!/^\d{4,6}$/.test(pin))fail('PIN musí mít 4–6 číslic.');
-    if(roles.includes('mech')&&!v('f-lic'))fail('Mechanik potřebuje číslo licence.');
+    const crsAuth=roles.includes('mech')&&chk('f-crsauth');if(chk('f-crsauth')&&!roles.includes('mech'))fail('Oprávnění k CRS má jen role Mechanik.');
+    if(crsAuth&&!v('f-lic'))fail('Osvědčující personál potřebuje číslo licence / oprávnění.');
     const email=v('f-email').toLowerCase();
     if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))fail('E-mail není ve správném tvaru.');
     if(email&&Object.values(S.users).some(y=>y.userId!==id&&y.email===email))fail('Tento e-mail už má jiný uživatel.');
     if(email&&BIND&&email===acctEmail())fail('Tohle je účet iPadu v letadle – osobní e-mail musí být jiný, jinak by se iPady přihlašovaly jako tento uživatel.');
     if(id===me().id&&!roles.includes('camo')&&!roles.includes('admin'))fail('Sám sobě správu neodebírejte – zůstali byste bez přístupu.');
     if(id===me().id&&has(me(),'admin')&&!roles.includes('admin')&&!Object.values(S.users).some(y=>y.userId!==id&&y.active!==false&&has(y,'admin')))fail('Jste poslední správce – nejdřív přidělte roli správce někomu dalšímu.');
-    await checkPin();const userId=id||rid('usr');const p={userId,name,licence:v('f-lic'),email,roles,active:id?chk('f-active'):true};if(v('f-hb'))p.homeBase=v('f-hb');if(pin)p.pinHash=await sha(userId+':'+pin);
+    await checkPin();const userId=id||rid('usr');const p={userId,name,licence:v('f-lic'),email,roles,crsAuth,active:id?chk('f-active'):true};if(v('f-hb'))p.homeBase=v('f-hb');if(pin)p.pinHash=await sha(userId+':'+pin);
     emit([['user.upsert',p]]);closeSheet();toast('Uživatel uložen');
   }});
 }
@@ -2764,6 +2909,11 @@ document.addEventListener('click',e=>{
     case 'crew-start':crewStart();break;
     case 'ofp-sec':ofpSecSign(id);break;
     case 'oil-form':openOilForm();break;
+    case 'prep-sign':{const x=S.preps[id];if(x){if(x.kind==='rect')openRectify(null,id);else openCrs(null,id)}break}
+    case 'prep-drop':openPrepDrop(id);break;
+    case 'crs-detail':openCrsDetail(id);break;
+    case 'ofp-note':{const [oid,key,...w]=id.split('|');openNoteEditor(oid,key,w.join('|'));break}
+    case 'note-tab':case 'note-fl':case 'note-add':case 'note-del':noteAction(act,id);break;
     case 'rec-del':openRecDel(id);break;
     case 'rec-del-ac':openRecDelAc(id);break;
     case 'rec-reset':openRecReset(id);break;
@@ -2773,7 +2923,8 @@ document.addEventListener('click',e=>{
     case 'cdate-edit':UI.draft.cdateEdit=true;saveDraft();render();break;
     case 'pf':UI.draft.pf=id;saveDraft();render();break;
     case 'divert':UI.draft.divert=true;saveDraft();render();break;
-    case 'start-flight':openStartFlight();break;
+    case 'start-flight':openStartChoice();break;
+    case 'start-noofp':closeSheet();openStartFlight();break;
     case 'close-flight':openCloseFlight();break;
     case 'sheet-to':{const el=document.getElementById('f-to');if(el){el.value=id;if(sheetLive)sheetLive()}break}
     case 'sldg':{const el=document.getElementById('s-ldg');if(el)el.value=Math.min(20,Math.max(1,(parseInt(el.value,10)||1)+parseInt(id,10)));break}
@@ -2837,10 +2988,10 @@ document.addEventListener('change',e=>{
   else if(t.id==='audit-all'){UI.auditAll=t.checked;render()}
   else if(t.id==='q-all'){UI.qAll=t.checked;const r=document.getElementById('q-res');if(r)r.innerHTML=searchResults(S.ac[UI.acId])}
   else if(t.id==='ofp-file'&&t.files&&t.files[0]){importOfp(t.files[0]);t.value=''}
+  else if(t.id==='ofp-file-s'&&t.files&&t.files[0]){const f=t.files[0];closeSheet();UI.ofpAfter=true;importOfp(f)}
   else if(t.id==='import-file'&&t.files&&t.files[0]){importJson(t.files[0]);t.value=''}
   else if(t.type==='checkbox'&&t.dataset&&t.dataset.of==='nonRvsm'){const c=t.closest('[data-ofp]');if(c){ofpSet(c.dataset.ofp,'nonRvsm',t.checked?'1':'');c.querySelectorAll('.rvsm-only').forEach(x=>x.hidden=t.checked)}}
   else if(t.id==='ho-in'&&t.files&&t.files[0]){hoReadFile(t.files[0]);t.value=''}
-  else if(t.id==='f-paper'){const r=document.getElementById('paper-row');if(r)r.hidden=!t.checked}
   else if(t.classList.contains('d-mel')){const f=t.closest('.def-row').querySelector('.d-melf');if(f)f.hidden=!t.checked}
   else if(t.dataset&&t.dataset.k&&(t.type==='checkbox'||t.type==='radio'||t.tagName==='SELECT')){UI.draft[t.dataset.k]=t.type==='checkbox'?t.checked:t.value;saveDraft();if(t.dataset.k==='defMel'||t.dataset.k==='secRes')render();else if(t.dataset.k==='app'){const o=document.getElementById('c-app-other');if(o)o.hidden=t.value!=='OTHER';crewLive()}else crewLive()}
   if(sheetLive&&t.closest('#sf'))sheetLive();
@@ -2885,7 +3036,10 @@ document.addEventListener('focusout',e=>{
   if(t.classList&&t.classList.contains('t4')&&t.value){const n=normHM(t.value);t.value=n;t.classList.toggle('bad',parseHM(n)==null);if(t.dataset.k){UI.draft[t.dataset.k]=n;saveDraft();crewLive()}else if(t.dataset.of){const c=t.closest('[data-ofp]');if(c)ofpSet(c.dataset.ofp,t.dataset.of,n)}else if(sheetLive)sheetLive()}
   if(renderPending)setTimeout(()=>{if(renderPending)softRender()},60);
 });
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet').hidden)closeSheet()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet').hidden)closeSheet();
+  if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button'&&e.target.tagName!=='BUTTON'&&e.target.dataset.act){e.preventDefault();e.target.click();return}
+  // note editor: Enter adds the entry instead of closing the sheet
+  if(e.key==='Enter'&&UI.noteEd&&e.target&&/^n-(alt|freq|hdg|txt)$/.test(e.target.id)){e.preventDefault();const k=e.target.id.slice(2);if(k==='alt'){const er=document.getElementById('n-err');if(er){er.textContent='Vyberte CLB ↑ nebo DESC ↓.';er.hidden=false}}else noteAction('note-add',k+'|')}});
 
 document.addEventListener('submit',async e=>{
   const f=e.target;e.preventDefault();

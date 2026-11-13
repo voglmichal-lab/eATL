@@ -1,0 +1,35 @@
+eTechLog – změna Z-020
+Verze: 0.6.7 (navazuje na Z-019 / 0.6.6)
+Datum: 2026-11-13
+
+Co se mění
+- Nastavení provozovatele: nástup do služby zvlášť na základně a mimo základnu.
+- Letadlo: číslo první elektronické stránky se zadává jen při číslování „jako na papíře“.
+- Mechanici: v uživateli zaškrtávací pole „Oprávnění k uvolnění do provozu“ (vyžaduje licenci).
+  Podepsat CRS a odstranění závady může jen mechanik s oprávněním. Ostatní mechanici zapisují závady, olej,
+  uzemnění a mohou uvolnění PŘIPRAVIT – osvědčující personál ho pak zkontroluje a podepíše (formulář předvyplněný).
+  POZOR: stávajícím mechanikům je potřeba oprávnění ve Správě zaškrtnout, jinak CRS nepodepíšou.
+- CRS se přiřazuje k letu (výchozí poslední let): je na stránce ATL toho letu a další posádka ho vidí v přehledu
+  letadla („Uvolněno do provozu od posledního letu“) – např. Weekly check bez závady.
+- Záložka Uvolnění: položky jdou rozkliknout (detail CRS, odstranění a odklad závady, uzemnění).
+- Kancelář → Začít let: nabídka „Nahrát OFP (PDF)“ (pak rovnou OFP dalšího letu), „Let bez OFP“ a nahraná OFP.
+- Zapsat let ručně (z papíru): číslo stránky papírového deníku je nahoře a je povinné.
+- OFP navigační log: ATO letiště odletu = čas vzletu, ATO cílového letiště (i divertu) = čas přistání – vyplní se samy.
+- Poznámky k bodům: rychlé zadání FL/ALT (CLB ↑ / DESC ↓, tlačítko FL), FREQ (133355 → 133,355),
+  HDG (0–360, ← / →) a volný text; víc záznamů u jednoho bodu, jednotlivě smazatelné. V PDF se tisknou i se šipkami.
+- Olej: všude zvlášť motor L a motor P (uzavření letu bez OFP, ruční zápis, prohlídka).
+- Oprava: smazání v testovacím režimu se přenáší i předáním mezi iPady (QR / soubor).
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-020.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

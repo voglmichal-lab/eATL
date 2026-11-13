@@ -35,10 +35,12 @@ příkaz, Output Directory ponechte prázdné → **Deploy**.
 4. Na úplně prvním zařízení aplikace nabídne založení účtu správce a otevře **Úvodní nastavení**:
    1. **Provozovatel a provoz**: název, AOC/CAMO, základny, pravidla služby, číslování stránek.
    2. **Letadla a počáteční stav**: z poslední podepsané stránky papírového deníku opište
-      TTAF, cykly, poslední papírovou a první elektronickou stránku a převezměte všechny
+      TTAF, cykly, poslední papírovou a první elektronickou stránku (jen při číslování „jako na papíře“; při číslování
+      registrací a datem se nezadává) a převezměte všechny
       otevřené a odložené závady. Podpisem **Uvést do e-deníku** potvrdíte přechodový bod.
       Do té doby posádky letadlo na iPadu nevidí.
-   3. **Posádky a mechanici** s PINy.
+   3. **Posádky a mechanici** s PINy. U mechanika, který smí uvolňovat do provozu, zaškrtněte
+      *Oprávnění k uvolnění do provozu* (a vyplňte licenci) – jen ten pak podepisuje CRS.
    4. iPady v letadlech.
 
 ## Aktualizace
@@ -76,14 +78,20 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
    - **Shrnutí a uzavření**: 7 Shrnutí letu – časy odletu a příletu i palivo jdou opravit, block/flight, posádka, PF,
      olej, závady, chybějící položky OFP → *Potvrdit a zapsat do ATL* (podpis kapitána).
    Navigační log: DCT, který je už přeletěný (cílový bod má ATO), nejde zrušit jedním klepnutím – pro opravu nejdřív
-   smažte ATO u cílového bodu.
+   smažte ATO u cílového bodu. ATO letiště odletu = čas vzletu a ATO cílového letiště (při divertu letiště divertu)
+   = čas přistání – vyplní se samy, ručně zapsaná hodnota má přednost.
+   Poznámka k bodu: klepnutím na „+ pozn.“ se otevře rychlé zadání – **FL / ALT** (výška ve stopách, tlačítkem FL
+   hladina; CLB ↑ / DESC ↓), **FREQ** (stačí 133355 → 133,355), **HDG** (0–360, ← vlevo / → vpravo) a **Text**.
+   U jednoho bodu může být víc záznamů, × jednotlivý smaže.
 5. **Let podepisuje jen PIC.** Když je na iPadu přihlášený někdo jiný, PIC zadá svůj PIN při uzavření.
 
 Posádka se předvolí podle předchozího letu toho dne na stejném letadle, jinak podle přihlášení na iPadech letadla –
 vždy jen jako návrh ke kontrole. PIC se vybírá jen ze seznamu; SIC, který v systému není, jde napsat (jméno, licence)
 a v ATL je označený „ověřit“ pro CAMO – v seznamu volba *Není v seznamu*, pak se objeví pole pro jméno (stejně u palubní průvodčí). Palubní průvodčí se zakládají s rolí *Palubní průvodčí* (bez PINu).
 
-*Let bez OFP* (přelet, OFP nejde nahrát) zůstává jako záloha na úvodní obrazovce.
+*Let bez OFP* (přelet, OFP nejde nahrát) zůstává jako záloha na úvodní obrazovce. V Kanceláři se po *Začít let*
+nabídne *Nahrát OFP (PDF)* (otevře se rovnou OFP dalšího letu), *Let bez OFP*, případně už nahraná OFP.
+*Zapsat let ručně (z papíru)*: nahoře je povinné číslo stránky papírového deníku, ze které se let přepisuje.
 
 ## Olej
 Olej se zapisuje v litrech, zvlášť motor L a P (APU se nepíše). V ATL patří k letu, před kterým byl doplněn.
@@ -94,6 +102,19 @@ Olej se zapisuje v litrech, zvlášť motor L a P (APU se nepíše). V ATL patř
   („Předvyplněno – doplnil(a) …“). Když posádka doplní ještě sama, přičte to. Při uzavření letu se zápis mechanika
   připojí k tomuto letu (v detailu letu „z toho na zemi: …“) a dalšímu letu už se nenabízí.
 - Když posádka zapíše méně, než doplnil mechanik, potvrzení před podpisem na to upozorní.
+- Všude, kde se olej zapisuje (OFP, uzavření letu bez OFP, ruční zápis letu, prohlídka), jsou dvě pole: motor L a motor P.
+
+## Uvolnění do provozu (CRS)
+- **Podepsat CRS** (samostatné i odstranění závady) může jen mechanik s *Oprávněním k uvolnění do provozu*
+  (Správa → uživatel). Stávajícím mechanikům je potřeba oprávnění zaškrtnout.
+- Mechanik bez oprávnění může zapisovat závady, olej, uzemnit a **připravit uvolnění** (*Připravit uvolnění (CRS)*,
+  u závady *Odstranit – připravit k podpisu CRS*). Připravené uvolnění je vidět u letadla, v záložce Uvolnění a u závady;
+  osvědčující personál ho otevře (*Zkontrolovat a podepsat*), formulář je předvyplněný, doplní licenci a podepíše.
+  Připravit/zrušit jde i znovu (*Zrušit přípravu*).
+- CRS se **přiřazuje k letu** (výchozí je poslední let) – objeví se na stránce ATL toho letu a posádka dalšího letu ho
+  vidí v přehledu letadla („Uvolněno do provozu od posledního letu“), i když nejde o odstranění závady (např. Weekly check).
+- V záložce Uvolnění jde každou položku rozkliknout: detail CRS (WO, let, TTAF/cykly, organizace, kdo podepsal
+  a s jakou licencí, kdo připravil), u závady odstranění a odklad, u uzemnění důvod a kdy skončilo.
 
 ## Testovací režim – mazání záznamů (prozatímní)
 Jen pro testování, před ostrým provozem se vypne (a z aplikace později zmizí).

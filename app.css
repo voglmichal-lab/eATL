@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.6.6"}
+:root{--etl-build:"0.6.7"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -294,12 +294,16 @@ input.t4,input.big-in{font-family:var(--f-mono);font-size:1.45rem;text-align:cen
 .pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
 .pick .user-btn{min-height:58px;align-content:center}
 .brief{margin:0;padding-left:18px;display:grid;gap:6px}
-.brief .b-warn b{color:var(--warn)}.brief .b-caution b{color:var(--caution)}
+.brief .b-warn b{color:var(--warn)}.brief .b-caution b{color:var(--caution)}.brief .b-ok b{color:var(--ok)}
 .mode-note{font-size:.9rem;color:var(--muted)}
 .planned{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 .ofp{display:grid;gap:16px}
 table.ofplog{min-width:980px}
 table.ofplog input.ofp-note{width:140px;text-align:left;font-family:var(--f-body)}
+table.ofplog .ofp-notebtn{min-width:140px;min-height:44px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;text-align:left;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);padding:4px 8px;font:600 .86rem var(--f-mono);cursor:pointer}
+table.ofplog .ofp-notebtn.empty{color:var(--muted);font-family:var(--f-body);font-weight:500;border-style:dashed}
+table.ofplog .ofp-notebtn span{background:var(--surface-2);border-radius:4px;padding:2px 6px;white-space:nowrap}
+table.ofplog .ofp-notebtn:disabled{cursor:default;border-style:solid;opacity:.85}
 table.ofplog tr.skip td{color:var(--muted);text-decoration:line-through;background:var(--surface-2)}
 table.ofplog tr.skip td:first-child,table.ofplog tr.skip td:last-child{text-decoration:none}
 table.ofplog td{vertical-align:middle}
@@ -380,10 +384,44 @@ table.crew-sum .pf-tog{margin:0}
 .test-panel{border-color:var(--warn);border-style:dashed}
 .del-test{margin-top:10px}
 .del-test .linkbtn{color:var(--warn)}
-.del-test.sm{float:right;margin:0 0 4px 8px}
+.del-test.sm{order:9;margin:0 0 0 auto}
 .del-test.sm .linkbtn{min-height:0;padding:0;font-size:.86rem}
 .del-list{display:grid;gap:0}
 .del-row{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line)}
 .del-row:first-child{border-top:0}
 .del-row span{overflow-wrap:anywhere;min-width:0}
 .del-row .btn{flex:none}
+/* certifying staff: prepared releases */
+.sub-check{margin:-2px 0 4px 32px}
+.prep-panel{border-color:var(--caution)}
+.prep-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}
+.prep-row:first-of-type{border-top:0}
+.prep-row>div:first-child{min-width:0;flex:1 1 260px;overflow-wrap:anywhere}
+.defect .box.prep{border:1px solid var(--caution);background:var(--caution-soft)}
+/* start flight: OFP or not */
+.start-choice{display:grid;gap:12px}
+.btn.choice{display:flex;gap:12px;align-items:center;justify-content:center}
+.btn.choice span{display:grid;gap:2px;text-align:left}
+.btn.choice small{font-size:.82rem;font-weight:500;opacity:.8}
+.paper-top{border:1px solid var(--accent);border-radius:8px;padding:10px 12px;background:var(--accent-soft)}
+/* nav log note editor */
+.ntabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line-strong);border-radius:10px;overflow:hidden}
+.ntab{border:0;background:var(--surface);color:var(--ink);min-height:50px;font-weight:700;font-size:1rem;cursor:pointer}
+.ntab+.ntab{border-left:1px solid var(--line-strong)}
+.ntab.on{background:var(--ink);color:var(--surface)}
+.note-pane{display:grid;gap:10px}
+.note-in{display:flex;gap:8px;align-items:stretch}
+.note-in input{flex:1;min-width:0;font:600 1.5rem var(--f-mono);padding:10px 14px;min-height:60px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);color:var(--ink)}
+.nfl{min-width:72px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);color:var(--ink);font:700 1.1rem var(--f-mono);cursor:pointer}
+.nfl.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.nfl.static{display:flex;align-items:center;justify-content:center;cursor:default;background:var(--surface-2)}
+.note-acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.note-acts.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.note-acts .btn.big{font-size:1.15rem}
+.note-chips{display:flex;flex-wrap:wrap;gap:8px}
+.note-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:4px 4px 4px 10px;font:600 1rem var(--f-mono)}
+.note-chip button{border:0;background:transparent;color:var(--warn);font-size:1.3rem;line-height:1;min-width:36px;min-height:36px;cursor:pointer}
+/* clickable release cards */
+.tap{cursor:pointer}
+.defect.tap:hover{border-color:var(--line-strong)}
+.line-item.tap:hover{background:var(--surface-2)}
