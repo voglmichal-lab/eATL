@@ -1,0 +1,36 @@
+eTechLog – změna Z-021
+Verze: 0.6.8 (navazuje na Z-020 / 0.6.7)
+Datum: 2026-11-13
+
+Co se mění
+- NOVÝ SOUBOR ftl.js – výpočet doby letu a služby. Bez něj aplikace hlásí „Neúplná aktualizace“.
+- Doba služby (FTL) z letů v ATL podle EASA ORO.FTL / CS FTL.1:
+  nástup / FDP / služba, max FDP podle tabulky ORO.FTL.205 (aklimatizace podle tab. 1), split duty (CS FTL.1.220),
+  WOCL a označení časný nástup / pozdní konec / noční služba, minimální odpočinek, kumulativní limity
+  (60/110/190 h služby za 7/14/28 dní, 100 h letu za 28 dní, 900 h za rok, 1000 h za 12 měsíců).
+  Výpočet zatím nezná služby bez letu (pohotovost, přelet jako cestující, SIM, kancelář) – je to u něj vždy napsané.
+- Přístup: Správce, CAMO, nové role OPS a Safety manažer – záložka „Doba služby“ se všemi posádkami (řádek otevře detail);
+  pilot vidí „Moje služba“ (v Kanceláři i na iPadu v liště dne). Export CSV se skutečnými časy (příprava na Fl3xx).
+- Split duty: Nastavení → „Provozní příručka povoluje split duty“ + čas na povinnosti během přerušení (min. 30 min).
+  Otevírá se při uzavření letu, po kterém přerušení začíná (Shrnutí OFP / uzavření letu: zaškrtnout + ubytování),
+  zavírá se samo dalším letem (posádka to vidí na kartě security search). V ATL je u letu „SPLIT DUTY ›“.
+  Opravit jde v detailu letu (PIC, CAMO, OPS, Safety) – zůstává v historii a auditu.
+- Nastavení: časová pásma letišť mimo Evropu (např. KTEB=America/New_York).
+- Palubní průvodčí vybraná v OFP se ukládá k letu (počítá se jí služba).
+- Oprava: OFP smazané v testovacím režimu jde znovu nahrát.
+- Doporučení: v Nastavení zadejte nástup mimo základnu 45 min (podle papírového deníku OK-WND).
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-021.txt) do kořene repozitáře eatl – včetně nového ftl.js. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

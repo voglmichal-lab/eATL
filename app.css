@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.6.7"}
+:root{--etl-build:"0.6.8"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -425,3 +425,20 @@ table.crew-sum .pf-tog{margin:0}
 .tap{cursor:pointer}
 .defect.tap:hover{border-color:var(--line-strong)}
 .line-item.tap:hover{background:var(--surface-2)}
+/* duty time (FTL) */
+.ftl-v{font-weight:700}
+.ftl-v.ok{color:var(--ok)}
+.ftl-v.caution{color:var(--caution)}
+.ftl-v.warn{color:var(--warn)}
+.ftl-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.ftl-tile{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:3px;background:var(--surface)}
+.ftl-tile b{font-size:1.35rem}
+.ftl-tile .bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden}
+.ftl-tile .bar i{display:block;height:100%;background:var(--ok)}
+.ftl-tile.caution .bar i{background:var(--caution)}
+.ftl-tile.warn{border-color:var(--warn)}
+.ftl-tile.warn .bar i{background:var(--warn)}
+table.ftl-tab tr.tap:hover td{background:var(--surface-2)}
+table.ftl-duties tr.bad td{background:var(--warn-soft)}
+table.ftl-duties td,table.ftl-tab td{vertical-align:top}
+.split-box{display:grid;gap:8px;border:1px dashed var(--line-strong);border-radius:8px;padding:10px 12px}

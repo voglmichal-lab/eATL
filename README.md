@@ -104,6 +104,30 @@ Olej se zapisuje v litrech, zvlášť motor L a P (APU se nepíše). V ATL patř
 - Když posádka zapíše méně, než doplnil mechanik, potvrzení před podpisem na to upozorní.
 - Všude, kde se olej zapisuje (OFP, uzavření letu bez OFP, ruční zápis letu, prohlídka), jsou dvě pole: motor L a motor P.
 
+## Doba služby (FTL)
+Počítá se z letů v ATL podle EASA ORO.FTL / CS FTL.1 (soubor `ftl.js`). Přístup: **Správce, CAMO, OPS a Safety manažer**
+vidí všechny posádky (záložka *Doba služby*), **pilot vidí svou službu** (záložka *Moje služba*, na iPadu tlačítko
+*Moje služba* v liště dne). Role OPS a Safety manažer se přidělují ve Správě → uživatel (jen čtení, nepodepisují lety ani CRS).
+- **Služba**: nástup = první off-block − nástup na základně / mimo základnu (Nastavení), FDP končí posledním on-blockem,
+  služba o čas ukončení později. Dvě skupiny letů, mezi kterými není minimální odpočinek, jsou jedna služba.
+- **Max FDP** podle tabulky ORO.FTL.205 (aklimatizovaná posádka, podle místního času nástupu a počtu úseků); při časovém
+  rozdílu > 2 h se stav aklimatizace určí podle tab. 1 (B / D / X – při X tabulka pro neznámý stav).
+- **Split duty** (CS FTL.1.220, jen pokud ji povoluje provozní příručka – Nastavení): otevírá se v ATL při uzavření letu,
+  po kterém přerušení začíná (Shrnutí OFP / uzavření letu: *Po tomto letu následuje přerušení služby* + ubytování),
+  zavírá se samo nástupem na další let – posádka to vidí na kartě security search dalšího letu. Přerušení = mezera mezi
+  on-blockem a dalším off-blockem minus čas na povinnosti (Nastavení, min. 30 min), musí mít ≥ 3 h; FDP se prodlouží
+  o 50 % přerušení. Při jiném než vhodném ubytování se počítá nejvýš 6 h a bez části ve WOCL. Upravit jde v detailu letu
+  (PIC, CAMO, OPS, Safety) – změna je v historii letu a v auditu.
+- **WOCL** (02:00–05:59 místního času aklimatizace): minuty FDP ve WOCL, označení časný nástup / pozdní konec / noční služba.
+- **Odpočinek** před službou (ORO.FTL.235: základna max(12 h, předchozí služba), jinde max(10 h, předchozí služba)).
+- **Kumulativní limity** (ORO.FTL.210): služba 60 h / 7 dní, 110 h / 14 dní, 190 h / 28 dní; let (block) 100 h / 28 dní,
+  900 h / kalendářní rok, 1000 h / 12 měsíců – zelená / oranžová (nad 90 %) / červená.
+- **Co zatím ne:** služby bez letu (pohotovost, přelet jako cestující, simulátor, kancelář), prodloužení FDP, odpočinek
+  během letu, zkrácený a týdenní odpočinek, lety před uvedením letadla do e-deníku. Aplikace to u výpočtu vždy uvádí.
+- Časová pásma: evropská a blízká letiště jsou zabudovaná, ostatní (USA, Kanada, Rusko…) se doplní v Nastavení
+  (`KTEB=America/New_York`).
+- **Export CSV (pro Fl3xx)** – služby všech posádek se skutečnými časy; připraveno pro pozdější napojení na Fl3xx.
+
 ## Uvolnění do provozu (CRS)
 - **Podepsat CRS** (samostatné i odstranění závady) může jen mechanik s *Oprávněním k uvolnění do provozu*
   (Správa → uživatel). Stávajícím mechanikům je potřeba oprávnění zaškrtnout.
@@ -158,4 +182,5 @@ V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signál
 | `vendor/` | knihovny – Supabase, čtení PDF (pdf.js), tvorba PDF (pdf-lib, fontkit), QR kódy (qrcode, jsQR); lokálně kvůli offline běhu |
 | `fonts/pdf/` | písma pro PDF s českou diakritikou (SIL OFL) |
 | `fonts/`, `fonts.css` | písma (lokálně kvůli offline) |
+| `ftl.js` | výpočet doby letu a služby (ORO.FTL / CS FTL.1) |
 | `supabase/schema.sql` | databáze, pravidla přístupu a živá synchronizace |
