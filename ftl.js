@@ -112,12 +112,13 @@ self.ETL_FTL = (function () {
         const restMin = (rep - end) / MIN, dutyLen = (end - cur.reportMs) / MIN;
         const atHome = homeBases.has(String(prev.to).toUpperCase());
         const minRest = Math.max(atHome ? 720 : 600, dutyLen);
+        if (l.outMs < prev.inMs) cur.overlaps.push({ a: prev.legId, b: l.legId, aReg: prev.reg, bReg: l.reg });
         if (restMin < minRest) { if (prev.split) cur.breaks.push({ a: prev, b: l }); else if (restMin >= 360) cur.shortRests.push({ min: Math.round(restMin), req: Math.round(minRest), atHome, after: prev.legId });
           cur.legs.push(l); continue }
         if (prev.split) cur.splitUnused = true;
         cur.restAfter = { min: Math.round(restMin), req: Math.round(minRest), atHome };
       }
-      cur = { legs: [l], reportMs: rep, breaks: [], shortRests: [] }; duties.push(cur);
+      cur = { legs: [l], reportMs: rep, breaks: [], shortRests: [], overlaps: [] }; duties.push(cur);
     }
     // 2. evaluate each duty
     let refTz = o.homeTz, lastRefReport = null;
@@ -156,6 +157,7 @@ self.ETL_FTL = (function () {
           if (cand.length > 1) d.notes.push('Víc přerušení označených jako split duty – počítá se jen jedno.');
         }
       }
+      if (d.overlaps.length) { d.flags.push('overlap'); d.notes.push('Lety se časově překrývají (' + d.overlaps.map(x => (x.aReg || '') + '/' + (x.bReg || '')).join(', ') + ') – zkontrolujte posádku nebo časy; výpočet je nespolehlivý.') }
       // a long gap that is still shorter than the minimum rest: not a rest, the duty continues
       d.shortRests.forEach(x => { if (!d.flags.includes('rest')) d.flags.push('rest'); d.notes.push(`Mezi lety jen ${Math.floor(x.min / 60)}:${String(x.min % 60).padStart(2, '0')} – kratší než minimální odpočinek ${Math.floor(x.req / 60)}:${String(x.req % 60).padStart(2, '0')}${x.atHome ? ' (základna)' : ''}, proto se počítá jako jedna služba (ORO.FTL.235).`) });
       if (d.splitUnused) d.notes.push('Split duty označené u posledního letu, ale následoval odpočinek – nepoužito.');

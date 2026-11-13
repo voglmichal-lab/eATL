@@ -1,0 +1,34 @@
+eTechLog – změna Z-022
+Verze: 0.6.9 (navazuje na Z-021 / 0.6.8)
+Datum: 2026-11-13
+
+Co se mění
+- Testovací režim → Správa → „Vložit lety OK-WND z papíru (10.–13. 11.)“: 8 letů ze stránek 800151–800154
+  (časy, palivo, olej, přiblížení, PF, security). Posádka náhodně z pilotů v systému (pro každý den jedna dvojice).
+  Nabídne smazat lety OK-WND z těch dní, které už v deníku jsou, a nastavit přechodový bod na stav před stránkou
+  800151 (TTAF 3166:15, cykly 2043, poslední papírová 800150) – po vložení pak sedí 3179:40 / 2051 jako na papíře.
+- supabase/export.sql: export celé databáze ve formátu úplné zálohy (jen čte).
+- Obnova ze zálohy je u prázdné databáze i na stránce Úvodní nastavení.
+- Člen posádky nemůže být na dvou letech zároveň (zahájení, uzavření, ruční zápis, oprava letu);
+  výpočet doby služby označí starší překrývající se lety.
+- Oprava (chyba od první verze, našla ji simulace): vypnutí „Simulovat výpadek sítě“ v panelu Synchronizace hlásilo
+  chybu a uložené záznamy se hned neodeslaly.
+- Ověřeno: 4 700 simulovaných záznamů (3 letadla, 10 měsíců, 1 200 letů) – součty TTAF/cyklů a navazování stránek
+  sedí s výpočtem nezávislým na aplikaci; 3 000 náhodných akcí v aplikaci bez chyby.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-022.txt) do kořene repozitáře eatl. config.js se nemění.
+- supabase/export.sql se jen ukládá do repozitáře (spouští se ručně v Supabase).
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  supabase/export.sql
+  sw.js
+  vercel.json
+  version.js

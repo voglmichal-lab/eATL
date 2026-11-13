@@ -127,6 +127,8 @@ vidí všechny posádky (záložka *Doba služby*), **pilot vidí svou službu**
 - Časová pásma: evropská a blízká letiště jsou zabudovaná, ostatní (USA, Kanada, Rusko…) se doplní v Nastavení
   (`KTEB=America/New_York`).
 - **Export CSV (pro Fl3xx)** – služby všech posádek se skutečnými časy; připraveno pro pozdější napojení na Fl3xx.
+- Jeden člověk nemůže být na dvou letech zároveň: zahájení letu, uzavření, ruční zápis i oprava letu to odmítnou
+  (otevřený let nebo časově překrývající se let na jiném letadle). Starší překrývající se záznamy výpočet označí.
 
 ## Uvolnění do provozu (CRS)
 - **Podepsat CRS** (samostatné i odstranění závady) může jen mechanik s *Oprávněním k uvolnění do provozu*
@@ -140,6 +142,12 @@ vidí všechny posádky (záložka *Doba služby*), **pilot vidí svou službu**
 - V záložce Uvolnění jde každou položku rozkliknout: detail CRS (WO, let, TTAF/cykly, organizace, kdo podepsal
   a s jakou licencí, kdo připravil), u závady odstranění a odklad, u uzemnění důvod a kdy skončilo.
 
+## Záloha a export databáze
+- Správa → *Stáhnout úplnou zálohu (JSON)* – celý log podpisů z tohoto zařízení.
+- Stejnou zálohu přímo z databáze: Supabase → SQL Editor → obsah `supabase/export.sql` → Run → výslednou buňku
+  uložit jako `.json`. Jen čte, nic nemění.
+- *Obnovit ze zálohy* je ve Správě a u prázdné databáze i na stránce Úvodní nastavení.
+
 ## Testovací režim – mazání záznamů (prozatímní)
 Jen pro testování, před ostrým provozem se vypne (a z aplikace později zmizí).
 - **Zapnutí:** Kancelář → *Správa* → *Testovací režim: mazání záznamů* → *Zapnout* (PIN správce). Na všech zařízeních
@@ -151,6 +159,9 @@ Jen pro testování, před ostrým provozem se vypne (a z aplikace později zmiz
 - **Najednou:** *Smazat všechny záznamy OK-XXX* (v záložce u letadla), *Smazat všechny provozní záznamy* (všechna
   letadla; letadla, uživatelé a nastavení zůstanou) a *Začít úplně od nuly* (i letadla, uživatelé, nastavení – všechna
   zařízení se vrátí na první spuštění). Hromadné mazání chce napsat SMAZAT a PIN.
+- *Vložit lety OK-WND z papíru (10.–13. 11.)* – přepis papírových stránek 800151–800154 (8 letů, posádka náhodně
+  z pilotů v systému, PF podle papíru). Nabídne smazat lety OK-WND z těch dní, které už v deníku jsou, a nastavit
+  přechodový bod na stav před stránkou 800151 (TTAF 3166:15, cykly 2043), aby se hodiny nezapočítaly dvakrát.
 - Smazání je podepsaný záznam, který se rozešle na všechna zařízení (i přes QR / soubor); v databázi se nic fyzicky
   nemaže, záznamy se jen přestanou zobrazovat a počítat. Úplná záloha (JSON) obsahuje i smazané, takže doporučuji ji
   před větším mazáním stáhnout.
