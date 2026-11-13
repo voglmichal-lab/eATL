@@ -667,7 +667,7 @@ function ftlPeople(){const ids=new Set();Object.values(S.users).forEach(x=>{if(x
   Object.values(S.legs).forEach(l=>{if(!l.void)[l.pic,l.sic,l.ca].forEach(i=>{if(i&&S.users[i])ids.add(i)})});return [...ids].map(i=>S.users[i]).sort((a,b)=>a.name.localeCompare(b.name))}
 function limCls(v,lim){return v>lim*60?'warn':v>=lim*60*0.9?'caution':'ok'}
 const hmUtc=ms=>new Date(ms).toISOString().slice(11,16);
-function ftlBanner(){return `<div class="warnline caution">Počítáno jen z letů zapsaných v ATL podle ORO.FTL / CS FTL.1${S.cfg.omRef?' ('+esc(S.cfg.omRef)+')':''}. <b>Služby bez letu</b> (pohotovost, přelet jako cestující, simulátor, výcvik, kancelář) tu nejsou – skutečná doba služby může být vyšší; lety před uvedením letadla do e-deníku chybí. Nehlídá se prodloužení FDP, odpočinek během letu, zkrácený ani týdenní odpočinek.</div>`}
+function ftlBanner(){return `<div class="warnline caution">Počítáno jen z letů zapsaných v ATL </div>`}
 function viewFtl(u){
   if(!can.ftlAll(u))return viewFtlPerson(u.id,u);
   if(UI.ftlUser&&S.users[UI.ftlUser])return `<div class="chips"><button class="btn" data-act="ftl-user" data-id="">‹ Všechny posádky</button></div>`+viewFtlPerson(UI.ftlUser,u);
