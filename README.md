@@ -143,6 +143,8 @@ vidí všechny posádky (záložka *Doba služby*), **pilot vidí svou službu**
   Připravit/zrušit jde i znovu (*Zrušit přípravu*).
 - CRS se **přiřazuje k letu** (výchozí je poslední let) – objeví se na stránce ATL toho letu a posádka dalšího letu ho
   vidí v přehledu letadla („Uvolněno do provozu od posledního letu“), i když nejde o odstranění závady (např. Weekly check).
+- Stejně se k letu přiřazuje i **odstranění závady (CRS k závadě)** – hodí se hlavně u závad zapsaných mimo let.
+  Na stránce ATL je pak v „Uvolnění do provozu na této stránce“, u letu značka *CRS ✓* a v tabulce závad i se závadou.
 - V záložce Uvolnění jde každou položku rozkliknout: detail CRS (WO, let, TTAF/cykly, organizace, kdo podepsal
   a s jakou licencí, kdo připravil), u závady odstranění a odklad, u uzemnění důvod a kdy skončilo.
 
@@ -175,6 +177,8 @@ Jen pro testování, před ostrým provozem se vypne (a z aplikace později zmiz
 
 ## Závady v ATL
 Na stránce deníku je u každé závady vedle sebe její odstranění (CRS) nebo odklad, i když proběhlo jiný den.
+Závada zjištěná na zemi (záložka Závady → *Zapsat závadu*) se zapíše na stránku ATL **za vybraný let**
+(výchozí je poslední let), v tabulce je jako „na zemi po letu N“. Volba *nepřiřazovat k letu* ji nechá jen v záložce Závady.
 
 ## PDF z OFP
 V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signálu). Z nabídky sdílení jde vytisknout (AirPrint), uložit do Souborů nebo poslat.

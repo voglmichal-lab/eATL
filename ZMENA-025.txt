@@ -1,0 +1,32 @@
+eTechLog – změna Z-025
+Verze: 0.6.12 (navazuje na Z-024 / 0.6.11)
+Datum: 2026-11-16
+
+Co se mění
+- Odstranění závady (CRS k závadě) má stejně jako samostatné CRS pole „Přiřadit k letu – uvidí ho posádka v ATL“.
+  Výchozí je poslední let, jde zvolit jiný z posledních 12 nebo „nepřiřazovat k letu“. Mechanik bez oprávnění
+  let zvolí při přípravě a osvědčující personál ho při podpisu vidí předvyplněný.
+- Závada zapsaná na zemi (záložka Závady → Zapsat závadu) má pole „Zapsat na stránku ATL – po letu“ (výchozí
+  poslední let). Dosud se taková závada na žádnou stránku ATL nedostala.
+- Na stránce ATL toho letu:
+  - v „Uvolnění do provozu na této stránce“ je řádek „CRS k závadě“ (rozklikne se detail);
+  - v tabulce „Závady a jejich odstranění“ je závada s odstraněním, u závady z jiné stránky „ze str. …“,
+    u závady ze země „na zemi po letu N“;
+  - u letu značka „CRS ✓“ a „… na zemi …“.
+- V záložce Uvolnění, v kartě závady a v detailu závady je vidět, ke kterému letu je CRS přiřazené.
+- Starší odstranění zůstávají „Nepřiřazeno k letu“; nic se nepřepočítává.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-025.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

@@ -183,7 +183,10 @@ function deriveAc(s,ac){
   for(const p of pages){p.pending=p.legs.some(l=>s.out.has(l.ev));const act=p.legs.filter(l=>!l.void);p.air=p.cfAir-p.bfAir;p.block=act.reduce((a,l)=>a+l.block,0);p.ldg=p.cfCyc-p.bfCyc;p.key=ac.acId+'|'+p.no}
   const defs=Object.values(s.defects).filter(d=>d.acId===ac.acId).sort((a,b)=>a.reported.at<b.reported.at?-1:1);
   const code=String(ac.reg||'').split('-').pop();
-  defs.forEach((d,i)=>{d.no=code+'-'+String(i+1).padStart(3,'0');const l=d.legId&&s.legs[d.legId];d.pageRef=l?l.page+'/'+l.idx:null});
+  defs.forEach((d,i)=>{d.no=code+'-'+String(i+1).padStart(3,'0');const l=d.legId&&s.legs[d.legId];const g=!l&&d.atLeg&&s.legs[d.atLeg];
+    // found in flight → its flight; found on the ground → the page it was written on (after a chosen flight)
+    d.pageLeg=l?l.legId:g?g.legId:null;d.ground=!l;d.pageRef=l?l.page+'/'+l.idx:g?g.page+'/'+g.idx:null;
+    const rl=d.rect&&d.rect.atLeg&&s.legs[d.rect.atLeg];d.rectRef=rl?rl.page+'/'+rl.idx:null});
   const today=todayISO();
   const open=defs.filter(d=>d.status==='open'),deferred=defs.filter(d=>d.status==='deferred');
   const overdue=deferred.filter(d=>d.deferral&&d.deferral.due&&d.deferral.due<today);
@@ -561,7 +564,7 @@ function viewLog(ac,u){
     if(l.void)flags.push('<span class="ann mute">zneplatněno</span>');
     if(l.plannedTo)flags.push(`<span class="ann warn">DIVERT · plán ${esc(l.plannedTo)}</span>`);
     if(l.split)flags.push(`<span class="ann info">SPLIT DUTY ›</span>`);
-    for(const d of ac.defects.filter(x=>x.legId===l.legId))flags.push(`<span class="ann ${d.status==='open'?'warn':d.status==='deferred'?'caution':'ok'}">${esc(d.no)} ${d.status==='open'?'otevřená':d.status==='deferred'?'odložená':'odstraněná'}</span>`);
+    for(const d of ac.defects.filter(x=>x.pageLeg===l.legId))flags.push(`<span class="ann ${d.status==='open'?'warn':d.status==='deferred'?'caution':'ok'}">${esc(d.no)}${d.ground?' na zemi':''} ${d.status==='open'?'otevřená':d.status==='deferred'?'odložená':'odstraněná'}</span>`);
     const pic=S.users[l.pic],sic=S.users[l.sic];
     const gap=l.gap?`<tr class="gaprow"><td colspan="16">Přerušený řetězec: předchozí let přistál v <b class="mono">${esc(l.gap)}</b>, tento odlétá z <b class="mono">${esc(l.from)}</b>. Chybí zápis, nebo jde o přelet mimo deník?</td></tr>`:'';
     const op=l.state==='open'&&!l.void;
@@ -572,10 +575,10 @@ function viewLog(ac,u){
       <td>${esc(KIND[l.kind]||l.kind||'')}${l.fno?`<br><span class="mono muted">${esc(l.fno)}</span>`:''}</td>
       <td class="sig">${esc(pic?pic.name:'–')}${l.pf&&l.pf===l.pic?' <span class="ann info" style="font-size:.62rem;padding:0 4px">PF</span>':''}<small>SIC ${sic?esc(sic.name):l.sicTxt?esc(l.sicTxt)+' <span class="ann caution" style="font-size:.6rem;padding:0 4px">ověřit</span>':'–'}${(l.pf&&l.sic&&l.pf===l.sic)||l.pf==='ext'?' · PF':''}</small></td>
       <td class="sig">${l.state==='open'?'<span class="ann info">Probíhá</span>':`${esc(l.signed.name)}<small>${fmtTs(l.signed.at)}</small>`}${l.sec?`<small>SEC ${esc(l.sec.time)}Z · ${esc(l.sec.byName||'')}</small>`:''}${flags.length?`<div class="flags">${flags.join('')}</div>`:''}</td>
-      <td class="keep"><div style="display:grid;gap:6px;justify-items:stretch">${op?`<button class="btn sm primary" data-act="complete-leg" data-id="${esc(l.legId)}">Uzavřít let</button>`:''}<button class="btn sm" data-act="leg-detail" data-id="${esc(l.legId)}">Detail</button>${crsOf(l).map(c=>`<span class="ann ok" title="${esc(c.name)} ${fmtTs(c.at)}">CRS ✓</span>`).join('')}${!op&&!l.void&&can.crs(u)?`<button class="btn sm" data-act="crs-leg" data-id="${esc(l.legId)}">CRS</button>`:''}</div></td></tr>`;
+      <td class="keep"><div style="display:grid;gap:6px;justify-items:stretch">${op?`<button class="btn sm primary" data-act="complete-leg" data-id="${esc(l.legId)}">Uzavřít let</button>`:''}<button class="btn sm" data-act="leg-detail" data-id="${esc(l.legId)}">Detail</button>${crsOf(l).map(c=>`<span class="ann ok" title="${esc(c.name)} ${fmtTs(c.at)}">CRS ✓</span>`).join('')}${rectOf(l).map(d=>`<span class="ann ok" title="${esc(d.no)} · ${esc(d.rect.name)} ${fmtTs(d.rect.at)}">CRS ✓</span>`).join('')}${!op&&!l.void&&can.crs(u)?`<button class="btn sm" data-act="crs-leg" data-id="${esc(l.legId)}">CRS</button>`:''}</div></td></tr>`;
   }).join('');
   const dailies=S.daily[ac.acId+'|'+pg.date]||[];
-  const pageDefs=ac.defects.filter(d=>d.legId&&pg.legs.some(l=>l.legId===d.legId));
+  const pageDefs=ac.defects.filter(d=>pg.legs.some(l=>l.legId===d.pageLeg||(d.rect&&d.rect.atLeg===l.legId)));
   return `${unfinishedBlock(ac,true)}<div class="panel-head">${pager}<span class="muted">Stránka = letadlo + den, max. ${PER_PAGE} letů</span></div>
   <article class="atl-page">
     <header class="atl-head">
@@ -597,7 +600,9 @@ function viewLog(ac,u){
     <section class="sheet-sec"><span class="label">Prohlídky ${fmtDate(pg.date)}</span>
       ${dailies.length?`<div class="list">${dailies.map(d=>`<div class="line-item"><span class="ann ok">${esc(DAILY[d.kind]||d.kind)}</span><span>${esc(d.name)}</span><span class="mono muted">${fmtTs(d.at)}</span>${d.tyres?`<span class="muted">Pneu N/L/P ${esc(d.tyres)} psi</span>`:''}${d.oil?`<span class="muted">Olej ${esc(d.oil)}</span>`:''}${d.brakes?'<span class="muted">Brzdy OK</span>':''}${d.notes?`<span>${esc(d.notes)}</span>`:''}</div>`).join('')}</div>`:`<p class="muted">Na tento den není podepsaná žádná prohlídka.</p>`}
     </section>
-    ${(()=>{const cr=pg.legs.flatMap(l=>crsOf(l).map(c=>({c,l})));return `<section class="sheet-sec"><span class="label">Uvolnění do provozu na této stránce</span>${cr.length?`<div class="list">${cr.map(({c,l})=>`<div class="line-item tap" data-act="crs-detail" data-id="crs|${esc(c.crsId)}" role="button" tabindex="0"><span class="ann ok">CRS</span><span>po letu ${l.idx} ${esc(l.from)} → ${esc(l.to)}</span><span>${esc(crsTitle(c))}${c.wo?' · WO '+esc(c.wo):''}</span><span class="muted">${esc(c.name)} · ${esc(c.licence||'')} · ${fmtTs(c.at)}</span></div>`).join('')}</div>`:'<p class="muted">Na této stránce zatím žádné CRS.</p>'}</section>`})()}
+    ${(()=>{const cr=pg.legs.flatMap(l=>crsOf(l).map(c=>({at:c.at,html:`<div class="line-item tap" data-act="crs-detail" data-id="crs|${esc(c.crsId)}" role="button" tabindex="0"><span class="ann ok">CRS</span><span>po letu ${l.idx} ${esc(l.from)} → ${esc(l.to)}</span><span>${esc(crsTitle(c))}${c.wo?' · WO '+esc(c.wo):''}</span><span class="muted">${esc(c.name)} · ${esc(c.licence||'')} · ${fmtTs(c.at)}</span></div>`})).concat(
+      rectOf(l).map(d=>({at:d.rect.at,html:`<div class="line-item tap" data-act="crs-detail" data-id="rect|${esc(d.defId)}" role="button" tabindex="0"><span class="ann ok">CRS k závadě</span><span>po letu ${l.idx} ${esc(l.from)} → ${esc(l.to)}</span><span>${esc(d.no)} – ${esc(d.text)}${d.rect.wo?' · WO '+esc(d.rect.wo):''}</span><span class="muted">${esc(d.rect.name)} · ${esc(d.rect.licence||'')} · ${fmtTs(d.rect.at)}</span></div>`})))).sort((a,b)=>a.at<b.at?-1:1);
+      return `<section class="sheet-sec"><span class="label">Uvolnění do provozu na této stránce</span>${cr.length?`<div class="list">${cr.map(x=>x.html).join('')}</div>`:'<p class="muted">Na této stránce zatím žádné CRS.</p>'}</section>`})()}
     <section class="sheet-sec"><span class="label">Závady a jejich odstranění</span>
       ${pageDefs.length?`<div class="scroll-x"><table class="plain defrect"><thead><tr><th>Let</th><th>Závada</th><th>Odstranění závady / odklad</th></tr></thead><tbody>${pageDefs.map(d=>defRectRow(d,pg)).join('')}</tbody></table></div>`:`<p class="muted">NIL – žádné závady.</p>`}
     </section>
@@ -605,12 +610,14 @@ function viewLog(ac,u){
 }
 
 function defRectRow(d,pg){
-  const l=pg.legs.find(x=>x.legId===d.legId);const st=d.status;
+  const l=pg.legs.find(x=>x.legId===d.pageLeg);const st=d.status;
+  const where=l?(d.ground?`na zemi po letu ${l.idx}`:`${l.idx} · ${esc(l.from)}–${esc(l.to)}`):(d.pageRef?'ze str. '+esc(d.pageRef):d.src==='paper'?'z papíru':'mimo let');
+  const rl=d.rect&&pg.legs.find(x=>x.legId===d.rect.atLeg);
   const df=d.deferral,r=d.rect;
   const defTxt=df?`<div class="${r?'muted':''}"><b>Odloženo dle MEL ${esc(df.melItem||'')} kat. ${esc(df.cat||'')}</b> – platí do ${fmtDate(df.due)}${df.procO||df.procM?` · ${df.procO?'(O)':''}${df.procM?' (M)':''} provedeno`:''}${df.rem?`<br>${esc(df.rem)}`:''}<br><small>${esc(df.name)} · ${fmtTs(df.at)}</small></div>`:'';
-  const rectTxt=r?`<div><b>${esc(r.action)}</b><br><span class="mono">ATA ${esc(r.ata||'–')} · WO ${esc(r.wo||'–')}</span><br><small>CRS ${esc(r.name)} (${esc(r.licence||'–')}) · ${fmtTs(r.at)} · TTAF ${hm(r.acAir)} / ${esc(r.acCyc)} cyklů</small></div>`:'';
+  const rectTxt=r?`<div><b>${esc(r.action)}</b><br><span class="mono">ATA ${esc(r.ata||'–')} · WO ${esc(r.wo||'–')}</span><br><small>CRS ${esc(r.name)} (${esc(r.licence||'–')}) · ${fmtTs(r.at)} · TTAF ${hm(r.acAir)} / ${esc(r.acCyc)} cyklů${rl?` · po letu ${rl.idx}`:d.rectRef?` · po letu str. ${esc(d.rectRef)}`:''}</small></div>`:'';
   const right=defTxt+rectTxt||`<span class="ann warn">Otevřená</span> <span class="muted">čeká na odstranění nebo odklad</span>`;
-  return `<tr class="${st}"><td class="mono" style="white-space:nowrap">${l?`${l.idx} · ${esc(l.from)}–${esc(l.to)}`:''}<br><span class="muted">${esc(d.no)}</span></td>
+  return `<tr class="${st}"><td class="mono" style="white-space:nowrap">${where}<br><span class="muted">${esc(d.no)}</span></td>
     <td>${esc(d.text)}<br><small class="muted">${d.ata?'ATA '+esc(d.ata)+' · ':''}${esc(d.reported.name)} · ${fmtTs(d.reported.at)}</small></td>
     <td><span class="ann ${st==='open'?'warn':st==='deferred'?'caution':'ok'}" style="margin-bottom:4px">${st==='open'?'Otevřená':st==='deferred'?'Odložená':'Odstraněná'}</span>${st==='open'?'<br><span class="muted">čeká na odstranění nebo odklad</span>':'<br>'+right}</td></tr>`;
 }
@@ -621,7 +628,7 @@ function defectCard(d,u,ac){
   let extra='';
   if(d.deferral){const left=d.deferral.due?daysBetween(todayISO(),d.deferral.due):null;
     extra+=`<div class="box"><b>MEL ${esc(d.deferral.melItem)} · kategorie ${esc(d.deferral.cat)}</b><span>Platí do ${fmtDate(d.deferral.due)}${left!=null?(left<0?` – <b style="color:var(--warn)">prošlé o ${-left} d</b>`:` – zbývá ${left} d`):''}</span><span class="muted">${[d.deferral.procO?'(O) provedeno':'',d.deferral.procM?'(M) provedeno':'',d.deferral.placard?'štítek INOP umístěn':''].filter(Boolean).join(' · ')}${d.deferral.rem?' · '+esc(d.deferral.rem):''}</span><span class="muted">Odložil ${esc(d.deferral.name)}, ${fmtTs(d.deferral.at)}</span></div>`}
-  if(d.rect)extra+=`<div class="box"><b>Odstranění · ATA ${esc(d.rect.ata||'–')} · WO ${esc(d.rect.wo||'–')}</b><span>${esc(d.rect.action)}</span>${d.rect.parts?`<span class="muted">Díly: ${esc(d.rect.parts)}</span>`:''}<span class="muted">CRS: ${esc(d.rect.name)} (${esc(d.rect.licence||'–')}) · ${fmtTs(d.rect.at)} · TTAF ${hm(d.rect.acAir)} / ${esc(d.rect.acCyc)} cyklů</span></div>`;
+  if(d.rect)extra+=`<div class="box"><b>Odstranění · ATA ${esc(d.rect.ata||'–')} · WO ${esc(d.rect.wo||'–')}</b><span>${esc(d.rect.action)}</span>${d.rect.parts?`<span class="muted">Díly: ${esc(d.rect.parts)}</span>`:''}<span class="muted">CRS: ${esc(d.rect.name)} (${esc(d.rect.licence||'–')}) · ${fmtTs(d.rect.at)} · TTAF ${hm(d.rect.acAir)} / ${esc(d.rect.acCyc)} cyklů</span><span class="muted">${d.rectRef?'Přiřazeno k letu – str. '+esc(d.rectRef):'Nepřiřazeno k letu'}</span></div>`;
   const btns=[];
   if(st==='open'&&can.defer(u))btns.push(`<button class="btn sm" data-act="defer-form" data-id="${esc(d.defId)}">Odložit dle MEL</button>`);
   const pr=st!=='closed'?prepFor(d.defId):null;
@@ -631,7 +638,7 @@ function defectCard(d,u,ac){
   if(pr&&canDropPrep(u,pr))btns.push(`<button class="btn sm ghost" data-act="prep-drop" data-id="${esc(pr.prepId)}">Zrušit přípravu</button>`);
   btns.push(`<button class="btn sm ghost" data-act="defect-detail" data-id="${esc(d.defId)}">Historie</button>`);
   return `<div class="defect ${st}"><div class="stripe"></div><div class="body">
-    <div class="top-row"><span class="mono">${esc(d.no)}</span><span class="ann ${st==='open'?'warn':st==='deferred'?'caution':'ok'}">${lbl}</span>${d.pageRef?`<span class="muted mono">str. ${esc(d.pageRef)}</span>`:d.src==='paper'?`<span class="ann mute">z papíru${d.paperPage?' str. '+esc(d.paperPage):''}</span>`:`<span class="muted">mimo let</span>`}${S.out.has(d.reported.ev)?'<span class="ann caution">neodesláno</span>':''}</div>
+    <div class="top-row"><span class="mono">${esc(d.no)}</span><span class="ann ${st==='open'?'warn':st==='deferred'?'caution':'ok'}">${lbl}</span>${d.pageRef?`<span class="muted mono">${d.ground?'na zemi · ':''}str. ${esc(d.pageRef)}</span>`:d.src==='paper'?`<span class="ann mute">z papíru${d.paperPage?' str. '+esc(d.paperPage):''}</span>`:`<span class="muted">mimo let</span>`}${S.out.has(d.reported.ev)?'<span class="ann caution">neodesláno</span>':''}</div>
     <p class="txt">${esc(d.text)}</p>
     <p class="meta">Zapsal ${esc(d.reported.name)} · ${fmtTs(d.reported.at)}${d.ata?` · ATA ${esc(d.ata)}`:''}</p>
     ${extra}<div class="btns">${btns.join('')}</div></div></div>`;
@@ -654,7 +661,7 @@ function viewCrs(ac,u){
   const row=it=>{
     if(it.kind==='crs')return `<div class="defect closed tap" data-act="crs-detail" data-id="crs|${esc(it.c.crsId)}" role="button" tabindex="0"><div class="stripe"></div><div class="body"><div class="top-row">${delLink('crs:'+it.c.crsId,'Smazat',true)}<span class="ann ok">CRS</span><span class="mono">WO ${esc(it.c.wo||'–')}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(crsTitle(it.c))}</p>${(()=>{const L=it.c.legId&&S.legs[it.c.legId];return L?`<p class="meta">Po letu ${esc(L.page)}/${L.idx} · ${fmtDate(L.date)} · ${esc(L.from)} → ${esc(L.to)}</p>`:'<p class="meta">Nepřiřazeno k letu</p>'})()}${it.c.wo?'<p class="meta">Rozsah a dílčí podpisy viz workpack '+esc(it.c.wo)+'</p>':''}<p class="meta">${esc(it.c.name)} · ${esc(it.c.licence||'–')} · ${esc(it.c.org||'')} · TTAF ${hm(it.c.acAir)} / ${esc(it.c.acCyc)} cyklů</p></div></div>`;
     if(it.kind==='ground')return `<div class="defect open tap" data-act="crs-detail" data-id="ground|${esc(it.c.ev)}" role="button" tabindex="0"><div class="stripe"></div><div class="body"><div class="top-row">${delLink('ev:'+it.c.ev,'Smazat',true)}<span class="ann warn">Uzemněno</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.reason)}</p><p class="meta">${esc(it.c.name)}${it.c.wo?' · WO '+esc(it.c.wo):''}</p></div></div>`;
-    return `<div class="defect closed tap" data-act="crs-detail" data-id="rect|${esc(it.c.defId)}" role="button" tabindex="0"><div class="stripe"></div><div class="body"><div class="top-row">${delLink('ev:'+it.c.rect.ev,'Smazat odstranění',true)}<span class="ann ok">CRS k závadě</span><span class="mono">${esc(it.c.no)}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.text)}</p><p class="meta">${esc(it.c.rect.action)} · ${esc(it.c.rect.name)} (${esc(it.c.rect.licence||'–')})</p></div></div>`;
+    return `<div class="defect closed tap" data-act="crs-detail" data-id="rect|${esc(it.c.defId)}" role="button" tabindex="0"><div class="stripe"></div><div class="body"><div class="top-row">${delLink('ev:'+it.c.rect.ev,'Smazat odstranění',true)}<span class="ann ok">CRS k závadě</span><span class="mono">${esc(it.c.no)}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.text)}</p><p class="meta">${esc(it.c.rect.action)} · ${esc(it.c.rect.name)} (${esc(it.c.rect.licence||'–')})</p>${(()=>{const L=it.c.rect.atLeg&&S.legs[it.c.rect.atLeg];return L?`<p class="meta">Po letu ${esc(L.page)}/${L.idx} · ${fmtDate(L.date)} · ${esc(L.from)} → ${esc(L.to)}</p>`:'<p class="meta">Nepřiřazeno k letu</p>'})()}</div></div>`;
   };
   return prepPanel(ac,u)+`<div class="panel"><div class="panel-head"><div><p class="label">Aktuální stav</p><h2>${esc(ac.reg)} · <span class="ann ${ac.status}">${STATUS_LABEL[ac.status]}</span></h2></div>${can.prepCrs(u)?`<button class="btn primary" data-act="crs-form">${ICON.check}${can.crs(u)?'Vydat CRS':'Připravit CRS'}</button>`:''}</div>
   <p class="muted">${ac.lastCrs?`Poslední samostatné CRS ${fmtTs(ac.lastCrs.at)} – ${esc(ac.lastCrs.name)}, WO ${esc(ac.lastCrs.wo||'–')}.`:'Zatím žádné samostatné CRS.'} Otevřené závady se uzavírají přes „Odstranit a uvolnit“ v záložce Závady, uzemnění ruší vydání CRS.</p></div>
@@ -2493,7 +2500,7 @@ function openLegDetail(id){
   if(l.ofpId&&ofpOf(l.ofpId))btns.push(`<button type="button" class="btn" data-act="ofp-open" data-id="${esc(l.ofpId)}">Otevřít OFP ${esc(ofpOf(l.ofpId).flt)}</button>`);
   if(s)btns.push(`<button type="button" class="btn" data-act="copy-sec" data-id="${esc(id)}">Kopírovat potvrzení (Fl3xx)</button>`);
   if(!isOpen&&!l.void&&can.prepCrs(u))btns.push(`<button type="button" class="btn" data-act="crs-leg" data-id="${esc(id)}">${ICON.check}${can.crs(u)?'Vydat CRS po tomto letu':'Připravit CRS po tomto letu'}</button>`);
-  const lc=crsOf(l);
+  const lc=crsOf(l).map(c=>({at:c.at,t:crsTitle(c),wo:c.wo,name:c.name,licence:c.licence})).concat(rectOf(l).map(d=>({at:d.rect.at,t:'Odstranění závady '+d.no+' – '+d.text,wo:d.rect.wo,name:d.rect.name,licence:d.rect.licence}))).sort((a,b)=>a.at<b.at?-1:1);
   if(!l.void&&isOpen&&can.leg(u))btns.push(`<button type="button" class="btn primary" data-act="complete-leg" data-id="${esc(id)}">Dokončit let</button>`,`<button type="button" class="btn danger" data-act="void-form" data-id="${esc(id)}">Zrušit – let se neuskutečnil</button>`);
   else if(!l.void&&can.amend(u,l))btns.push(`<button type="button" class="btn" data-act="amend-form" data-id="${esc(id)}">Opravit zápis</button>`,`<button type="button" class="btn danger" data-act="void-form" data-id="${esc(id)}">Zneplatnit (duplicita / omyl)</button>`);
   else if(!l.void&&!isOpen)btns.push(`<span class="muted" style="font-size:.9rem">Opravit tento let může jen jeho PIC${pic?' ('+esc(pic.name)+')':''} nebo CAMO.</span>`);
@@ -2514,7 +2521,7 @@ function openLegDetail(id){
     ${!isOpen&&(S.cfg.splitDuty||l.split)?`<dt>Split duty</dt><dd>${l.split?'po tomto letu přerušení služby – '+esc(SPLIT_ACC[l.split.acc]||''):'ne'}${can.splitEdit(u,l)?` <button type="button" class="linkbtn" style="display:inline;min-height:0;padding:0 0 0 6px" data-act="split-form" data-id="${esc(l.legId)}">upravit</button>`:''}</dd>`:''}
     ${l.void?`<dt>Zneplatněno</dt><dd>${esc(l.void.name)} · ${fmtTs(l.void.at)} – ${esc(l.void.reason)}</dd>`:''}
   </dl>${hist?`<div><p class="label">Historie oprav</p><ul>${hist}</ul></div>`:''}
-  ${lc.length?`<div><p class="label">Uvolnění do provozu po tomto letu</p><ul>${lc.map(c=>`<li><b>${esc(crsTitle(c))}</b>${c.wo?' · WO '+esc(c.wo):''} – ${esc(c.name)} (${esc(c.licence||'–')}), ${fmtTs(c.at)}</li>`).join('')}</ul></div>`:''}
+  ${lc.length?`<div><p class="label">Uvolnění do provozu po tomto letu</p><ul>${lc.map(c=>`<li><b>${esc(c.t)}</b>${c.wo?' · WO '+esc(c.wo):''} – ${esc(c.name)} (${esc(c.licence||'–')}), ${fmtTs(c.at)}</li>`).join('')}</ul></div>`:''}
   ${btns.length?`<div class="chips">${btns.join('')}</div>`:''}${delLink('leg:'+l.legId,'Smazat tento let')}`;
   openSheet(`${ac.reg} · ${l.from}–${l.to} · ${fmtDate(l.date)}`,html,{focus:false});
 }
@@ -2538,9 +2545,9 @@ function openVoid(id){
 /* --- defects --- */
 function openDefectForm(){
   const ac=S.ac[UI.acId];const u=me();
-  openSheet('Zapsat závadu – '+ac.reg,`${F.date('f-date','Datum zjištění (UTC)',todayISO())}${F.area('f-text','Popis závady','','Co bylo zjištěno, kde, za jakých podmínek')}${F.text('f-ata','ATA kapitola (nepovinné)','',{attrs:'inputmode="numeric" maxlength="2" placeholder="např. 32"'})}<p class="muted">Závada zapsaná mimo let (např. při prohlídce na zemi). Letadlo bude do odložení nebo odstranění vedeno jako neprovozuschopné.</p>`,{submit:'Podepsat zápis',sign:true,onSubmit:async()=>{
+  openSheet('Zapsat závadu – '+ac.reg,`${F.date('f-date','Datum zjištění (UTC)',todayISO())}${F.area('f-text','Popis závady','','Co bylo zjištěno, kde, za jakých podmínek')}${F.text('f-ata','ATA kapitola (nepovinné)','',{attrs:'inputmode="numeric" maxlength="2" placeholder="např. 32"'})}<div class="fgrid wide">${legPick('f-defleg',ac,ac.lastLeg?ac.lastLeg.legId:'','Zapsat na stránku ATL – po letu')}</div><p class="muted">Závada zjištěná mimo let (např. při prohlídce na zemi) se zapíše na stránku ATL za vybraný let, aby ji viděla posádka. Letadlo bude do odložení nebo odstranění vedeno jako neprovozuschopné.</p>`,{submit:'Podepsat zápis',sign:true,onSubmit:async()=>{
     const date=parseDate(v('f-date'));if(!date)fail('Datum musí být ve tvaru dd/mm/rrrr.');const text=v('f-text');if(text.length<4)fail('Popište závadu.');
-    await checkPin();emit([['defect.report',{defId:rid('def'),acId:ac.acId,legId:null,date,text,ata:v('f-ata'),src:has(u,'mech')?'mech':has(u,'crew')?'crew':'camo'}]]);UI.tab='defects';closeSheet();toast('Závada zapsána');
+    await checkPin();emit([['defect.report',{defId:rid('def'),acId:ac.acId,legId:null,atLeg:v('f-defleg')||null,date,text,ata:v('f-ata'),src:has(u,'mech')?'mech':has(u,'crew')?'crew':'camo'}]]);UI.tab='defects';closeSheet();toast('Závada zapsána');
   }});
 }
 function openDefer(id){
@@ -2565,9 +2572,10 @@ function openRectify(id,prepId){
     ${F.text('f-air','TTAF při odstranění',hm(pv('acAir',ac.air)).replace(/\u2009/g,''),{attrs:'inputmode="numeric" class="mono"'})}${F.text('f-cyc','Cykly',String(pv('acCyc',ac.cyc)),{attrs:'inputmode="numeric"'})}
     ${auth?F.text('f-lic','Číslo licence / oprávnění',u.licence||''):''}</div>
     ${F.area('f-action','Provedená opatření',pv('action',''),'Co bylo provedeno, podle jakého dokumentu (AMM/IPC kapitola)')}
+    <div class="fgrid wide">${legPick('f-rectleg',ac,pr?(pr.atLeg||''):(ac.lastLeg?ac.lastLeg.legId:''),'Přiřadit k letu – uvidí ho posádka v ATL')}</div>
     ${auth?`<div class="statement">${CRS_TEXT}</div>${F.check('f-stmt','Potvrzuji prohlášení o uvolnění do provozu',false)}`:''}`,{submit:auth?'Podepsat CRS':'Připravit k podpisu',sign:true,onSubmit:async()=>{
     const action=v('f-action');if(action.length<4)fail('Popište provedená opatření.');const air=parseDur(v('f-air'));if(air==null)fail('TTAF zadejte jako hodiny:minuty, např. 3455:40.');
-    const base={defId:id,ata:v('f-ata'),wo:v('f-wo'),acAir:air,acCyc:parseInt(v('f-cyc'),10)||0,action};
+    const base={defId:id,ata:v('f-ata'),wo:v('f-wo'),acAir:air,acCyc:parseInt(v('f-cyc'),10)||0,action,atLeg:v('f-rectleg')||null};
     if(!auth){if(prepFor(id))fail('Odstranění této závady už je připravené k podpisu.');await checkPin();emit([['crs.prep',Object.assign({prepId:rid('prep'),kind:'rect',acId:d.acId},base)]]);closeSheet();toast('Odstranění připraveno – čeká na podpis CRS');return}
     if(!v('f-lic'))fail('Vyplňte číslo licence.');if(!chk('f-stmt'))fail('Potvrďte prohlášení CRS.');
     if(pr&&(pr.used||pr.dropped))fail('Tato příprava už byla podepsaná nebo zrušená.');
@@ -2587,7 +2595,7 @@ function prepNote(acId){const n=prepsOf(acId).length;return n?`<div class="warnl
 // releases signed after the last flight's on-block: the next crew should see them before departure
 function sinceLastFlight(ac){const l=ac.lastLeg;const cut=l&&l.signed?l.signed.at:'';
   const out=S.crs.filter(c=>c.acId===ac.acId&&(c.at>=cut||(l&&c.legId===l.legId))).map(c=>({t:'CRS '+crsTitle(c)+(c.wo?' (WO '+c.wo+')':''),name:c.name,at:c.at}));
-  ac.defects.filter(d=>d.rect&&d.rect.at>=cut).forEach(d=>out.push({t:'odstranění závady '+d.no+' – '+d.text,name:d.rect.name,at:d.rect.at}));
+  ac.defects.filter(d=>d.rect&&(d.rect.at>=cut||(l&&d.rect.atLeg===l.legId))).forEach(d=>out.push({t:'odstranění závady '+d.no+' – '+d.text,name:d.rect.name,at:d.rect.at}));
   return out.sort((a,b)=>a.at<b.at?-1:1)}
 function openCrsDetail(id){
   const [k,x]=String(id).split('|');
@@ -2614,7 +2622,7 @@ function openDefectDetail(id){
   const d=S.defects[id];if(!d)return;
   const R=d.rect,D=d.deferral;
   openSheet('Závada '+d.no,`<p class="txt">${esc(d.text)}</p>
-    ${R?`<div><p class="label">Odstranění a CRS</p><dl class="kvgrid"><dt>Opatření</dt><dd>${esc(R.action)}</dd><dt>ATA / WO</dt><dd class="mono">${esc(R.ata||'–')} · ${esc(R.wo||'–')}</dd><dt>TTAF / cykly</dt><dd class="mono">${R.acAir!=null?hm(R.acAir):'–'} · ${esc(R.acCyc??'–')}</dd><dt>CRS podepsal</dt><dd>${esc(R.name)} · licence <span class="mono">${esc(R.licence||'–')}</span> · ${fmtTs(R.at)}</dd>${R.prepBy?`<dt>Připravil</dt><dd>${esc(R.prepBy)}</dd>`:''}</dl><div class="statement">${CRS_TEXT}</div></div>`:''}
+    ${R?`<div><p class="label">Odstranění a CRS</p><dl class="kvgrid"><dt>Opatření</dt><dd>${esc(R.action)}</dd><dt>ATA / WO</dt><dd class="mono">${esc(R.ata||'–')} · ${esc(R.wo||'–')}</dd><dt>TTAF / cykly</dt><dd class="mono">${R.acAir!=null?hm(R.acAir):'–'} · ${esc(R.acCyc??'–')}</dd><dt>CRS podepsal</dt><dd>${esc(R.name)} · licence <span class="mono">${esc(R.licence||'–')}</span> · ${fmtTs(R.at)}</dd><dt>Přiřazeno k letu</dt><dd>${(()=>{const L=R.atLeg&&S.legs[R.atLeg];return L?`<button type="button" class="linkbtn" style="display:inline;min-height:0;padding:0" data-act="leg-detail" data-id="${esc(L.legId)}">po letu ${esc(L.page)}/${L.idx} · ${fmtDate(L.date)} · ${esc(L.from)} → ${esc(L.to)}</button>`:'nepřiřazeno'})()}</dd>${R.prepBy?`<dt>Připravil</dt><dd>${esc(R.prepBy)}</dd>`:''}</dl><div class="statement">${CRS_TEXT}</div></div>`:''}
     ${D?`<div><p class="label">Odklad</p><dl class="kvgrid"><dt>MEL</dt><dd class="mono">${esc(D.melItem||'–')} · kat. ${esc(D.cat)}</dd><dt>Platí do</dt><dd>${fmtDate(D.due)}</dd><dt>Odložil</dt><dd>${esc(D.name)} · ${fmtTs(D.at)}</dd></dl></div>`:''}
     <p class="label">Historie</p><ul>${d.trail.map(t=>`<li><b>${esc(t.t)}</b> – ${esc(t.name)}, ${fmtTs(t.at)} <span class="mono muted">${esc(t.dev)}</span></li>`).join('')}</ul>
     ${d.rect?delLink('ev:'+d.rect.ev,'Smazat jen odstranění (závada se znovu otevře)'):''}${d.deferral?delLink('ev:'+d.deferral.ev,'Smazat jen odklad'):''}${delLink('def:'+id,'Smazat celou závadu')}`,{focus:false});
@@ -2624,14 +2632,18 @@ function openDefectDetail(id){
 const CRS_KIND={SCHED:'Pravidelná prohlídka',WP:'Plánovaná údržba',UNSCHED:'Neplánovaná údržba'};
 function crsTitle(c){return c.scope||(c.kind&&CRS_KIND[c.kind])||'Údržba dle workpacku'}
 function crsOf(l){return S.crs.filter(c=>c.legId&&c.legId===l.legId)}
+function rectOf(l){return Object.values(S.defects).filter(d=>d.rect&&d.rect.atLeg&&d.rect.atLeg===l.legId)}
+// choose the flight after which a release / ground defect is written – the ATL page the crew sees (default: the last flight)
+function legPick(id,ac,sel,label){const flown=ac.legs.filter(l=>l.state==='closed'&&!l.void).slice(-12).reverse();if(sel&&!flown.some(l=>l.legId===sel)&&S.legs[sel])flown.push(S.legs[sel]);
+  return `<label class="fld full"><span>${label}</span><select id="${id}">${flown.map(l=>`<option value="${esc(l.legId)}" ${l.legId===sel?'selected':''}>po letu ${esc(l.page)}/${l.idx} · ${fmtDate(l.date)} · ${esc(l.from)} → ${esc(l.to)} · on-block ${esc(l.in||'–')}Z</option>`).join('')}<option value="" ${sel?'':'selected'}>nepřiřazovat k letu</option></select></label>`}
 function openCrs(legId,prepId){
   const pr=prepId&&S.preps[prepId];if(pr)legId=pr.legId;
   const L=legId&&S.legs[legId];const ac=S.ac[pr?pr.acId:L?L.acId:UI.acId];const u=me();const auth=can.crs(u);if(!auth&&(pr||!can.prepCrs(u)))return;
   const tAir=L?L.ttaf:ac.air,tCyc=L?L.tcyc:ac.cyc;const last=[...S.crs].reverse().find(c=>c.licence&&c.id===u.id);
   const pv=(k,d)=>pr&&pr[k]!=null?pr[k]:d;
   // the release belongs to a flight's ATL page so the crew sees it – by default after the last flight
-  const flown=ac.legs.filter(l=>l.state==='closed'&&!l.void).slice(-12).reverse();const selLeg=pr?(pr.legId||''):(L?L.legId:(ac.lastLeg?ac.lastLeg.legId:''));
-  const legSel=`<label class="fld full"><span>Přiřadit k letu – uvidí ho posádka v ATL</span><select id="f-crsleg">${flown.map(l=>`<option value="${esc(l.legId)}" ${l.legId===selLeg?'selected':''}>po letu ${esc(l.page)}/${l.idx} · ${fmtDate(l.date)} · ${esc(l.from)} → ${esc(l.to)} · on-block ${esc(l.in||'–')}Z</option>`).join('')}<option value="" ${selLeg?'':'selected'}>nepřiřazovat k letu</option></select></label>`;
+  const selLeg=pr?(pr.legId||''):(L?L.legId:(ac.lastLeg?ac.lastLeg.legId:''));
+  const legSel=legPick('f-crsleg',ac,selLeg,'Přiřadit k letu – uvidí ho posádka v ATL');
   openSheet((auth?'Uvolnění do provozu – ':'Příprava uvolnění – ')+ac.reg,`${auth?'':'<div class="warnline info">Podepsat CRS může jen osvědčující personál s oprávněním. Připravené uvolnění uvidí v záložce Uvolnění, zkontroluje a podepíše.</div>'}${pr?`<div class="warnline info">Připravil ${esc(pr.who.name)} · ${fmtTs(pr.at)} – zkontrolujte a podepište.</div>`:''}${L?`<div class="warnline info">Po letu <b class="mono">${esc(L.from)} → ${esc(L.to)}</b> · ${fmtDate(L.date)} · stránka ${esc(L.page)}/${L.idx} · on-block ${esc(L.in)}Z</div>`:''}${ac.open.length?`<div class="warnline caution">Otevřené závady (${ac.open.length}) se samostatným CRS neuzavřou – uzavřete je v záložce Závady.</div>`:''}
     <div class="fgrid wide">${legSel}</div>
     <div class="fgrid">${F.text('f-wo','Číslo WO / workpacku',pv('wo',''),{attrs:'autocapitalize="characters" placeholder="např. WO-2026-0142"'})}</div>
