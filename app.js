@@ -424,6 +424,17 @@ function render(){
   for(const k in kept){const el=document.getElementById(k);if(el&&!el.value&&el.closest('[data-keep]'))el.value=kept[k]}
   renderPill();
   if(mode()==='crew')crewLive();
+  // sticky OFP phase tabs sit right under the sticky header, not behind it
+  {const t=app.querySelector('.top');document.documentElement.style.setProperty('--top-h',(t?t.getBoundingClientRect().height:0)+'px')}
+}
+// after switching the OFP phase, bring the start of the new phase up under the tabs
+function ofpScrollToPhase(ph){
+  const sec=document.querySelector(`.ofp .ophase[data-ph="${ph}"]`);if(!sec)return;
+  const hdr=document.querySelector('.top'),tabs=document.querySelector('.phase-tabs');
+  const off=(hdr?hdr.getBoundingClientRect().height:0)+(tabs?tabs.getBoundingClientRect().height:0)+8;
+  const top=sec.getBoundingClientRect().top;if(top>=off-2&&top<=window.innerHeight*0.5)return;
+  const smooth=!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  window.scrollTo({top:Math.max(0,top+window.scrollY-off),behavior:smooth?'smooth':'auto'});
 }
 
 function renderSetup(){
@@ -3013,7 +3024,7 @@ document.addEventListener('click',e=>{
     case 'predep-form':openPredep();break;
     case 'ofp-pick':{const f=document.getElementById('ofp-file');if(f)f.click();break}
     case 'ofp-goto':{const [ph2,st2]=String(id).split('|');if(UI.ofpId){UI.ofpPh={id:UI.ofpId,ph:ph2};render()}setTimeout(()=>{const t=document.getElementById('ofps-'+st2);if(t)t.scrollIntoView({block:'start',behavior:'smooth'})},40);break}
-    case 'ofp-ph':{ofpFlush();const [oid,ph3]=String(id).split('|');UI.ofpPh={id:oid,ph:ph3};render();const t=document.querySelector('.phase-tabs');if(t)t.scrollIntoView({block:'start',behavior:'smooth'});break}
+    case 'ofp-ph':{ofpFlush();const [oid,ph3]=String(id).split('|');UI.ofpPh={id:oid,ph:ph3};render();requestAnimationFrame(()=>ofpScrollToPhase(ph3));break}
     case 'no-ofp':UI.noOfp=true;if(UI.draft.ofpId){UI.draft={};saveDraft()}render();setTimeout(()=>{const c=document.querySelector('.step.next');if(c)c.scrollIntoView({block:'start',behavior:'smooth'})},40);break;
     case 'no-ofp-off':UI.noOfp=false;render();break;
     case 'close-no-ofp':UI.closeNoOfp=true;render();setTimeout(()=>{const c=document.querySelector('.step.next');if(c)c.scrollIntoView({block:'start',behavior:'smooth'})},40);break;

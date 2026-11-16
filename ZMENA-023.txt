@@ -1,0 +1,24 @@
+eTechLog – změna Z-023
+Verze: 0.6.10 (navazuje na Z-022 / 0.6.9)
+Datum: 2026-11-13
+
+Co se mění
+- OFP: po „Pokračovat: Let ›“ (a stejně „Pokračovat: Přílet a uzavření ›“ nebo klepnutí na záložku fáze) stránka
+  vyjede nahoru – začátek nové fáze je hned pod záložkami.
+- Záložky fází (Před letem / Let / Shrnutí a uzavření) při posouvání zůstávají viditelné pod horní lištou;
+  dosud se schovaly za ni.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-023.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js
