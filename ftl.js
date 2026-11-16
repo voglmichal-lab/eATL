@@ -113,7 +113,11 @@ self.ETL_FTL = (function () {
         const atHome = homeBases.has(String(prev.to).toUpperCase());
         const minRest = Math.max(atHome ? 720 : 600, dutyLen);
         if (l.outMs < prev.inMs) cur.overlaps.push({ a: prev.legId, b: l.legId, aReg: prev.reg, bReg: l.reg });
-        if (restMin < minRest) { if (prev.split) cur.breaks.push({ a: prev, b: l }); else if (restMin >= 360) cur.shortRests.push({ min: Math.round(restMin), req: Math.round(minRest), atHome, after: prev.legId });
+        // the duty continues through a gap shorter than the absolute minimum rest (12 h home / 10 h away) – a wait at an outstation is duty;
+        // a marked split duty break continues it up to the full minimum rest. Never past 24 h from report: then it is a separate duty
+        // with a too-short rest (flagged) – otherwise one short night would chain every later day into a single "duty".
+        const absMin = atHome ? 720 : 600, within24 = (l.inMs - cur.reportMs) <= 24 * 60 * MIN;
+        if (within24 && (prev.split ? restMin < minRest : restMin < absMin)) { if (prev.split) cur.breaks.push({ a: prev, b: l }); else if (restMin >= 360) cur.shortRests.push({ min: Math.round(restMin), req: Math.round(minRest), atHome, after: prev.legId });
           cur.legs.push(l); continue }
         if (prev.split) cur.splitUnused = true;
         cur.restAfter = { min: Math.round(restMin), req: Math.round(minRest), atHome };
@@ -173,7 +177,8 @@ self.ETL_FTL = (function () {
       d.reportLocal = localHM(d.acclTz, d.reportMs); d.endLocal = localHM(d.acclTz, d.endMs); d.dateLocal = localDate(d.acclTz, d.reportMs);
       d.reportTzAirport = tzR;
       // rest after the previous duty
-      if (i > 0) { const pr = duties[i - 1].restAfter; d.restBefore = pr; if (pr && pr.min < pr.req) d.flags.push('rest') }
+      if (i > 0) { const pr = duties[i - 1].restAfter; d.restBefore = pr;
+        if (pr && pr.min < pr.req) { d.flags.push('rest'); d.notes.push(`Odpočinek před službou jen ${Math.floor(pr.min / 60)}:${String(pr.min % 60).padStart(2, '0')} – minimum ${Math.floor(pr.req / 60)}:${String(pr.req % 60).padStart(2, '0')} (${pr.atHome ? 'na základně' : 'mimo základnu'}, ORO.FTL.235).`) } }
       d.route = [first.from].concat(d.legs.map(l => l.to)).join('–');
     });
     // 3. cumulative limits (ORO.FTL.210) – at the end of every duty and now

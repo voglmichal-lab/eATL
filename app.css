@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.6.10"}
+:root{--etl-build:"0.6.11"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -345,7 +345,7 @@ table.defrect tr.open td:nth-child(3){background:var(--warn-soft)}
 .ostep-h h2{margin:0;font-size:1.25rem}
 .ostep-h p{margin:2px 0 0;font-size:.9rem}
 .ostep-n{flex:none;display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 1rem/1 var(--f-display)}
-.ostep.done .ostep-n{background:var(--ok);color:#fff}
+.ostep.done .ostep-n{background:var(--ok);color:var(--surface)}
 .ostep .panel{border:0;padding:0;background:none;box-shadow:none}
 .ostep .two{gap:16px}
 .atl-preview dd{margin-bottom:2px}
@@ -380,7 +380,7 @@ table.crew-sum .pf-tog{margin:0}
 .pf-tog input:checked::after{content:'';width:7px;height:13px;border:solid var(--accent-ink);border-width:0 3px 3px 0;transform:translateY(-2px) rotate(45deg)}
 .pf-tog input:disabled{opacity:.7}
 /* test mode – record deletion (temporary) */
-.testband{background:var(--warn);color:#fff;text-align:center;font-weight:600;font-size:.86rem;letter-spacing:.02em;padding:6px 16px}
+.testband{background:var(--warn);color:var(--surface);text-align:center;font-weight:600;font-size:.86rem;letter-spacing:.02em;padding:6px 16px}
 .test-panel{border-color:var(--warn);border-style:dashed}
 .del-test{margin-top:10px}
 .del-test .linkbtn{color:var(--warn)}
@@ -442,3 +442,7 @@ table.ftl-tab tr.tap:hover td{background:var(--surface-2)}
 table.ftl-duties tr.bad td{background:var(--warn-soft)}
 table.ftl-duties td,table.ftl-tab td{vertical-align:top}
 .split-box{display:grid;gap:8px;border:1px dashed var(--line-strong);border-radius:8px;padding:10px 12px}
+/* appearance switch in the top band */
+.theme-btn{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:4px 10px;background:transparent;border-color:rgba(255,255,255,.25);color:var(--band-ink)}
+.theme-btn svg{width:18px;height:18px}
+@media (max-width:1000px){.theme-btn{padding:4px 8px}.theme-btn span{display:none}}

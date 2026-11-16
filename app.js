@@ -369,6 +369,9 @@ const can={
 
 /* ---------- render ---------- */
 const ICON={
+  sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>',
+  moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
+  auto:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/></svg>',
   plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   plane:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M21 15.5v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V8.5l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-6z" transform="translate(.5 0)"/></svg>',
   wrench:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0 5 5L22 13.6 13.6 22l-2.3-2.3a4 4 0 0 0-5-5L2 10.4 10.4 2z" transform="scale(.9) translate(1.3 1.3)"/></svg>',
@@ -378,6 +381,15 @@ const ICON={
   clip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h4"/></svg>'
 };
 
+/* appearance: per device – follow the iPad setting, or always light / dark (bright cockpit vs. night) */
+const THEME_LABEL={auto:'Podle zařízení',light:'Světlý',dark:'Tmavý'};
+function themeGet(){try{const t=localStorage.getItem('etl.theme');return t==='light'||t==='dark'?t:'auto'}catch(e){return 'auto'}}
+function themeApply(t){const r=document.documentElement;if(t==='light'||t==='dark')r.setAttribute('data-theme',t);else r.removeAttribute('data-theme');
+  const dark=t==='dark'||(t==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',dark?'#0a0f14':'#13202c')}
+function themeNext(){const order=['auto','light','dark'];const t=order[(order.indexOf(themeGet())+1)%3];try{if(t==='auto')localStorage.removeItem('etl.theme');else localStorage.setItem('etl.theme',t)}catch(e){}
+  themeApply(t);render();toast('Vzhled: '+THEME_LABEL[t].toLowerCase())}
+function themeBtn(){const t=themeGet();return `<button type="button" class="btn sm theme-btn" data-act="theme" title="Vzhled: ${THEME_LABEL[t]} – klepnutím přepnete" aria-label="Vzhled: ${THEME_LABEL[t]}. Přepnout.">${ICON[t==='auto'?'auto':t==='light'?'sun':'moon']}<span>${t==='auto'?'Auto':THEME_LABEL[t]}</span></button>`}
 function header(){
   const u=me();const crew=mode()==='crew';const bac=BIND&&S.ac[BIND];
   let right='';
@@ -387,7 +399,7 @@ function header(){
   return `<header class="top"><div class="top-in wrap">
     <div class="brand"><span class="brand-mark">ATL</span><div><b>${S.cfg.opName?esc(S.cfg.opName)+' ':''}eTechLog</b><small>${crew&&bac?'iPad · '+esc(bac.reg):S.cfg.aoc?esc(S.cfg.aoc):'nenastaveno'} · testovací verze</small></div></div>
     <button class="pill" id="syncpill" data-act="sync-panel" aria-label="Stav synchronizace"></button>
-    ${right}
+    ${themeBtn()}${right}
   </div></header>${testOn()?`<div class="testband">TESTOVACÍ REŽIM – záznamy jde mazat (Kancelář → Správa). Před ostrým provozem vypnout.</div>`:''}`;
 }
 
@@ -3063,6 +3075,7 @@ document.addEventListener('click',e=>{
     case 'prep-drop':openPrepDrop(id);break;
     case 'crs-detail':openCrsDetail(id);break;
     case 'split-form':openSplitForm(id);break;
+    case 'theme':themeNext();break;
     case 'ftl-user':UI.ftlUser=id||null;UI.ftlPer=UI.ftlPer||'28';render();window.scrollTo(0,0);break;
     case 'ftl-per':UI.ftlPer=id;render();break;
     case 'ftl-export':exportFtl();break;
@@ -3228,6 +3241,7 @@ document.addEventListener('submit',async e=>{
 });
 
 /* ---------- boot ---------- */
+themeApply(themeGet());try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themeGet()==='auto')themeApply('auto')})}catch(e){}
 rebuild();render();initDb();
 checkOffline();if('serviceWorker' in navigator){navigator.serviceWorker.ready.then(()=>setTimeout(checkOffline,500)).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>setTimeout(checkOffline,500))}
 setInterval(()=>{if(off.ready!==true)checkOffline()},15000);

@@ -1,0 +1,27 @@
+eTechLog – změna Z-024
+Verze: 0.6.11 (navazuje na Z-023 / 0.6.10)
+Datum: 2026-11-16
+
+Co se mění
+- Vzhled: v horní liště je nové tlačítko (sluníčko / měsíc). Klepnutím se přepíná
+  Podle zařízení → Světlý → Tmavý. Platí pro daný iPad, pamatuje si to i po zavření aplikace
+  a při startu nic nebliká. Na iPadu na výšku je tlačítko jen jako ikona, aby se lišta vešla na jeden řádek.
+- Doba služby (FTL): jedna krátká noc už nespojí všechny další dny do jedné „služby“ o stovkách hodin.
+  Čekání mezi lety kratší než 12 h na základně / 10 h mimo ni zůstává součástí služby, nejdéle 24 h od nástupu.
+  Delší přestávka je odpočinek. Když je kratší než předchozí služba (ORO.FTL.235), služba dostane nález
+  „Odpočinek před službou jen h:mm – minimum h:mm“.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-024.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

@@ -43,6 +43,9 @@ příkaz, Output Directory ponechte prázdné → **Deploy**.
       *Oprávnění k uvolnění do provozu* (a vyplňte licenci) – jen ten pak podepisuje CRS.
    4. iPady v letadlech.
 
+**Vzhled:** tlačítko se sluníčkem / měsícem v horní liště přepíná *Podle zařízení* (řídí se nastavením iPadu) →
+*Světlý* → *Tmavý*. Volba platí pro dané zařízení a pamatuje si ji i po restartu.
+
 ## Aktualizace
 Nahrajte na GitHub **všechny soubory ze zipu změny** (zip obsahuje vždy celou sadu souborů aplikace). Pokud by se app.css a app.js lišily verzí, aplikace zobrazí upozornění „Neúplná aktualizace“.
 Při úpravách kódu zvyšte číslo verze ve `version.js` i `--etl-build` v `app.css`. Vercel nasadí sám,
@@ -109,7 +112,8 @@ Počítá se z letů v ATL podle EASA ORO.FTL / CS FTL.1 (soubor `ftl.js`). Př�
 vidí všechny posádky (záložka *Doba služby*), **pilot vidí svou službu** (záložka *Moje služba*, na iPadu tlačítko
 *Moje služba* v liště dne). Role OPS a Safety manažer se přidělují ve Správě → uživatel (jen čtení, nepodepisují lety ani CRS).
 - **Služba**: nástup = první off-block − nástup na základně / mimo základnu (Nastavení), FDP končí posledním on-blockem,
-  služba o čas ukončení později. Dvě skupiny letů, mezi kterými není minimální odpočinek, jsou jedna služba.
+  služba o čas ukončení později. Čekání mezi lety kratší než 12 h na základně / 10 h mimo ni je součástí služby
+  (nanejvýš do 24 h od nástupu). Delší přestávka je odpočinek; když je kratší než předchozí služba, je označený jako nález.
 - **Max FDP** podle tabulky ORO.FTL.205 (aklimatizovaná posádka, podle místního času nástupu a počtu úseků); při časovém
   rozdílu > 2 h se stav aklimatizace určí podle tab. 1 (B / D / X – při X tabulka pro neznámý stav).
 - **Split duty** (CS FTL.1.220, jen pokud ji povoluje provozní příručka – Nastavení): otevírá se v ATL při uzavření letu,
