@@ -92,7 +92,10 @@ self.ETL_FTL = (function () {
     const seq = [hm(l.out), hm(l.off), hm(l.on), hm(l.in)]; if (seq[0] == null || seq[3] == null) return null;
     let prev = null, add = 0; const out = [];
     for (const t of seq) { if (t == null) { out.push(null); continue } if (prev != null && t < prev) add += 1440; prev = t; out.push(base + (t + add) * MIN) }
-    return { outMs: out[0], offMs: out[1], onMs: out[2], inMs: out[3] };
+    // recorded report (duty on), e.g. from a paper page: the same day or the evening before, at most 8 h before off-block
+    let repMs = null; const r = hm(l.rep);
+    if (r != null) { let x = base + r * MIN; while (x > out[0]) x -= 1440 * MIN; if (out[0] - x <= 8 * 60 * MIN) repMs = x }
+    return { outMs: out[0], offMs: out[1], onMs: out[2], inMs: out[3], repMs };
   }
   function overlap(iv, a, b) { let s = 0; for (const [x, y] of iv) s += Math.max(0, Math.min(b, y) - Math.max(a, x)); return Math.round(s / MIN) }
 
@@ -102,7 +105,8 @@ self.ETL_FTL = (function () {
     const homeBases = new Set((o.homeBases || []).map(x => String(x).toUpperCase()));
     const tz = icao => tzOf(icao, o.tzOver) ;
     const legs = legsIn.map(l => Object.assign({}, l, legTimes(l))).filter(l => l.outMs != null && l.inMs != null).sort((a, b) => a.outMs - b.outMs);
-    const repOf = l => l.outMs - (homeBases.has(String(l.from).toUpperCase()) ? o.reportBase : o.reportAway) * MIN;
+    const stdRep = l => (homeBases.has(String(l.from).toUpperCase()) ? o.reportBase : o.reportAway);
+    const repOf = l => l.repMs != null ? l.repMs : l.outMs - stdRep(l) * MIN;
     // 1. group flights into duties: a gap shorter than the minimum rest is not a rest – the duty continues
     const duties = []; let cur = null;
     for (const l of legs) {
@@ -132,6 +136,7 @@ self.ETL_FTL = (function () {
       d.fdp = Math.round((d.fdpEndMs - d.reportMs) / MIN); d.duty = Math.round((d.endMs - d.reportMs) / MIN);
       d.block = Math.round(d.legs.reduce((a, l) => a + (l.inMs - l.outMs), 0) / MIN); d.sectors = d.legs.length;
       d.flags = []; d.notes = [];
+      if (first.repMs != null) { d.repRecorded = true; d.notes.push('Začátek služby podle záznamu ' + localHM('UTC', d.reportMs) + 'Z (ne standardních ' + stdRep(first) + ' min před off-block).') }
       // acclimatisation and reference time
       let tzR = tz(first.from); if (!tzR) { tzR = refTz; d.notes.push('Časové pásmo ' + first.from + ' neznámé – počítáno v čase ' + refTz + '.') }
       const diffH = Math.abs(offsetMin(tzR, d.reportMs) - offsetMin(refTz, d.reportMs)) / 60;

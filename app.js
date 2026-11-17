@@ -169,7 +169,9 @@ function deriveAc(s,ac){
   for(const l of legs){
     l.air=dur(l.off,l.on)||0;l.block=dur(l.out,l.in)||0;l.gap=null;l.dup=false;
     if(l.state==='open'){l.air=0;l.block=0}
-    if(!cur||cur.date!==l.date||cur.legs.length>=PER_PAGE){cur={no:nextNo(l.date),date:l.date,legs:[],bfAir:air,bfCyc:cyc,acId:ac.acId};pages.push(cur)}
+    // a flight transcribed from paper stays on its paper page number and does not use up the electronic numbering
+    const pp=l.paper&&l.paper.page?String(l.paper.page).trim():'';
+    if(pp?(!cur||cur.paperNo!==pp):(!cur||cur.paperNo||cur.date!==l.date||cur.legs.length>=PER_PAGE)){cur={no:pp||nextNo(l.date),paperNo:pp||null,date:l.date,legs:[],bfAir:air,bfCyc:cyc,acId:ac.acId};pages.push(cur)}
     l.page=cur.no;l.idx=cur.legs.length+1;cur.legs.push(l);
     if(!l.void){
       if(prev&&prev.to&&l.from&&prev.to!==l.from)l.gap=prev.to;
@@ -180,7 +182,7 @@ function deriveAc(s,ac){
     }
     l.ttaf=air;l.tcyc=cyc;cur.cfAir=air;cur.cfCyc=cyc;
   }
-  for(const p of pages){p.pending=p.legs.some(l=>s.out.has(l.ev));const act=p.legs.filter(l=>!l.void);p.air=p.cfAir-p.bfAir;p.block=act.reduce((a,l)=>a+l.block,0);p.ldg=p.cfCyc-p.bfCyc;p.key=ac.acId+'|'+p.no}
+  for(const p of pages){p.pending=p.legs.some(l=>s.out.has(l.ev));const act=p.legs.filter(l=>!l.void);p.air=p.cfAir-p.bfAir;p.block=act.reduce((a,l)=>a+l.block,0);p.ldg=p.cfCyc-p.bfCyc;p.key=ac.acId+'|'+(p.paperNo?'P':'')+p.no}
   const defs=Object.values(s.defects).filter(d=>d.acId===ac.acId).sort((a,b)=>a.reported.at<b.reported.at?-1:1);
   const code=String(ac.reg||'').split('-').pop();
   defs.forEach((d,i)=>{d.no=code+'-'+String(i+1).padStart(3,'0');const l=d.legId&&s.legs[d.legId];const g=!l&&d.atLeg&&s.legs[d.atLeg];
@@ -552,7 +554,7 @@ function viewLog(ac,u){
   if(!ac.pages.length)return `<div class="empty"><h2>Deník je prázdný</h2><p>První stránka dostane číslo <span class="mono">${S.cfg.pageFmt==='date'?esc(String(ac.reg).split('-').pop())+'-'+todayISO().slice(2).replace(/-/g,''):esc(ac.startPage)}</span>. Počáteční stav: TTAF ${hm(ac.openAir)}, ${ac.openCyc} cyklů.</p>${can.leg(u)?`<button class="btn primary" data-act="start-flight">${ICON.plus}Začít let</button>`:''}</div>`;
   let pg=ac.pages.find(p=>p.key===UI.page);if(!pg)pg=ac.pages[ac.pages.length-1];
   const i=ac.pages.indexOf(pg);
-  const opts=[...ac.pages].reverse().map(p=>`<option value="${esc(p.key)}" ${p===pg?'selected':''}>${p.no} · ${fmtDate(p.date)} · ${p.legs.length} let${p.legs.length>1?(p.legs.length>4?'ů':'y'):''}${p.pending?' · neodesláno':''}</option>`).join('');
+  const opts=[...ac.pages].reverse().map(p=>`<option value="${esc(p.key)}" ${p===pg?'selected':''}>${p.no}${p.paperNo?' (papír)':''} · ${fmtDate(p.date)} · ${p.legs.length} let${p.legs.length>1?(p.legs.length>4?'ů':'y'):''}${p.pending?' · neodesláno':''}</option>`).join('');
   const pager=`<div class="pager"><button class="btn sm" data-act="page" data-id="${i>0?esc(ac.pages[i-1].key):''}" ${i>0?'':'disabled'} aria-label="Předchozí stránka">‹ Předchozí</button><select id="page-sel" aria-label="Vybrat stránku">${opts}</select><button class="btn sm" data-act="page" data-id="${i<ac.pages.length-1?esc(ac.pages[i+1].key):''}" ${i<ac.pages.length-1?'':'disabled'} aria-label="Další stránka">Další ›</button></div>`;
   const rows=pg.legs.map(l=>{
     const flags=[];
@@ -586,7 +588,7 @@ function viewLog(ac,u){
       <div class="kv"><span class="label">Typ</span><b>${esc(ac.type||'–')}</b></div>
       <div class="kv"><span class="label">Výr. číslo</span><b>${esc(ac.msn||'–')}</b></div>
       <div class="kv"><span class="label">Datum (UTC)</span><b>${fmtDate(pg.date)}</b></div>
-      <div class="pg"><span class="label">Stránka</span><b>${pg.no}</b>${pg.pending?'<span class="ann caution">čeká na sync</span>':''}</div>
+      <div class="pg"><span class="label">Stránka</span><b>${pg.no}</b>${pg.paperNo?'<span class="ann mute">přepis z papíru</span>':''}${pg.pending?'<span class="ann caution">čeká na sync</span>':''}</div>
     </header>
     <div class="scroll-x"><table class="atl">
       <thead><tr><th>#</th><th>Odkud</th><th>Kam</th><th>Off-blk</th><th>Vzlet</th><th>Přist.</th><th>On-blk</th><th>Let</th><th>Blok</th><th>Ldg</th><th>APP</th><th>Palivo</th><th>Druh</th><th>PIC / SIC</th><th>Podpis</th><th></th></tr></thead>
@@ -691,7 +693,7 @@ const FTL_FLAG={overlap:'lety se překrývají',fdp:'FDP překročena',rest:'kra
 const FTL_TAG={early:'časný nástup',late:'pozdní konec',night:'noční služba'};
 function ftlOpts(x){const c=S.cfg;const tzOver=ETL_FTL.parseOverrides(c.tzOver);const bases=(c.bases||[]).length?c.bases:['LKPR'];const hb=x&&x.homeBase&&bases.includes(x.homeBase)?x.homeBase:null;
   return {homeTz:ETL_FTL.tzOf(hb||bases[0],tzOver)||'Europe/Prague',homeBases:hb?[hb]:bases,reportBase:+(c.reportMin??60),reportAway:+(c.reportMinAway??c.reportMin??60),post:+(c.postMin??30),prePost:+(c.splitPrePost??30),splitAllowed:!!c.splitDuty,tzOver,now:Date.now()}}
-function ftlLegs(id){return Object.values(S.legs).filter(l=>!l.void&&l.state==='closed'&&(l.pic===id||l.sic===id||l.ca===id)).map(l=>({legId:l.legId,date:l.date,out:l.out,off:l.off,on:l.on,in:l.in,from:l.from,to:l.to,split:l.split||null,fno:l.fno,reg:(S.ac[l.acId]||{}).reg||'',role:l.pic===id?'PIC':l.sic===id?'SIC':'CA'}))}
+function ftlLegs(id){return Object.values(S.legs).filter(l=>!l.void&&l.state==='closed'&&(l.pic===id||l.sic===id||l.ca===id)).map(l=>({legId:l.legId,date:l.date,out:l.out,off:l.off,on:l.on,in:l.in,rep:l.rep||null,from:l.from,to:l.to,split:l.split||null,fno:l.fno,reg:(S.ac[l.acId]||{}).reg||'',role:l.pic===id?'PIC':l.sic===id?'SIC':'CA'}))}
 function ftlOf(id){if(FTLC.s!==S)FTLC={s:S,m:{}};if(!FTLC.m[id])FTLC.m[id]=ETL_FTL.compute(ftlLegs(id),ftlOpts(S.users[id]));return FTLC.m[id]}
 function ftlPeople(){const ids=new Set();Object.values(S.users).forEach(x=>{if(x.active!==false&&(has(x,'crew')||has(x,'cabin')))ids.add(x.userId)});
   Object.values(S.legs).forEach(l=>{if(!l.void)[l.pic,l.sic,l.ca].forEach(i=>{if(i&&S.users[i])ids.add(i)})});return [...ids].map(i=>S.users[i]).sort((a,b)=>a.name.localeCompare(b.name))}
@@ -841,7 +843,8 @@ function openDevWipe(){
       for(const k of ['etl.ev','etl.out','etl.cursor','etl.session','etl.crew','etl.bind','etl.draft','etl.ac'])store.set(k,k==='etl.ev'?{}:k==='etl.out'?[]:k==='etl.draft'?{}:null);
       closeSheet();setTimeout(()=>location.reload(),300)}});
 }
-/* temporary (test mode): OK-WND flights 10.–13. 11. 2026 transcribed from the paper pages 800151–800154 */
+/* paper ATL pages transcribed into the e-log (with the paper page number, crew, times and the transition point).
+   OK-WND 10.–13. 11.: test only (random crew). OK-UFF 15.–17. 11.: history before the first electronic flight (crew codes → pilots). */
 const PAPER_WND=[
   {page:'800151',date:'2026-11-10',legs:[
     {fno:'4J',from:'LSZH',to:'EGJJ',out:'05:20',off:'05:30',on:'06:45',in:'07:05',app:'ILS',pf:'pic',fuelMin:3315,fuelUp:2380,fuelBlk:6700,fuelRem:4600,fuelBurn:2100,oil:'0.2 / 0',sec:'05:10'},
@@ -855,36 +858,83 @@ const PAPER_WND=[
     {fno:'4N',from:'EGPD',to:'EDLN',out:'17:20',off:'17:30',on:'18:40',in:'18:50',app:'RNAV',pf:'pic',fuelMin:3442,fuelUp:1200,fuelBlk:3800,fuelRem:2000,fuelBurn:1800,oil:'',sec:'17:00'}]},
   {page:'800154',date:'2026-11-13',legs:[
     {fno:'4L',from:'EDLN',to:'LIML',out:'13:40',off:'14:10',on:'15:15',in:'15:25',app:'ILS',pf:'sic',fuelMin:3197,fuelUp:901,fuelBlk:3500,fuelRem:1800,fuelBurn:1700,oil:'1 / 1',sec:'13:15'}]}];
-function openPaperSeed(){
-  const u=me();if(!canDel(u))return;const ac=Object.values(S.ac).find(a=>a.reg==='OK-WND');
-  if(!ac){openSheet('Lety z papíru – OK-WND','<div class="warnline caution">V systému není letadlo OK-WND.</div>',{focus:false});return}
-  const pilots=Object.values(S.users).filter(x=>x.active!==false&&has(x,'crew')&&x.pinHash);
-  const pick=()=>{const a=[...pilots].sort(()=>Math.random()-.5);return {pic:a[0]||null,sic:a[1]||null}};
-  UI.seedCrew=PAPER_WND.map(()=>pick());
-  const exist=ac.legs.filter(l=>!l.void&&l.date>='2026-11-10'&&l.date<='2026-11-13');
-  const n=PAPER_WND.reduce((a,pg)=>a+pg.legs.length,0);
-  openSheet('Lety z papíru – OK-WND 10.–13. 11.',`<div class="warnline info">Vloží ${n} letů ze stránek 800151–800154 jako přepis z papíru (s číslem stránky). Posádka je náhodná z pilotů v systému – pro každý den jedna dvojice, PF podle papíru.</div>
-    <div class="scroll-x"><table class="plain"><thead><tr><th>Str.</th><th>Datum</th><th>Let</th><th>Off / vzlet / přist. / on</th><th>PIC / SIC</th></tr></thead><tbody>${PAPER_WND.map((pg,i)=>pg.legs.map(l=>`<tr><td class="mono">${pg.page}</td><td>${fmtDate(pg.date)}</td><td class="mono">${l.fno} ${l.from}→${l.to}</td><td class="mono">${l.out} ${l.off} ${l.on} ${l.in}</td><td>${esc(UI.seedCrew[i].pic?UI.seedCrew[i].pic.name:'–')} / ${esc(UI.seedCrew[i].sic?UI.seedCrew[i].sic.name:'–')}</td></tr>`).join('')).join('')}</tbody></table></div>
-    ${pilots.length<2?'<div class="warnline caution">V systému je méně než 2 piloti – SIC zůstane prázdný.</div>':''}
-    ${exist.length?F.check('f-seeddel',`Nejdřív smazat ${exist.length} let(y) OK-WND, které už v těch dnech jsou (testovací mazání)`,true):''}
-    ${F.check('f-seedopen',`Přechodový bod OK-WND nastavit na stav před stránkou 800151: TTAF 3166:15, cykly 2043, poslední papírová stránka 800150, datum přechodu 10/11/2026 (teď ${hm(ac.openAir||0)} · ${ac.openCyc||0} · str. ${esc(ac.lastPaper||'–')}) – jinak by se hodiny započítaly dvakrát`,true)}`,
+// OK-UFF pages 600227–600229; rep = report (duty on) from the page, first flight of the day
+const PAPER_UFF=[
+  {page:'600227',date:'2026-11-15',pic:'PENA',sic:'JOPA',legs:[
+    {fno:'6S',from:'LIEO',to:'ESMS',out:'11:35',off:'11:40',on:'13:50',in:'14:05',app:'ILS',pf:'sic',fuelMin:4571,fuelUp:1550,fuelBlk:5300,fuelRem:1900,fuelBurn:3400,oil:'',sec:'11:00',rep:'10:30'},
+    {fno:'6C',from:'ESMS',to:'EGLC',out:'15:10',off:'15:15',on:'16:45',in:'17:00',app:'ILS',pf:'pic',fuelMin:3694,fuelUp:1450,fuelBlk:4500,fuelRem:2100,fuelBurn:2400,oil:'',sec:'14:10'}]},
+  {page:'600228',date:'2026-11-16',pic:'PENA',sic:'JOPA',legs:[
+    {fno:'6R',from:'EGLC',to:'EBBR',out:'13:40',off:'13:50',on:'14:20',in:'14:40',app:'ILS',pf:'sic',fuelMin:2577,fuelUp:900,fuelBlk:3500,fuelRem:2300,fuelBurn:1200,oil:'',sec:'12:45',rep:'12:45'},
+    {fno:'6C',from:'EBBR',to:'EGLC',out:'16:15',off:'16:20',on:'16:55',in:'17:00',app:'ILS',pf:'pic',fuelMin:3148,fuelUp:1000,fuelBlk:4000,fuelRem:2900,fuelBurn:1100,oil:'',sec:'15:00'}]},
+  {page:'600229',date:'2026-11-17',pic:'PENA',sic:'JOPA',legs:[
+    {fno:'6L',from:'EGLC',to:'LIML',out:'09:10',off:'09:30',on:'11:00',in:'11:05',app:'ILS',pf:'sic',fuelMin:3865,fuelUp:1000,fuelBlk:4500,fuelRem:2300,fuelBurn:2200,oil:'',sec:'07:30',rep:'07:00'},
+    {fno:'6A',from:'LIML',to:'LIRA',out:'11:45',off:'12:00',on:'12:40',in:'12:50',app:'ILS',pf:'pic',fuelMin:2997,fuelUp:1000,fuelBlk:4000,fuelRem:2700,fuelBurn:1300,oil:'',sec:'11:15'},
+    {fno:'6R',from:'LIRA',to:'LKPR',out:'17:50',off:'18:00',on:'19:30',in:'19:35',app:'ILS',pf:'sic',fuelMin:3981,fuelUp:1401,fuelBlk:5000,fuelRem:2800,fuelBurn:2200,oil:'',sec:'14:00'}]}];
+const PAPER_SETS={
+  wnd:{reg:'OK-WND',span:'10.–13. 11.',from:'2026-11-10',to:'2026-11-13',pages:PAPER_WND,open:{air:3166*60+15,cyc:2043,date:'2026-11-10',lastPaper:'800150'},test:true},
+  uff:{reg:'OK-UFF',span:'15.–17. 11.',from:'2026-11-15',to:'2026-11-17',pages:PAPER_UFF,open:{air:4560*60+45,cyc:3401,date:'2026-11-15',lastPaper:'600226'}}};
+const deacc=x=>String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+// crew code from the paper (PENA) → the one pilot whose name gives it (PEtr NAvrátil or NAvrátil PEtr)
+function crewCodeGuess(code,list){const c=deacc(code);const hit=list.filter(x=>{const w=deacc(x.name).split(/\s+/).filter(Boolean);if(w.length<2)return false;const f=w[0],l=w[w.length-1];
+  return f.slice(0,2)+l.slice(0,2)===c||l.slice(0,2)+f.slice(0,2)===c});return hit.length===1?hit[0].userId:''}
+function paperDone(set,ac){const nos=set.pages.map(p=>p.page);return ac?ac.legs.filter(l=>!l.void&&l.paper&&nos.includes(String(l.paper.page))):[]}
+function openPaperSeed(id){
+  const set=PAPER_SETS[id||'wnd'];const u=me();if(!set||!u)return;
+  if(set.test?!canDel(u):!(mode()==='office'&&has(u,'admin')))return;
+  const title=`Lety z papíru – ${set.reg} ${set.span}`;const ac=Object.values(S.ac).find(a=>a.reg===set.reg&&!a.archived);
+  if(!ac){openSheet(title,`<div class="warnline caution">V systému není letadlo ${set.reg}. Nejdřív ho založte (Správa → Letadla) – na počátečních hodnotách nezáleží, nastaví se tady.</div>`,{focus:false});return}
+  const codes=set.test?[]:[...new Set(set.pages.flatMap(pg=>[pg.pic,pg.sic]).filter(Boolean))];
+  const pilots=Object.values(S.users).filter(x=>x.active!==false&&has(x,'crew')&&(codes.length||x.pinHash)).sort((a,b)=>a.name.localeCompare(b.name,'cs'));
+  if(set.test){const pick=()=>{const a=[...pilots].sort(()=>Math.random()-.5);return {pic:a[0]||null,sic:a[1]||null}};UI.seedCrew=set.pages.map(()=>pick())}
+  const nos=set.pages.map(p=>p.page),pgTxt=nos[0]+(nos.length>1?'–'+nos[nos.length-1]:'');const n=set.pages.reduce((a,pg)=>a+pg.legs.length,0);
+  const done=paperDone(set,ac),exist=ac.legs.filter(l=>!l.void&&l.date>=set.from&&l.date<=set.to),wipe=canDel(u);
+  const o=set.open,before=String(+nos[0]-1);
+  const crewOf=(pg,i)=>set.test?{pic:UI.seedCrew[i].pic?UI.seedCrew[i].pic.name:'–',sic:UI.seedCrew[i].sic?UI.seedCrew[i].sic.name:'–'}:{pic:pg.pic,sic:pg.sic};
+  const roleOf=c=>set.pages.some(pg=>pg.pic===c)?'velitel (PIC)':'druhý pilot (SIC)';
+  openSheet(title,`<div class="warnline info">Vloží ${n} letů ze stránek ${pgTxt} jako přepis z papíru (s číslem papírové stránky). ${set.test?'Posádka je náhodná z pilotů v systému – pro každý den jedna dvojice, PF podle papíru.':'Časy, palivo, PF, security prohlídka a začátek služby jsou opsané ze stránek – zkontrolujte je proti papíru.'}</div>
+    ${codes.length?`<p class="label">Kdo je kdo – zkratky z papíru</p><div class="fgrid">${codes.map(c=>{const g=crewCodeGuess(c,pilots);return `<label class="fld"><span>${esc(c)} – ${roleOf(c)}</span><select id="f-cc-${esc(c)}"><option value="">– vyberte pilota –</option>${pilots.map(x=>`<option value="${esc(x.userId)}" ${x.userId===g?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>`}).join('')}</div>
+      ${pilots.length<2?'<div class="warnline caution">V systému jsou méně než 2 piloti (role Posádka) – nejdřív je založte ve Správě.</div>':''}`:''}
+    <div class="scroll-x"><table class="plain"><thead><tr><th>Str.</th><th>Datum</th><th>Let</th><th>Off · vzlet · přist. · on</th><th>PIC / SIC · PF</th><th>Palivo min / odlet / přist. · L</th><th>Služba od · security</th></tr></thead><tbody>${set.pages.map((pg,i)=>pg.legs.map(l=>{const c=crewOf(pg,i);
+      return `<tr><td class="mono">${pg.page}</td><td>${fmtDate(pg.date)}</td><td class="mono">${l.fno} ${l.from}→${l.to}</td><td class="mono">${l.out} · ${l.off} · ${l.on} · ${l.in}</td><td>${esc(c.pic)} / ${esc(c.sic)} · PF ${l.pf==='sic'?'SIC':'PIC'}</td><td class="mono">${fmtN(l.fuelMin)} / ${fmtN(l.fuelBlk)} / ${fmtN(l.fuelRem)} · ${fmtN(l.fuelUp)} L</td><td class="mono">${l.rep?esc(l.rep):'–'} · ${esc(l.sec)}</td></tr>`}).join('')).join('')}</tbody></table></div>
+    ${S.cfg.pageFmt!=='date'&&(parseInt(ac.startPage,10)||0)<=+nos[nos.length-1]&&(parseInt(ac.startPage,10)||0)>=+nos[0]?`<div class="warnline warn">První elektronická stránka ${esc(ac.startPage)} se kryje s papírovými stránkami ${pgTxt} – v úpravě letadla ji nastavte aspoň na ${+nos[nos.length-1]+1}.</div>`:''}
+    ${done.length?`<div class="warnline ${wipe?'caution':'warn'}"><b>Stránky ${pgTxt} už v systému jsou (${done.length} letů).</b> ${wipe?'Podruhé je vložit nejde – leda je napřed smazat (níže).':'Podruhé je vložit nejde. Smazat je jde jen v testovacím režimu.'}</div>`:''}
+    ${exist.length&&!done.length&&!wipe?`<div class="warnline warn">${set.reg} už má v těchto dnech ${exist.length} let(y) v e-deníku – nejdřív zkontrolujte, že nejde o stejné lety (zneplatnit je jde v detailu letu).</div>`:''}
+    ${exist.length&&wipe?F.check('f-seeddel',`Nejdřív smazat ${exist.length} let(y) ${set.reg}, které už v těch dnech jsou (testovací mazání)`,!!set.test||!!done.length):''}
+    ${F.check('f-seedopen',`Přechodový bod ${set.reg} nastavit na stav před stránkou ${nos[0]}: TTAF ${hm(o.air)}, cykly ${o.cyc}, poslední papírová stránka ${before}, datum přechodu ${fmtDate(o.date)} (teď ${hm(ac.openAir||0)} · ${ac.openCyc||0} · str. ${esc(ac.lastPaper||'–')}) – jinak by se hodiny započítaly dvakrát`,true)}`,
     {submit:`Vložit ${n} letů`,sign:true,onSubmit:async()=>{
-      if(!pilots.length)fail('V systému není žádný pilot (role Posádka s PINem).');await checkPin();
+      const del=exist.length&&wipe&&chk('f-seeddel');
+      if(done.length&&!del)fail(`Stránky ${pgTxt} už v systému jsou – podruhé je vložit nejde.`);
+      if(exist.length&&!wipe)fail(`${set.reg} už má v těchto dnech lety v e-deníku – nejdřív je zkontrolujte nebo zneplatněte.`);
+      let map={};
+      if(set.test){if(!pilots.length)fail('V systému není žádný pilot (role Posádka s PINem).')}
+      else{codes.forEach(c=>{map[c]=v('f-cc-'+c)});
+        set.pages.forEach(pg=>{if(!map[pg.pic])fail(`Vyberte pilota pro zkratku ${pg.pic} (velitel).`)});
+        const ids=codes.map(c=>map[c]).filter(Boolean);if(new Set(ids).size<ids.length)fail('Jeden pilot je vybraný pro dvě zkratky.')}
+      await checkPin();
       const items=[];
-      if(exist.length&&chk('f-seeddel'))items.push(['rec.del',{keys:exist.map(l=>'leg:'+l.legId),what:'lety OK-WND 10.–13. 11. před vložením z papíru',n:exist.length,acId:ac.acId}]);
-      if(chk('f-seedopen'))items.push(['ac.upsert',{acId:ac.acId,openAir:3166*60+15,openCyc:2043,openDate:'2026-11-10',lastPaper:'800150'}]);
-      PAPER_WND.forEach((pg,i)=>{const c=UI.seedCrew[i];const pic=c.pic?c.pic.userId:'',sic=c.sic?c.sic.userId:'';
+      if(del)items.push(['rec.del',{keys:exist.map(l=>'leg:'+l.legId),what:`lety ${set.reg} ${set.span} před vložením z papíru`,n:exist.length,acId:ac.acId}]);
+      if(chk('f-seedopen'))items.push(['ac.upsert',{acId:ac.acId,openAir:o.air,openCyc:o.cyc,openDate:o.date,lastPaper:before}]);
+      set.pages.forEach((pg,i)=>{let pic,sic;if(set.test){const c=UI.seedCrew[i];pic=c.pic?c.pic.userId:'';sic=c.sic?c.sic.userId:''}else{pic=map[pg.pic]||'';sic=map[pg.sic]||''}
+        const picName=(S.users[pic]||{}).name||'';
         pg.legs.forEach(l=>items.push(['leg.sign',{legId:rid('leg'),acId:ac.acId,date:pg.date,kind:'CAT',fno:l.fno,from:l.from,to:l.to,out:l.out,off:l.off,on:l.on,in:l.in,ldg:1,app:l.app,
           pic,sic,sicTxt:'',ca:'',caTxt:'',pf:l.pf==='sic'&&sic?sic:pic,fuelUp:l.fuelUp,fuelBlk:l.fuelBlk,fuelMin:l.fuelMin,fuelRem:l.fuelRem,fuelBurn:l.fuelBurn,oil:l.oil,oilSvc:[],
-          rem:'Přepsáno z papírové stránky '+pg.page,nil:true,paper:{page:pg.page},split:null,
-          sec:{time:l.sec,place:l.from,result:'NIL',notes:'Přepsáno z papírového deníku',byName:c.pic?c.pic.name:''}}]))});
-      emit(items);UI.seedCrew=null;UI.acId=ac.acId;UI.tab='log';closeSheet();toast(`Vloženo ${n} letů z papíru`)}});
+          rem:'Přepsáno z papírové stránky '+pg.page,nil:true,paper:{page:pg.page},split:null,...(l.rep?{rep:l.rep}:{}),
+          sec:{time:l.sec,place:l.from,result:'NIL',notes:'Přepsáno z papírového deníku',byName:picName}}]))});
+      UI.seedCrew=null;UI.acId=ac.acId;UI.tab='log';emit(items);closeSheet();render();toast(`Vloženo ${n} letů z papíru`)}});
+}
+// admin: carry over the paper history of an aircraft going electronic (not tied to the test mode)
+function paperPanel(u){
+  if(!has(u,'admin')||mode()!=='office')return '';const set=PAPER_SETS.uff;const ac=Object.values(S.ac).find(a=>a.reg===set.reg&&!a.archived);const done=paperDone(set,ac);
+  return `<div class="panel"><div class="panel-head"><div><p class="label">Přechod z papírového deníku</p><h2>Lety z papíru</h2></div></div>
+    <p class="muted">Přepis papírových stránek ATL do e-deníku – s číslem papírové stránky, posádkou, časy a začátkem služby, aby navazovaly hodiny, cykly i doba služby posádek.</p>
+    <div class="chips"><button class="btn" data-act="paper-seed" data-id="uff">Vložit lety ${set.reg} z papíru (${set.span}, str. ${set.pages[0].page}–${set.pages[set.pages.length-1].page})</button></div>
+    <p class="muted" style="font-size:.86rem">${!ac?`Nejdřív založte letadlo ${set.reg}.`:done.length?`<span class="ann ok">vloženo</span> ${done.length} letů ze stránek ${set.pages[0].page}–${set.pages[set.pages.length-1].page}.`:'Zatím nevloženo.'}</p></div>`;
 }
 function testPanel(u){
   if(!has(u,'admin'))return '';const on=testOn();
   return `<div class="panel test-panel"><div class="panel-head"><div><p class="label">Prozatímní – jen pro testování</p><h2>Testovací režim: mazání záznamů</h2></div><button class="btn ${on?'':'danger'}" data-act="test-toggle">${on?'Vypnout':'Zapnout'}</button></div>
     ${on?`<p class="muted">Jednotlivé záznamy se mažou v záložce <b>Mazání (test)</b> u letadla nebo odkazem „… (test)“ u letu, OFP, závady a CRS.</p>
-    <div class="chips"><button class="btn danger" data-act="rec-reset" data-id="ops">Smazat všechny provozní záznamy</button><button class="btn danger" data-act="rec-reset" data-id="all">Začít úplně od nuly</button><button class="btn" data-act="dev-wipe">Vymazat data v tomto zařízení</button><button class="btn" data-act="paper-seed">Vložit lety OK-WND z papíru (10.–13. 11.)</button></div>
+    <div class="chips"><button class="btn danger" data-act="rec-reset" data-id="ops">Smazat všechny provozní záznamy</button><button class="btn danger" data-act="rec-reset" data-id="all">Začít úplně od nuly</button><button class="btn" data-act="dev-wipe">Vymazat data v tomto zařízení</button><button class="btn" data-act="paper-seed" data-id="wnd">Vložit lety OK-WND z papíru (10.–13. 11.)</button></div>
     <p class="muted" style="font-size:.86rem">Provozní záznamy = lety, OFP, závady, CRS, prohlídky, olej, uzemnění, security, přihlášení (letadla, uživatelé a nastavení zůstanou). „Od nuly“ smaže i je.</p>`
     :`<p class="muted">Vypnuto. Po zapnutí jde mazat jednotlivé záznamy i začít s čistou databází; na všech zařízeních pak svítí pruh TESTOVACÍ REŽIM.</p>`}</div>`;
 }
@@ -1832,7 +1882,7 @@ function viewAdmin(u){
     <label class="fld"><span>Obnovit ze zálohy</span><input type="file" id="import-file" accept=".json,application/json"></label>
     <p class="muted" style="font-size:.86rem">Obnova jen doplní záznamy, které chybí. Nic nepřepíše ani nesmaže.</p></div>
   <div class="panel"><h2>Synchronizace tohoto zařízení</h2>${syncDetails()}</div>
-  </div>${testPanel(u)}`;
+  </div>${paperPanel(u)}${testPanel(u)}`;
 }
 function syncDetails(){
   const s=syncInfo();
@@ -2509,7 +2559,7 @@ function openLegDetail(id){
     <dt>Stránka / let</dt><dd class="mono">${l.page} / ${l.idx}</dd><dt>Trasa</dt><dd class="mono">${esc(l.from)} → ${esc(l.to)}</dd>
     <dt>Bezpečnostní prohlídka</dt><dd>${secTxt}</dd>
     ${isOpen?`<dt>Plán off-block</dt><dd class="mono">${dash(l.std)}</dd>`:`<dt>Časy UTC</dt><dd class="mono">${esc(l.out)} · ${esc(l.off)} · ${esc(l.on)} · ${esc(l.in)}</dd>
-    <dt>Let / blok</dt><dd class="mono">${hm(l.air)} / ${hm(l.block)}</dd><dt>Přistání</dt><dd class="mono">${esc(l.ldg)}${l.app?' · '+esc(l.app):''}</dd>
+    ${l.rep?`<dt>Začátek služby</dt><dd class="mono">${esc(l.rep)}Z${l.paper?' <span class="muted">(z papíru)</span>':''}</dd>`:''}<dt>Let / blok</dt><dd class="mono">${hm(l.air)} / ${hm(l.block)}</dd><dt>Přistání</dt><dd class="mono">${esc(l.ldg)}${l.app?' · '+esc(l.app):''}</dd>
     <dt>TTAF po letu</dt><dd class="mono">${hm(l.ttaf)} · ${l.tcyc} cyklů</dd>`}
     <dt>PIC / SIC</dt><dd>${esc(pic?pic.name:'–')} / ${esc(sic?sic.name:l.sicTxt?l.sicTxt+' (ověřit CAMO)':'–')}</dd>${l.pf?`<dt>PF / PM</dt><dd>PF ${esc((S.users[l.pf]||{}).name||'')} · PM ${esc((S.users[l.pf===l.pic?l.sic:l.pic]||{}).name||'–')}</dd>`:''}<dt>Druh</dt><dd>${esc(KIND[l.kind]||'')} ${esc(l.fno||'')}</dd>
     <dt>Palivo</dt><dd>natankováno ${fmtN(l.fuelUp)} L · na odlet ${fmtN(l.fuelBlk)} lbs · min. required ${fmtN(l.fuelMin)} lbs${isOpen?'':` · po přistání ${fmtN(l.fuelRem)} lbs · spáleno ${fmtN(l.fuelBurn)} lbs`}</dd>
@@ -3098,7 +3148,7 @@ document.addEventListener('click',e=>{
     case 'rec-reset':openRecReset(id);break;
     case 'test-toggle':openTestToggle();break;
     case 'dev-wipe':openDevWipe();break;
-    case 'paper-seed':openPaperSeed();break;
+    case 'paper-seed':openPaperSeed(id);break;
     case 'crew-close':crewClose();break;
     case 'cdate-edit':UI.draft.cdateEdit=true;saveDraft();render();break;
     case 'pf':UI.draft.pf=id;saveDraft();render();break;

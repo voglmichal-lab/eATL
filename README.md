@@ -95,6 +95,18 @@ a v ATL je označený „ověřit“ pro CAMO – v seznamu volba *Není v sezna
 *Let bez OFP* (přelet, OFP nejde nahrát) zůstává jako záloha na úvodní obrazovce. V Kanceláři se po *Začít let*
 nabídne *Nahrát OFP (PDF)* (otevře se rovnou OFP dalšího letu), *Let bez OFP*, případně už nahraná OFP.
 *Zapsat let ručně (z papíru)*: nahoře je povinné číslo stránky papírového deníku, ze které se let přepisuje.
+Lety přepsané z papíru zůstávají v ATL na svém papírovém čísle stránky (v nabídce stránek „(papír)“, v hlavičce
+„přepis z papíru“) a neubírají čísla elektronickým stránkám.
+
+### Převzetí historie z papíru – OK-UFF (15.–17. 11. 2026)
+Správa → **Lety z papíru** → *Vložit lety OK-UFF z papíru* (jen správce v Kanceláři, testovací režim není potřeba).
+Vloží 7 letů ze stránek 600227–600229 včetně paliva, PF, security prohlídky a začátku služby z papíru.
+1. Založte OK-UFF: typ C560XL, přechod 15/11/2026, poslední papírová stránka 600226, TTAF 4560:45, cykly 3401
+   (převod na str. 600227), první elektronická stránka 600230. Pak *Uvést do e-deníku*.
+2. Založte oba piloty (role Posádka). V dialogu přiřaďte zkratky z papíru (PENA = velitel, JOPA = druhý pilot);
+   když jméno zkratce odpovídá (např. PEtr NAvrátil → PENA), je předvybrané.
+3. Zkontrolujte tabulku proti papíru, nechte zaškrtnutý přechodový bod a podepište. Po vložení musí sedět
+   TTAF 4569:10 a cykly 3408 (součet na str. 600229). Podruhé stejné stránky vložit nejde.
 
 ## Olej
 Olej se zapisuje v litrech, zvlášť motor L a P (APU se nepíše). V ATL patří k letu, před kterým byl doplněn.
@@ -124,6 +136,8 @@ vidí všechny posádky (záložka *Doba služby*), **pilot vidí svou službu**
   (PIC, CAMO, OPS, Safety) – změna je v historii letu a v auditu.
 - **WOCL** (02:00–05:59 místního času aklimatizace): minuty FDP ve WOCL, označení časný nástup / pozdní konec / noční služba.
 - **Odpočinek** před službou (ORO.FTL.235: základna max(12 h, předchozí služba), jinde max(10 h, předchozí služba)).
+- **Začátek služby** je standardně nástup před 1. off-blockem (Nastavení); u letů přepsaných z papíru se bere
+  zapsaný „Duty on“ (v detailu letu *Začátek služby … (z papíru)*, ve službě poznámka „podle záznamu“).
 - **Kumulativní limity** (ORO.FTL.210): služba 60 h / 7 dní, 110 h / 14 dní, 190 h / 28 dní; let (block) 100 h / 28 dní,
   900 h / kalendářní rok, 1000 h / 12 měsíců – zelená / oranžová (nad 90 %) / červená.
 - **Co zatím ne:** služby bez letu (pohotovost, přelet jako cestující, simulátor, kancelář), prodloužení FDP, odpočinek
@@ -165,7 +179,7 @@ Jen pro testování, před ostrým provozem se vypne (a z aplikace později zmiz
 - **Najednou:** *Smazat všechny záznamy OK-XXX* (v záložce u letadla), *Smazat všechny provozní záznamy* (všechna
   letadla; letadla, uživatelé a nastavení zůstanou) a *Začít úplně od nuly* (i letadla, uživatelé, nastavení – všechna
   zařízení se vrátí na první spuštění). Hromadné mazání chce napsat SMAZAT a PIN.
-- *Vložit lety OK-WND z papíru (10.–13. 11.)* – přepis papírových stránek 800151–800154 (8 letů, posádka náhodně
+- *Vložit lety OK-WND z papíru (10.–13. 11.)* (jen v testovacím režimu) – přepis papírových stránek 800151–800154 (8 letů, posádka náhodně
   z pilotů v systému, PF podle papíru). Nabídne smazat lety OK-WND z těch dní, které už v deníku jsou, a nastavit
   přechodový bod na stav před stránkou 800151 (TTAF 3166:15, cykly 2043), aby se hodiny nezapočítaly dvakrát.
 - Smazání je podepsaný záznam, který se rozešle na všechna zařízení (i přes QR / soubor); v databázi se nic fyzicky

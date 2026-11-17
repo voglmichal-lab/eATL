@@ -1,0 +1,39 @@
+eTechLog – změna Z-026
+Verze: 0.6.13 (navazuje na Z-025 / 0.6.12)
+Datum: 2026-11-17
+
+Co se mění
+- Správa → nový panel „Lety z papíru“ → „Vložit lety OK-UFF z papíru (15.–17. 11., str. 600227–600229)“.
+  Jen správce v Kanceláři, testovací režim není potřeba. Vloží 7 letů opsaných ze tří nahraných stránek:
+  časy, palivo (min / odlet / přílet / natankováno), PF, přiblížení, security prohlídka a začátek služby.
+- Zkratky posádky z papíru (PENA = velitel, JOPA = druhý pilot) se v dialogu přiřadí pilotům ze seznamu;
+  když jméno zkratce odpovídá (např. PEtr NAvrátil → PENA), je předvybrané.
+- Přechodový bod se nastaví na stav před stránkou 600227: TTAF 4560:45, cykly 3401, poslední papírová stránka
+  600226, přechod 15/11/2026. Po vložení musí sedět TTAF 4569:10 a cykly 3408 (součet na str. 600229).
+- Stejné stránky podruhé vložit nejde. Pokud už OK-UFF v těch dnech nějaké lety má, vložení se zastaví.
+- Lety přepsané z papíru zůstávají v ATL na svém papírovém čísle stránky (v nabídce „(papír)“, v hlavičce
+  „přepis z papíru“) a neubírají čísla elektronickým stránkám. Týká se i dřív přepsaných letů OK-WND.
+- Doba služby: u přepsaných letů se bere zapsaný začátek služby (Duty on) z papíru místo standardního nástupu
+  před off-blockem; v detailu letu „Začátek služby … (z papíru)“, ve službě poznámka „podle záznamu“.
+
+Postup zítra
+1. Kancelář → Správa → Letadla → Přidat: OK-UFF, typ C560XL, TTAF při přechodu 4560:45, cykly 3401,
+   datum přechodu 15/11/2026, poslední papírová stránka 600226, první elektronická stránka 600230.
+2. Úvodní nastavení → Uvést OK-UFF do e-deníku (podpis přechodového bodu).
+3. Správa → Uživatelé: oba piloti s rolí Posádka (pokud tam nejsou).
+4. Správa → Lety z papíru → Vložit lety OK-UFF: přiřadit PENA a JOPA, zkontrolovat tabulku proti papíru, podepsat.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-026.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js
