@@ -133,6 +133,7 @@ function rebuild(){
       case 'ac.ground':s.grounds.push(Object.assign({},p,who));break;
       case 'sec.sign':s.secs.push(Object.assign({},p,who));break;
       case 'cfg.set':Object.assign(s.cfg,p);s.cfgSet=who;break;
+      case 'user.prefs':{const x=s.users[p.userId],by=s.users[e.by];if(x&&p.prefs&&(e.by===p.userId||(by&&(by.roles||[]).includes('admin'))))x.prefs=Object.assign({},x.prefs||{},p.prefs);break}
       case 'crew.login':{const k=p.acId+'|'+p.date;const a=s.logins[k]||(s.logins[k]=[]);if(e.by&&!a.includes(e.by))a.push(e.by);s.loginEv.push(Object.assign({acId:p.acId,date:p.date},who));break}
       case 'ofp.import':if(!s.ofps[p.ofpId])s.ofps[p.ofpId]=Object.assign({},p.data,{ofpId:p.ofpId,acId:p.acId,file:p.file,imported:who,fill:{},defs:p.defs||null,signed:null,void:null});break;
       case 'ofp.fill':{const o=s.ofps[p.ofpId];if(o)Object.assign(o.fill,p.data);break}
@@ -266,6 +267,7 @@ async function checkOffline(){
 }
 function cssMismatch(){try{const v2=getComputedStyle(document.documentElement).getPropertyValue('--etl-build').replace(/["'\s]/g,'');return v2!==String(window.ETL_VERSION||'')?(v2||'neznámá'):null}catch(e){return null}}
 function offlineNote(){
+  if(!self.ETL_ATIS)return `<div class="warnline warn wrap"><b>Neúplná aktualizace.</b> Chybí soubor atis.js (zápis ATIS a clearance). Nahrajte na server všechny soubory z posledního zipu.</div>`;
   if(!self.ETL_FTL)return `<div class="warnline warn wrap"><b>Neúplná aktualizace.</b> Chybí soubor ftl.js (výpočet doby služby). Nahrajte na server všechny soubory z posledního zipu.</div>`;
   const cm=cssMismatch();if(cm)return `<div class="warnline warn wrap"><b>Neúplná aktualizace.</b> Vzhled (app.css) je z verze ${esc(cm)}, aplikace z verze ${esc(window.ETL_VERSION||'')}. Nahrajte na server všechny soubory z posledního zipu.</div>`;
   if(isIOS&&!standalone())return `<div class="warnline warn wrap"><b>Otevřeno v Safari.</b> Bez signálu se spustí jen aplikace z ikony na ploše: Sdílet → Přidat na plochu a dál otevírejte jen ikonu.</div>`;
@@ -398,9 +400,9 @@ function themeBtn(){const t=themeGet();return `<button type="button" class="btn 
 function header(){
   const u=me();const crew=mode()==='crew';const bac=BIND&&S.ac[BIND];
   let right='';
-  if(crew){if(crewValid()){right=`<div class="who"><span><b>${esc(u.name)}</b></span><button class="btn sm" data-act="crew-end">Konec dne</button><button class="btn sm" data-act="crew-logout">Odhlásit</button></div>`}}
-  else if(u&&personal())right=`<div class="who"><span><b>${esc(u.name)}</b> · ${u.roles.map(r=>ROLE[r]).join(', ')}</span><button class="btn sm" data-act="dev-logout">Odhlásit</button></div>`;
-  else if(u)right=`<div class="who"><span><b>${esc(u.name)}</b> · ${u.roles.map(r=>ROLE[r]).join(', ')}</span><button class="btn sm" data-act="office-off">Režim posádky</button><button class="btn sm" data-act="logout">Odhlásit</button></div>`;
+  if(crew){if(crewValid()){right=`<div class="who"><span><b>${esc(u.name)}</b></span><button class="btn sm" data-act="acct">Můj účet</button><button class="btn sm" data-act="crew-end">Konec dne</button><button class="btn sm" data-act="crew-logout">Odhlásit</button></div>`}}
+  else if(u&&personal())right=`<div class="who"><span><b>${esc(u.name)}</b> · ${u.roles.map(r=>ROLE[r]).join(', ')}</span><button class="btn sm" data-act="acct">Můj účet</button><button class="btn sm" data-act="dev-logout">Odhlásit</button></div>`;
+  else if(u)right=`<div class="who"><span><b>${esc(u.name)}</b> · ${u.roles.map(r=>ROLE[r]).join(', ')}</span><button class="btn sm" data-act="acct">Můj účet</button><button class="btn sm" data-act="office-off">Režim posádky</button><button class="btn sm" data-act="logout">Odhlásit</button></div>`;
   return `<header class="top"><div class="top-in wrap">
     <div class="brand"><span class="brand-mark">ATL</span><div><b>${S.cfg.opName?esc(S.cfg.opName)+' ':''}eTechLog</b><small>${crew&&bac?'iPad · '+esc(bac.reg):S.cfg.aoc?esc(S.cfg.aoc):'nenastaveno'} · testovací verze</small></div></div>
     <button class="pill" id="syncpill" data-act="sync-panel" aria-label="Stav synchronizace"></button>
@@ -440,6 +442,7 @@ function render(){
   app.innerHTML=header()+(Object.keys(S.users).length?offlineNote():'')+body+`<p class="footnote wrap">Testovací verze. Neslouží jako úřední záznam – papírový technický deník platí dál. Zařízení <span class="mono">${esc(DEV)}</span> · časy v UTC.</p>`;
   for(const k in kept){const el=document.getElementById(k);if(el&&!el.value&&el.closest('[data-keep]'))el.value=kept[k]}
   renderPill();
+  if(self.ETL_ATIS)ETL_ATIS.after();
   if(mode()==='crew')crewLive();
   // sticky OFP phase tabs sit right under the sticky header, not behind it
   {const t=app.querySelector('.top');document.documentElement.style.setProperty('--top-h',(t?t.getBoundingClientRect().height:0)+'px')}
@@ -1390,7 +1393,7 @@ function viewOfp(o,u){
   ${!o.closed&&!o.void?`<div class="chips" style="justify-content:flex-end"><button type="button" class="btn primary" data-act="ofp-ph" data-id="${esc(o.ofpId)}|flight">Pokračovat: Let ›</button></div>`:''}`)}
   ${sec('flight',`${!l&&mode()==='crew'&&!o.closed&&!o.void?`<div class="warnline caution">Let ještě není zahájený – palivo a security search jsou v části <button type="button" class="linkbtn" style="display:inline;min-height:0;padding:0" data-act="ofp-goto" data-id="pre|fuel">Před letem</button>.</div>`:''}
   <section class="panel ostep ${done.dep?'done':''}" id="ofps-dep">${stepH('dep','Před odletem','ATIS, clearance a kontrola výškoměrů.')}
-    <div class="fgrid wide">${ofpIn(o,'atisDep','ATIS DEP',{area:true})}${ofpIn(o,'clr','ATC clearance',{area:true})}</div>
+    ${self.ETL_ATIS?`<div class="atf-pair">${ETL_ATIS.field(o,'atisDep',LK)}${ETL_ATIS.field(o,'clr',LK)}</div>`:`<div class="fgrid wide">${ofpIn(o,'atisDep','ATIS DEP',{area:true})}${ofpIn(o,'clr','ATC clearance',{area:true})}</div>`}
     <div><p class="label">Kontrola výškoměrů (ft)</p>
       <p class="muted" style="margin:4px 0 0;font-weight:600">On ground</p><div class="fgrid">${ofpIn(o,'rg_lh','LH',{num:true})}${ofpIn(o,'rg_sb','SBY',{num:true})}${ofpIn(o,'rg_rh','RH',{num:true})}</div>
       <p class="muted" style="margin:8px 0 0;font-weight:600">RVSM</p>
@@ -1403,7 +1406,7 @@ function viewOfp(o,u){
   </section>
   ${ofpDivertPanel(o,LK)}
   <section class="panel ostep ${done.arr?'done':''}" id="ofps-arr">${stepH('arr','Přílet a přistání'+(ofpVal(o,'dv')?' – DIVERT '+esc(divTo(o)):''))}
-    <div class="fgrid wide">${ofpIn(o,'atisArr','ATIS ARR',{area:true})}</div>
+    ${self.ETL_ATIS?`<div class="atf-pair">${ETL_ATIS.field(o,'atisArr',LK)}${ETL_ATIS.field(o,'clrArr',LK)}</div>`:`<div class="fgrid wide">${ofpIn(o,'atisArr','ATIS ARR',{area:true})}</div>`}
     <div><p class="label">Přistávací data</p><div class="fgrid">${ofpIn(o,'ld_w','LD weight',{num:true})}${ofpIn(o,'ld_dist','LD dist',{num:true})}${ofpIn(o,'vref','VREF',{num:true})}${ofpIn(o,'vapp','VAPP',{num:true})}${ofpIn(o,'vfs','VFS',{num:true})}${ofpIn(o,'magrad','MA grad')}${ofpIn(o,'ld167','LD × 1,67',{num:true})}</div></div>
     <div><p class="label">Přistání</p>${ofpLandingStep(o)}</div>
   </section>
@@ -1522,7 +1525,7 @@ async function ofpPdf(o){
   }
   // --- arrival ---
   section('Přílet'+(val('dv')?' – divert '+divTo(o):''));
-  cells([['ATIS ARR',val('atisArr')]],1);
+  cells(val('clrArr')?[['ATIS ARR',val('atisArr')],['Příletová clearance',val('clrArr')]]:[['ATIS ARR',val('atisArr')]],val('clrArr')?2:1);
   cells([['LD weight',val('ld_w')],['LD dist',val('ld_dist')],['VREF',val('vref')],['VAPP',val('vapp')],['VFS',val('vfs')],['MA grad',val('magrad')],['LD × 1,67',val('ld167')]],7);
   // --- ATL ---
   section('Technický deník (ATL)');
@@ -1842,7 +1845,8 @@ function evText(e){
     case 'rec.del':return `${reg}<b>Smazáno v testovacím režimu</b> – ${esc(p.what||'')}${p.n>1?` (celkem ${p.n} záznamů)`:''}`;
     case 'rec.reset':return `<b>Testovací režim – ${p.scope==='all'?'smazáno úplně vše (začátek od nuly)':'smazány všechny provozní záznamy'}</b>`;
     case 'cfg.set':if(Object.keys(p).length===1&&'testDel' in p)return `Testovací režim mazání záznamů ${p.testDel?'zapnut':'vypnut'}`;return `Nastavení provozovatele změněno – pravidla ${esc(FTL_RULES[p.ftlRules]||p.ftlRules||'')}${p.omRef?', '+esc(p.omRef):''}, základny ${esc((p.bases||[]).join(', '))}`;
-    case 'user.upsert':return `Uživatel ${esc(p.name||(S.users[p.userId]||{}).name||'')} – údaje uloženy`;
+    case 'user.upsert':return p.pinHash&&Object.keys(p).length===2?`Uživatel ${esc((S.users[p.userId]||{}).name||'')} – změna PINu`:`Uživatel ${esc(p.name||(S.users[p.userId]||{}).name||'')} – údaje uloženy`;
+    case 'user.prefs':return `Uživatel ${esc((S.users[p.userId]||{}).name||'')} – nastavení účtu`;
   }
   return esc(e.type);
 }
@@ -3035,6 +3039,28 @@ function openUserForm(id){
     emit([['user.upsert',p]]);closeSheet();toast('Uživatel uložen');
   }});
 }
+// personal settings of the signed-in pilot: ATIS / clearance fields and quick notes (user.prefs), own PIN (user.upsert)
+function openAccount(){
+  const u=me();if(!u)return;
+  openSheet('Můj účet',`<p class="muted">${esc(u.name)} · ${u.roles.map(r=>ROLE[r]).join(', ')}</p>
+    ${self.ETL_ATIS?`<section class="acct-sec"><h3>Zápis ATIS a clearance</h3><p class="muted">Pořadí a výběr polí na klávesnici eTechLogu. Volitelná pole („přes tlačítko“) se v řádku objeví, až je použijete. Platí jen pro vás, na každém iPadu.</p>${ETL_ATIS.cfgEditor()}</section>`:''}
+    <section class="acct-sec"><h3>Změna PINu</h3><p class="muted">Vyplňte jen když PIN měníte.</p><div class="fgrid">
+      <label class="fld"><span>Současný PIN</span><input type="password" id="ac-pin0" inputmode="numeric" autocomplete="off"></label>
+      <label class="fld"><span>Nový PIN (4–6 číslic)</span><input type="password" id="ac-pin1" inputmode="numeric" autocomplete="off"></label>
+      <label class="fld"><span>Nový PIN znovu</span><input type="password" id="ac-pin2" inputmode="numeric" autocomplete="off"></label></div></section>`,
+  {submit:'Uložit',focus:false,onSubmit:async()=>{
+    const uid=u.userId||u.id,items=[];
+    const p0=v('ac-pin0'),p1=v('ac-pin1'),p2=v('ac-pin2');
+    if(p0||p1||p2){
+      if(!u.pinHash||await sha(uid+':'+p0)!==u.pinHash){const el=document.getElementById('ac-pin0');if(el){el.value='';el.classList.add('bad')}fail('Současný PIN nesouhlasí.')}
+      if(!/^\d{4,6}$/.test(p1))fail('Nový PIN musí mít 4–6 číslic.');if(p1!==p2)fail('Nový PIN a jeho zopakování se liší.');
+      items.push(['user.upsert',{userId:uid,pinHash:await sha(uid+':'+p1)}]);
+    }
+    if(self.ETL_ATIS){const c=ETL_ATIS.cfgResult();if(JSON.stringify(c)!==JSON.stringify((u.prefs||{}).atis||null))items.unshift(['user.prefs',{userId:uid,prefs:{atis:c}}])}
+    closeSheet();if(!items.length){toast('Beze změny');return}
+    emit(items);toast(items.some(x=>x[0]==='user.upsert')?'Uloženo, PIN změněn':'Nastavení uloženo');
+  }});
+}
 function openSyncPanel(){openSheet('Synchronizace',`<div id="syncbody">${syncDetails()}</div><p class="muted">Každý zápis se nejdřív uloží v tomto zařízení. Odešle se hned, jak je spojení. Zápisy z ostatních iPadů se sem stáhnou automaticky.</p>`,{focus:false})}
 
 /* --- exports --- */
@@ -3138,6 +3164,7 @@ document.addEventListener('click',e=>{
     case 'crs-detail':openCrsDetail(id);break;
     case 'split-form':openSplitForm(id);break;
     case 'theme':themeNext();break;
+    case 'acct':openAccount();break;
     case 'ftl-user':UI.ftlUser=id||null;UI.ftlPer=UI.ftlPer||'28';render();window.scrollTo(0,0);break;
     case 'ftl-per':UI.ftlPer=id;render();break;
     case 'ftl-export':exportFtl();break;
@@ -3303,6 +3330,7 @@ document.addEventListener('submit',async e=>{
 });
 
 /* ---------- boot ---------- */
+if(self.ETL_ATIS)ETL_ATIS.bind({prefs:()=>{const u=me();return u&&u.prefs||null},ofpOf,ofpVal,ofpSet,ofps:()=>Object.values((S&&S.ofps)||{}),arrApt:o=>ofpVal(o,'dv')?divTo(o):o.des});
 themeApply(themeGet());try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themeGet()==='auto')themeApply('auto')})}catch(e){}
 rebuild();render();initDb();
 checkOffline();if('serviceWorker' in navigator){navigator.serviceWorker.ready.then(()=>setTimeout(checkOffline,500)).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>setTimeout(checkOffline,500))}

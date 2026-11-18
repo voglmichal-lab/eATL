@@ -1,0 +1,37 @@
+eTechLog – změna Z-027
+Verze: 0.6.14 (navazuje na Z-026 / 0.6.13)
+Datum: 2026-11-19
+
+Co se mění
+- OFP → Let → Před odletem / Přílet a přistání: ATIS DEP, ATC clearance, ATIS ARR a nová Příletová clearance se píšou
+  na klávesnici eTechLogu (vysune se zespodu po ťuknutí na políčko) místo klávesnice iPadu.
+- Pořadí polí jako v ICAO a evropských ATIS. Tlačítka vědí, kam patří, takže přiblížení může být před dráhou i po ní,
+  vynechané pole se přeskočí. Zápis jako na papír se uloží jednotně: FEW 2 0 0 0 → FEW020, 1 0 → 9999, 1 2 5 → 12/05.
+- ILS s variantou Z / Y / X a CAT II, stav dráhy (WET, SLUSH… + RWYCC), RVR, jevy (− = light, + = heavy), trend, čas ATIS
+  (zapíná se v Můj účet), rychlé poznámky (BIRDS, GNSS RFI, WORKS, TWY CLSD, LVP).
+- SID a STAR: plán z navigačního logu OFP (např. KOK7S / BISBA3X) je v políčku slabě, potvrdí se ✓. Jiný: bod z OFP
+  (KOK…) + číslo a písmeno. Kurz po odletu: HDG a tři číslice. Dříve použité hodnoty na letišti z ostatních OFP.
+- Můj účet (horní lišta): pořadí a vypnutí polí pro každého pilota zvlášť (platí na všech iPadech), předvolby
+  ICAO / Evropa a USA, rychlé poznámky, změna PINu.
+- PDF z OFP: přibyla Příletová clearance.
+
+Návrat na 0.6.13, kdyby to byla cesta zpět
+- Nahrajte znovu všechny soubory ze zipu eatl-Z-026-v0.6.13.zip. Data zůstanou: zápisy jsou v OFP i jako text
+  v původních polích (0.6.13 je zobrazí a vytiskne), změněný PIN platí dál. atis.js může na serveru zůstat.
+- Vyzkoušeno: data z 0.6.14 → 0.6.13 → zpět 0.6.14 bez chyb a bez ztráty zápisů.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-027.txt) do kořene repozitáře eatl. Nový soubor atis.js. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

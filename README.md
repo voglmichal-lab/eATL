@@ -51,6 +51,14 @@ Nahrajte na GitHub **všechny soubory ze zipu změny** (zip obsahuje vždy celou
 Při úpravách kódu zvyšte číslo verze ve `version.js` i `--etl-build` v `app.css`. Vercel nasadí sám,
 iPady si novou verzi stáhnou při dalším otevření se signálem.
 
+### Návrat na předchozí verzi
+Nahrajte znovu všechny soubory ze zipu předchozí změny (např. `eatl-Z-026-v0.6.13.zip` pro návrat z 0.6.14). Data zůstávají:
+- Zápisy ATIS a clearance z 0.6.14 jsou v OFP uložené i jako běžný text v původních polích, takže je 0.6.13 zobrazí
+  i vytiskne. Příletová clearance (nové pole) se v 0.6.13 nezobrazí, ale v datech zůstane.
+- PIN změněný v Můj účet platí i v 0.6.13. Nastavení účtu 0.6.13 nezná – v auditu se ukáže jako „user.prefs“ a jinak se ignoruje.
+- Text, který někdo mezitím upraví v 0.6.13, má po návratu na 0.6.14 přednost: objeví se jako poznámka pole, nic se neztratí.
+- Soubor `atis.js` může na serveru zůstat, 0.6.13 ho nenačítá.
+
 ## Jak funguje offline a synchronizace
 - Každý podpis se nejdřív uloží v zařízení (IndexedDB) a pak odešle. Bez signálu se
   zápisy řadí do fronty („čeká na signál“) a odejdou samy po připojení.
@@ -194,6 +202,27 @@ Na stránce deníku je u každé závady vedle sebe její odstranění (CRS) neb
 Závada zjištěná na zemi (záložka Závady → *Zapsat závadu*) se zapíše na stránku ATL **za vybraný let**
 (výchozí je poslední let), v tabulce je jako „na zemi po letu N“. Volba *nepřiřazovat k letu* ji nechá jen v záložce Závady.
 
+## ATIS a clearance – klávesnice eTechLogu
+V OFP (Let → Před odletem, Přílet a přistání) se ATIS DEP, ATC clearance, ATIS ARR a nová **Příletová clearance** píšou
+na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na políčko se klávesnice vysune zespodu.
+- **Pořadí nehraje roli.** Každé tlačítko ví, do kterého pole patří (ILS, CAVOK, BKN, VRB…), číslice jdou tam, kde je kurzor.
+  Přiblížení může zaznít před dráhou i po ní. Když pole v ATIS nezazní, číslice skočí do dalšího.
+- **Zápis jako na papír, výsledek jednotný:** FEW 2 0 i FEW 2 0 0 0 → FEW020, viditelnost 1 0 → 9999, 2 5 0 0 8 → 250/08,
+  1 2 5 → 12/05, QNH 9 8 9 i 1 0 1 3. Pomlčka u jevů = slabý (light): − SH RA = −SHRA, plus = silný (heavy).
+- **ILS** s variantou Z / Y / X a **CAT II**, stav dráhy (DRY, WET, SLUSH… + RWYCC 5/5/5), RVR, vítr s nárazy a rozmezím (240V320), trend.
+- **SID a STAR z OFP:** plánovaná procedura z navigačního logu (např. KOK7S, BISBA3X) je v políčku slabě a potvrdí se ✓.
+  Jiná procedura: tlačítko s bodem z OFP (KOK…) a doplní se číslo a písmeno. Kurz po odletu: HDG a tři číslice.
+  Přiblížení a dráhu v příletové clearance nabídne z ATIS ARR. Dříve použité hodnoty na letišti (SID, dráhy, TL, výšky,
+  frekvence) se nabízejí z ostatních OFP.
+- Do OFP, PDF a kontroly vyplnění jde jeden normalizovaný řádek (např. `INFO K · ILS · RWY 26 · TL60 · 240/10 · 9999 · FEW020 · 12/05 · Q1018 · NOSIG`).
+  Pod polem je poznámka (klávesnice iPadu) a rychlé poznámky (BIRDS, GNSS RFI…).
+
+## Můj účet
+Tlačítko **Můj účet** v horní liště (posádka i kancelář):
+- **Zápis ATIS a clearance** – pořadí polí (šipky), vypnutí polí, předvolby ICAO / Evropa a USA, rychlé poznámky.
+  Platí pro přihlášeného pilota na všech iPadech. Čas ATIS je ve výchozím stavu vypnutý.
+- **Změna PINu** – současný PIN a dvakrát nový.
+
 ## PDF z OFP
 V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signálu). Z nabídky sdílení jde vytisknout (AirPrint), uložit do Souborů nebo poslat.
 
@@ -216,4 +245,5 @@ V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signál
 | `fonts/pdf/` | písma pro PDF s českou diakritikou (SIL OFL) |
 | `fonts/`, `fonts.css` | písma (lokálně kvůli offline) |
 | `ftl.js` | výpočet doby letu a služby (ORO.FTL / CS FTL.1) |
+| `atis.js` | zápis ATIS a clearance klávesnicí eTechLogu |
 | `supabase/schema.sql` | databáze, pravidla přístupu a živá synchronizace |
