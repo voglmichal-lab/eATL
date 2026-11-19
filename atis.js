@@ -593,8 +593,9 @@ const RWY_TOK = [['ILS', ''], ['RNP', ''], ['LOC', 'localizer'], ['VOR', ''], ['
   ['Z', 'varianta'], ['Y', 'varianta'], ['X', 'varianta'], null, ['L', 'left'], ['C', 'centre'], ['R', 'right']];
 const MET_TOK = [['VRB', 'variable'], ['G', 'gusting'], ['V', 'var. between'], ['CAVOK', ''], ['9999', '10 km +'],
   ['FEW', 'few'], ['SCT', 'scattered'], ['BKN', 'broken'], ['OVC', 'overcast'], ['NSC', 'no sig. cloud'],
-  ['CB', ''], ['TCU', ''], ['VV', 'vert. vis'], ['RVR', 'runway vis.'], ['JEVY', 'déšť, mlha…'],
-  ['NOSIG', ''], ['TEMPO', ''], ['BECMG', ''], ['STAV RWY', 'kontaminace · RWYCC', null, 1]];
+  ['CB', ''], ['TCU', ''], ['VV', 'vert. vis'], ['TEMPO', ''], ['BECMG', ''],
+  // the last row: NOSIG and the keys that open another keypad (outlined, with an arrow) – they do not write a value themselves
+  ['NOSIG', ''], ['RVR', 'runway vis. ›', null, 0, 'nav'], ['JEVY', 'déšť, mlha… ›', null, 0, 'nav'], ['STAV RWY', 'kontaminace · RWYCC ›', null, 1, 'nav']];
 const WX_TOK = [['−', 'light'], ['+', 'heavy'], ['VC', 'vicinity'], ['SH', 'showers'], ['TS', 'thunderstorm'], ['RA', 'rain'], ['SN', 'snow'], ['DZ', 'drizzle'], ['FZ', 'freezing'], ['GR', 'hail'], ['BR', 'mist'], ['FG', 'fog'], ['HZ', 'haze'], ['PL', 'ice pellets'], null];
 const CLD_ROW = [['FEW', 'few'], ['SCT', 'scattered'], ['BKN', 'broken'], ['OVC', 'overcast'], ['NSC', 'no sig. cloud']];
 // trend: wind first (VRB, G), then visibility, weather and cloud – TEMPO / BECMG / NOSIG sit in the chips above
@@ -607,7 +608,7 @@ const TURN_TOK = [['STRAIGHT', 'straight ahead', null, 1], ['PASSING', 'when pas
 const COND_TOK = [['DRY', 'dry'], ['WET', 'wet'], ['FROST', 'frost'], ['SLUSH', 'slush'], ['ST WATER', 'standing water'], ['DRY SNOW', 'dry snow'], ['WET SNOW', 'wet snow'], ['COMP SNOW', 'compacted snow'], ['ICE', 'ice'], ['WET ICE', 'wet ice'], null, null];
 function keyBtn(code, label, cls, small, dis) { return `<button type="button" class="ak-key${cls ? ' ' + cls : ''}" data-ak="${esc(code)}"${dis ? ' disabled' : ''}>${label}${small ? `<small>${esc(small)}</small>` : ''}</button>` }
 // a lit key shows what is set now (G = the wind has gusts), not which keys belong to the field
-function grid(list, ON, prefix) { return list.map(x => x ? keyBtn((prefix || 'tok:') + x[0], esc(x[0]), 't' + (ON && ON.has(x[0]) ? ' on' : '') + (x[3] ? ' s2' : '') + (x[0].length > 5 ? ' sm' : ''), x[1]) : '<span></span>').join('') }
+function grid(list, ON, prefix) { return list.map(x => x ? keyBtn((prefix || 'tok:') + x[0], esc(x[0]), 't' + (ON && ON.has(x[0]) ? ' on' : '') + (x[3] ? ' s2' : '') + (x[4] ? ' ' + x[4] : '') + (x[0].length > 5 ? ' sm' : ''), x[1]) : '<span></span>').join('') }
 function onSet(f, k, kind) {
   const v = f.v, S = new Set();
   if (kind === 'rwy') { const p = appParts(v.app); if (p.b) S.add(p.b); if (p.x) S.add(p.x); if (p.c) S.add('CAT II'); const m = /^\d{2}([LCR])$/.exec(v.rwy || ''); if (m) S.add(m[1]) }
@@ -664,7 +665,7 @@ function renderDock() {
   const ctx = d.querySelector('#ak-ctx');
   if (kind === 'abc') {
     const r = f.v.route || '';
-    const extra = k === 'route' ? [f.type === 'clr' ? keyBtn('tok:STRAIGHT', 'STRAIGHT', 't sm', 'straight ahead') : keyBtn('tok:DCT', 'DCT', 't' + (isDct(r) ? ' on' : ''), 'direct to bod'), keyBtn('tok:HDG', 'HDG', 't' + (/^HDG/.test(r) ? ' on' : ''), 'kurz + číslo')] : ['<span></span>', '<span></span>'];
+    const extra = k === 'route' ? [f.type === 'clr' ? keyBtn('tok:STRAIGHT', 'STRAIGHT', 't sm', 'straight ahead') : keyBtn('tok:DCT', 'DCT', 't kdct' + (isDct(r) ? ' on' : ''), 'direct to bod'), keyBtn('tok:HDG', 'HDG', 't' + (/^HDG/.test(r) ? ' on' : ''), 'kurz + číslo')] : ['<span></span>', '<span></span>'];
     ctx.className = 'ak-ctx abc'; ctx.innerHTML = letters('let:', k === 'info' ? f.v.info : null) + extra.join('');
   } else if (kind === 'taxi') {
     const dep = f.type === 'taxi';
@@ -674,7 +675,7 @@ function renderDock() {
       + keyBtn('tok:RWY', 'RWY', 't s2' + (k === 'rwy' ? ' on' : ''), 'runway') + (dep ? keyBtn('tok:HP', 'HP', 't' + (k === 'hp' ? ' on' : ''), 'hold. pt') : keyBtn('tok:STAND', 'STAND', 't sm' + (k === 'stand' ? ' on' : ''), 'stání'))
       + keyBtn('tok:HS', 'HOLD SHORT', 't sm s2', 'hold short of') + keyBtn('tok:VIA', 'VIA', 't s2' + (k === 'via' ? ' on' : ''), 'pojezdové dráhy');
   }
-  else if (kind === 'rwy') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(RWY_TOK, ON) + (f.type === 'atis' ? keyBtn('tok:STAV RWY', 'STAV RWY', 't sm', 'kontaminace') : '<span></span>') }
+  else if (kind === 'rwy') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(RWY_TOK, ON) + (f.type === 'atis' ? keyBtn('tok:STAV RWY', 'STAV RWY', 't sm nav', 'kontaminace ›') : '<span></span>') }
   else if (kind === 'cond') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(COND_TOK, ON, 'rc:') }
   else if (kind === 'turn') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(TURN_TOK, ON); if (!HINT) hint.textContent = 'Straight ahead: PASSING a výška, LEFT / RIGHT, HDG a tři číslice. Pak Další ›.' }
   else if (kind === 'met') { ctx.className = 'ak-ctx c5'; ctx.innerHTML = grid(MET_TOK, ON) }
@@ -755,8 +756,8 @@ function press(code) {
 // stored like the notes of 0.6.13 ("a · b · c" under w<i>_note), so the PDF and an older version show them unchanged
 const NOTE_SEP = ' · ';
 const ATC_W = ['CLB', 'DES', 'HDG', 'DCT', 'LEFT', 'RIGHT', 'SPD', 'FREQ', 'QNH', 'SQ', 'HOLD', 'EXPECT', 'MAINT', 'OWN NAV'];
-const ATC_TOK = [['CLB', 'climb'], ['DES', 'descend'], ['FL', 'flight level'], ['HDG', 'heading'], ['DCT', 'direct to'],
-  ['LEFT', 'turn left'], ['RIGHT', 'turn right'], ['SPD', 'speed kt'], ['M.', 'mach'], ['FREQ', 'contact'],
+const ATC_TOK = [['CLB', 'climb'], ['DES', 'descend'], ['FL', 'flight level'], ['HDG', 'heading'], ['DCT', 'direct to', null, 0, 'kdct'],
+  ['LEFT', 'turn left'], ['RIGHT', 'turn right'], ['SPD', 'speed kt'], ['M.', 'mach'], ['FREQ', 'contact', null, 0, 'kfreq'],
   ['QNH', ''], ['SQ', 'squawk'], ['HOLD', 'holding'], ['EXPECT', ''], ['MAINT', 'maintain']];
 const nbId = (oid, key) => 'nb-' + String(oid).replace(/[^A-Za-z0-9]/g, '_') + '-' + key;
 const atcParts = t => String(t || '').split(NOTE_SEP).map(x => x.trim()).filter(Boolean);

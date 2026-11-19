@@ -47,7 +47,8 @@ self.addEventListener('fetch', e => {
     return;
   }
   // app shell: try the network briefly, fall back to the cached copy (weak signal on the apron)
-  e.respondWith(Promise.race([fetch(req), timeout(4000)]).then(res => {
+  // 'no-cache' = always ask the server (a copy kept by the browser could mix files of two versions)
+  e.respondWith(Promise.race([fetch(req.mode === 'navigate' ? req : new Request(req.url, { cache: 'no-cache' })), timeout(4000)]).then(res => {
     if (res && res.ok) { const cp = res.clone(); caches.open(CACHE).then(c => c.put(req, cp)); }
     return res;
   }).catch(() => caches.match(req, { ignoreSearch: true }).then(hit => hit || (req.mode === 'navigate' ? caches.match('index.html') : Response.error()))));

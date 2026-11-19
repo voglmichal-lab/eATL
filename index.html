@@ -34,8 +34,10 @@ if('serviceWorker' in navigator){
   // a new version took over: reload once so the app runs the new code
   // first install takes control silently; only a later update reloads (and never with a form open)
   const hadController=!!navigator.serviceWorker.controller;let reloaded=false;
+  // never under the crew's hands: wait until no form, keypad or typing is in progress (checked every few seconds)
+  const busy=()=>{const a=document.activeElement;return !!(document.querySelector('#sheet:not([hidden])')||document.querySelector('#akdock:not([hidden])')||(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)))};
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!hadController||reloaded)return;reloaded=true;
-    const busy=document.querySelector('#sheet:not([hidden])');if(!busy)location.reload()});
+    const go=()=>{if(busy())setTimeout(go,4000);else location.reload()};go()});
 }
 </script>
 </body>

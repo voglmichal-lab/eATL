@@ -60,6 +60,8 @@ Nahrajte znovu všechny soubory ze zipu předchozí změny (např. `eatl-Z-026-v
 - Soubor `atis.js` může na serveru zůstat, 0.6.13 ho nenačítá.
 - Z 0.6.16 zpět na 0.6.15 nebo 0.6.13: TAXI DEP / TAXI ARR starší verze nezobrazí (v datech zůstanou), ATC instrukce
   za letu ukáže jako poznámky u bodů i s časem, ATIS s větrem v TEMPO je běžný text.
+- **Z 0.7 zpět na 0.6.x: jen se signálem.** 0.7 ukládá záznamy jinak (viz níže); 0.6 si po návratu stáhne deník ze
+  serveru znovu a neodeslané záznamy z 0.7 odešle. Bez signálu by 0.6 ukázala prázdný deník, dokud se nepřipojí.
 
 ## Jak funguje offline a synchronizace
 - Každý podpis se nejdřív uloží v zařízení (IndexedDB) a pak odešle. Bez signálu se
@@ -67,6 +69,24 @@ Nahrajte znovu všechny soubory ze zipu předchozí změny (např. `eatl-Z-026-v
 - Server záznamy jen přidává – nejdou změnit ani smazat. Oprava je nový podepsaný záznam.
 - Ostatní zařízení dostávají nové zápisy živě, nebo při dalším otevření.
 - Vypršení přihlášení bez signálu posádku nezablokuje – synchronizace jen počká.
+
+### Jádro od 0.7 – aby se aplikace nezpomalovala s přibývajícími záznamy
+- **Jeden záznam = jeden řádek v úložišti zařízení** (databáze `etechlog-ev`). Do 0.6 byl celý deník jedna hodnota,
+  která se při každé změně přepsala celá. S daty za rok provozu (83 000 záznamů) trvalo uložení jedné hodnoty v OFP
+  165 ms na stolním počítači; v 0.7 je to pod 1 ms a na délce deníku to nezávisí.
+- Nová hodnota v OFP se do stavu promítne přímo, deník se nepřehrává celý. Celé přehrání zůstává pro podpisy a pro
+  záznamy, které dorazí z jiného zařízení se starším časem – výsledek je vždy stejný (hlídá test).
+- **Zařízení, které neukládá** (plné úložiště), to řekne: stav „Zařízení neukládá“ a pokyn nechat aplikaci otevřenou
+  se signálem. Zápis na disk je potvrzovaný (durability strict).
+- **Hodiny zařízení** se při startu a pak každou hodinu porovnají se serverem; rozdíl přes 2 minuty aplikace ohlásí.
+  Pořadí záznamů a časy podpisů se řídí hodinami zařízení.
+- Záznam z jiného zařízení s posunutým časem nic nerozbije: podepsaný let se znovu neotevře, hodnoty OFP zapsané
+  „před“ nahráním OFP se neztratí.
+- **Jedno okno na zařízení.** Druhé okno nebo záložka se nespustí (dvě okna by si přepisovala frontu neodeslaných záznamů).
+- Záznam, který server odmítne, nezablokuje odeslání ostatních; stav ukáže „server odmítl N“.
+- Dotaz na server, který neodpoví, se po 30 s vzdá (dřív mohl zablokovat další stahování až do restartu).
+- Nová verze se nenačte pod rukama: počká, až není otevřený formulář, klávesnice ani rozepsané pole.
+- Soubory aplikace se vždy ověřují proti serveru (`atis.js`, `ftl.js` byly dřív mimo) – nemíchají se dvě verze.
 
 ## Předání dat mezi iPady bez signálu
 **⇄ Druhý iPad** (u registrace letadla, v OFP nebo v panelu synchronizace):
@@ -252,6 +272,9 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
   na letišti se nabízejí z ostatních OFP.
 
 ## Ovládání na iPadu
+- **ATO jen minutami.** U bodů trati stačí napsat minuty jako na papíře: „40“ → 10:40. Hodinu doplní aplikace podle
+  ETO bodu – vezme čas s těmi minutami nejbližší k ETO (ETO 11:01, napsáno 59 → 10:59; ETO 12:58, napsáno 01 → 13:01).
+  Bez ETO vezme první takový čas po předchozím ATO. Celý čas (1040) jde psát dál.
 - **Enter = další pole.** V běžných polích (palivo, takeoff data, časy, formuláře) přeskočí Enter na další pole – klávesa
   na klávesnici iPadu má nápis *další*. Za posledním polem fáze klávesnice zmizí, ve formuláři poslední Enter odešle.
   Víceřádkové poznámky Enter dál zalamuje.
@@ -289,6 +312,19 @@ V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signál
 - Bezplatný tarif Supabase uspí projekt po delší nečinnosti a nemá zálohy ke stažení.
   Pravidelně stahujte **Správa → Stáhnout úplnou zálohu (JSON)**.
 - První spuštění na novém zařízení potřebuje internet.
+
+### Otevřené body po auditu 0.7 (k rozhodnutí)
+- **Oprávnění hlídá jen aplikace.** Server přijme od přihlášeného účtu jakýkoli záznam (i `user.upsert` s rolí
+  správce, `rec.reset`) a vydá všem všechno včetně otisků PINů; čtyřmístný PIN jde z otisku uhodnout okamžitě.
+  Patří do odložené bezpečnostní fáze, ale před přístupem OPS / SM z webu je to nutné: pravidla podle typu účtu
+  v Supabase, PINy ověřovat na serveru nebo otisk s pomalou funkcí, omezení počtu pokusů.
+- **Testovací mazání** (`rec.del`, `rec.reset`) před ostrým provozem vypnout i na serveru.
+- **Čísla stránek ATL a čísla závad se počítají z pořadí záznamů.** Let doplněný zpětně (iPad dlouho offline,
+  oprava data letu) přečísluje všechny pozdější stránky. Pro ostrý provoz číslo přidělit při otevření letu a uložit.
+- **Velikost deníku:** rok provozu dvou letadel ≈ 30 MB, z toho 96 % jsou průběžné hodnoty OFP (`ofp.fill`).
+  Zařízení drží celý deník v paměti a nové zařízení ho stahuje celý. Na několik let to stačí; pak archivovat
+  průběžné hodnoty uzavřených OFP (ponechat jen výsledný stav).
+- **Záloha** je ruční (JSON). Pro ostrý provoz placený tarif Supabase se zálohami, nebo pravidelný export.
 
 ## Soubory
 | Soubor | Co obsahuje |

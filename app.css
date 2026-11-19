@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.6.24"}
+:root{--etl-build:"0.7.0"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -535,6 +535,12 @@ table.ftl-duties td,table.ftl-tab td{vertical-align:top}
 .ak-key.on{background:var(--key-on);color:var(--key-on-ink);box-shadow:0 1px 0 rgba(0,0,0,.35)}
 .ak-key.on small{color:#3d5266}
 .ak-key.join{box-shadow:inset 0 0 0 2px var(--key-hi)}
+/* keys that open another keypad, not write a value: outlined */
+.ak-key.nav{background:transparent;box-shadow:inset 0 0 0 2px var(--key-muted)}
+.ak-key.nav:active{background:var(--key)}
+/* direct-to = magenta (as on the FMS), frequency = light blue */
+.ak-key.kdct{box-shadow:inset 0 0 0 2px #e85ad6}
+.ak-key.kfreq{box-shadow:inset 0 0 0 2px #7cc7ff}
 .ak-chip.on{background:var(--key-on);color:var(--key-on-ink)}
 .ak-ctx.r5{grid-template-rows:repeat(5,minmax(0,1fr))}
 .ak-ctx.r5 .ak-key{min-height:46px}

@@ -1,0 +1,48 @@
+eTechLog – změna Z-038
+Verze: 0.7.0 (navazuje na Z-037 / 0.6.24; obsahuje vše předchozí)
+Datum: 2026-11-19
+
+AUDIT A NOVÉ JÁDRO
+Hlavní nález: celý deník se při každé změně znovu ukládal a znovu přehrával. S daty za rok provozu (83 000 záznamů,
+28 MB) trvalo uložení jedné hodnoty v OFP 165 ms na stolním počítači (na iPadu řádově sekundu) a rostlo s každým letem.
+- Záznamy se ukládají po jednom řádku; uložení hodnoty je pod 1 ms a na délce deníku nezávisí.
+- Hodnota v OFP se promítne přímo, bez přehrání deníku (výsledek je stejný jako po celém přehrání – hlídá test).
+- Zařízení, které neukládá (plné úložiště), to ohlásí. Dřív by záznamy tiše zůstaly jen v paměti.
+- Hodiny zařízení se porovnávají se serverem; rozdíl přes 2 min aplikace ohlásí (pořadí záznamů se řídí hodinami).
+- Záznam s posunutým časem z jiného zařízení nic nerozbije (podepsaný let se neotevře, hodnoty OFP se neztratí).
+- Jedno okno aplikace na zařízení (dvě by si přepisovala frontu neodeslaných záznamů).
+- Záznam odmítnutý serverem neblokuje ostatní; dotaz bez odpovědi se po 30 s vzdá (dřív mohl zablokovat stahování).
+- Nová verze se nenačte uprostřed psaní; atis.js a ftl.js se vždy ověřují proti serveru (nemíchají se verze).
+- Předání mezi iPady přenáší i nastavení účtu. Seznam OFP ukazuje 40 nejnovějších, starší na tlačítko.
+
+NOVÉ
+- ATO bodů trati jen minutami: „40“ → 10:40. Hodina podle ETO bodu (ETO 11:01, napsáno 59 → 10:59; ETO 12:58,
+  napsáno 01 → 13:01). Celý čas jde psát dál.
+- Klávesnice ATIS: RVR, JEVY a STAV RWY jsou oddělené ve spodní řadě (obrys a šipka – otevírají jinou klávesnici).
+- ATC instrukce: DCT má magenta okraj, FREQ světle modrý.
+
+NÁVRAT NA 0.6.24 – JEN SE SIGNÁLEM
+- Nahrajte eatl-Z-037-v0.6.24.zip. 0.6 si deník stáhne ze serveru znovu a neodeslané záznamy odešle (vyzkoušeno).
+  Bez signálu by ukázala prázdný deník, dokud se nepřipojí.
+
+OTEVŘENÉ BODY (k rozhodnutí, podrobně v README → Omezení → Otevřené body po auditu)
+- Oprávnění hlídá jen aplikace, server přijme a vydá cokoli včetně otisků PINů – nutné před přístupem OPS / SM.
+- Testovací mazání vypnout před ostrým provozem. Čísla stránek ATL a závad se počítají z pořadí (zpětně doplněný
+  let je přečísluje). Deník roste ~30 MB za rok – za pár let archivace průběžných hodnot OFP. Záloha je ruční.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-038.txt) do kořene repozitáře eatl, VČETNĚ vercel.json a sw.js.
+  config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

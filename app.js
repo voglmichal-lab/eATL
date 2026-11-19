@@ -17,9 +17,22 @@ const MELDAYS={A:null,B:3,C:10,D:120};
 const DAILY={PRE:'Předletová prohlídka',DAILY:'Denní prohlídka',POST:'Poletová prohlídka'};
 const PER_PAGE=5;
 
+/* ---------- one window per device ---------- */
+// Two windows of the app on one device would each keep their own list of unsent records and overwrite each other's.
+// The first window holds a lock; a second one says so instead of starting (a reload may need a moment to free it).
+if(navigator.locks&&navigator.locks.request){
+  const tryLock=()=>new Promise(res=>{try{navigator.locks.request('etl-app',{ifAvailable:true},lock=>{res(!!lock);return lock?new Promise(()=>{}):undefined}).catch(()=>res(true))}catch(e){res(true)}});
+  let got=await tryLock();for(let i=0;i<12&&!got;i++){await new Promise(r=>setTimeout(r,150));got=await tryLock()}
+  if(!got){document.getElementById('app').innerHTML='<div class="wrap"><div class="center"><div class="empty"><h2>eTechLog je už otevřený v jiném okně</h2><p>Na jednom zařízení může běžet jen jednou, jinak by se mohly ztratit neodeslané záznamy. Zavřete druhé okno nebo záložku.</p><button class="btn primary" id="relock">Zkusit znovu</button></div></div></div>';
+    document.getElementById('relock').addEventListener('click',()=>location.reload());return}
+}
+
 /* ---------- storage (per device) ---------- */
 /* local store: IndexedDB (survives far better than localStorage on iPad), held in memory for synchronous reads */
-const KV={data:{},db:null,
+// A write that fails (storage full, private mode) must be seen: the pill and a warning line say so (storeFail).
+const idbOpen=(name,make)=>new Promise((res,rej)=>{const r=indexedDB.open(name,1);r.onupgradeneeded=()=>make(r.result);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);r.onblocked=()=>rej(new Error('blocked'))});
+function storeFail(e){const m=String(e&&(e.name||e.message)||e||'chyba úložiště');if(KV.fail)return;KV.fail=m;setTimeout(()=>{try{softRender()}catch(x){}},0)}
+const KV={data:{},db:null,fail:null,
   async init(){
     try{
       this.db=await new Promise((res,rej)=>{const r=indexedDB.open('etechlog',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
@@ -28,10 +41,19 @@ const KV={data:{},db:null,
     try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   },
   put(k,v){this.data[k]=v;
-    if(this.db){try{this.db.transaction('kv','readwrite').objectStore('kv').put(v,k);return}catch(e){}}
-    try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+    if(this.db){try{const t=this.db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.onabort=()=>storeFail(t.error);return}catch(e){storeFail(e)}}
+    try{localStorage.setItem(k,JSON.stringify(v))}catch(e){storeFail(e)}}
 };
-await KV.init();
+// Events live one per row in their own database: a new record costs one small write, however long the log is.
+// (Until 0.6 the whole log was one value, rewritten on every change – slower with every flight.)
+const EVS={db:null,
+  async init(){try{this.db=await idbOpen('etechlog-ev',d=>d.createObjectStore('ev',{keyPath:'id'}))}catch(e){this.db=null}},
+  tx(){try{return this.db.transaction('ev','readwrite',{durability:'strict'})}catch(e){return this.db.transaction('ev','readwrite')}},
+  all(){return new Promise((res,rej)=>{const r=this.db.transaction('ev').objectStore('ev').getAll();r.onsuccess=()=>{const o={};for(const e of r.result)o[e.id]=e;res(o)};r.onerror=()=>rej(r.error)})},
+  put(list){if(!list.length)return Promise.resolve();return new Promise(res=>{try{const t=this.tx(),st=t.objectStore('ev');for(const e of list)st.put(e);t.oncomplete=()=>res(true);t.onabort=()=>{storeFail(t.error);res(false)}}catch(e){storeFail(e);res(false)}})},
+  clear(){return new Promise(res=>{try{const t=this.tx();t.objectStore('ev').clear();t.oncomplete=()=>res();t.onabort=()=>res()}catch(e){res()}})}
+};
+await KV.init();await EVS.init();
 const store={get(k,d){return k in KV.data?KV.data[k]:d},set(k,v){KV.put(k,v)}};
 
 /* ---------- helpers ---------- */
@@ -65,24 +87,46 @@ function has(u,r){return !!(u&&Array.isArray(u.roles)&&u.roles.includes(r))}
 function withTimeout(p,ms){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout'}),ms))])}
 
 /* ---------- state ---------- */
-let EV=store.get('etl.ev',{});          // all known events (local replica)
+let EV={};                              // all known events (local replica)
 let OUT=store.get('etl.out',[]);        // event ids waiting to be sent
+// 'etl.ev' in the small store now holds only the unsent events (and whatever 0.6 or a test helper put there): it is
+// merged into the event store at start. Going back to 0.6 therefore loses nothing that was sent – 0.6 finds no cursor
+// and downloads the log again; the unsent events are in 'etl.ev' where it expects them.
+const CURK=EVS.db?'etl.cur2':'etl.cursor';
+if(EVS.db){
+  try{EV=await EVS.all()}catch(e){storeFail(e)}
+  const old=store.get('etl.ev',null),add=[];
+  if(old&&typeof old==='object')for(const id in old){const e=old[id];if(e&&e.id&&e.type&&!EV[e.id]){EV[e.id]=e;add.push(e)}}
+  let moved=true;if(add.length)moved=await EVS.put(add);
+  if(moved){const c1=store.get('etl.cursor',null),c2=store.get('etl.cur2',null);
+    if(c1){store.set('etl.cur2',!c2||c1>c2?c1:c2);store.set('etl.cursor',null)}
+    if(old&&Object.keys(old).some(id=>!OUT.includes(id)))store.set('etl.ev',Object.fromEntries(OUT.filter(id=>EV[id]).map(id=>[id,EV[id]])))}
+}else EV=store.get('etl.ev',{});
+let NEWEV=[],ORD=null,outSig=OUT.join();   // events not yet written; all events in order (kept while new ones only append)
+const evCmp=(a,b)=>a.at<b.at?-1:a.at>b.at?1:(a.dev&&a.dev===b.dev?(a.seq||0)-(b.seq||0):0)||((a.n||0)-(b.n||0))||(a.id<b.id?-1:a.id>b.id?1:0);
+function addEv(ev){EV[ev.id]=ev;NEWEV.push(ev);if(ORD){if(!ORD.length||evCmp(ORD[ORD.length-1],ev)<0)ORD.push(ev);else ORD=null}}
 let DEV=store.get('etl.dev',null); if(!DEV){DEV='dev-'+rid('x').slice(-8);store.set('etl.dev',DEV)}
 let SEQ=store.get('etl.seq',0);
 let SESSION=store.get('etl.session',null);
 let SIMOFF=store.get('etl.simoff',false);
 const UI={acId:store.get('etl.ac',null),tab:'log',page:null,defFilter:'active',loginUser:null,auditAll:false};
-const OFFREQ=['./','index.html','app.css','fonts.css','app.js','config.js','version.js','manifest.webmanifest','vendor/supabase.js','vendor/591.supabase.js','vendor/pdf.min.js','vendor/pdf.worker.min.js','vendor/qrcode.min.js','vendor/jsqr.min.js','vendor/pdf-lib.min.js','vendor/fontkit.min.js','fonts/pdf/barlow-400.ttf','fonts/pdf/barlow-600.ttf','fonts/pdf/plexmono-400.ttf','fonts/pdf/plexmono-600.ttf'];
+const OFFREQ=['./','index.html','app.css','fonts.css','app.js','ftl.js','atis.js','config.js','version.js','manifest.webmanifest','vendor/supabase.js','vendor/591.supabase.js','vendor/pdf.min.js','vendor/pdf.worker.min.js','vendor/qrcode.min.js','vendor/jsqr.min.js','vendor/pdf-lib.min.js','vendor/fontkit.min.js','fonts/pdf/barlow-400.ttf','fonts/pdf/barlow-600.ttf','fonts/pdf/plexmono-400.ttf','fonts/pdf/plexmono-600.ttf'];
 const off={ready:null,missing:[],checking:false};
-const net={state:'connecting',err:null,last:store.get('etl.last',null),flushing:false,slow:false,loaded:!!store.get('etl.cursor',null),email:null};
+const net={state:'connecting',err:null,last:store.get('etl.last',null),flushing:false,slow:false,loaded:!!store.get(CURK,null),email:null};
 let db=null,S=null,sheetSubmit=null,sheetLive=null,sbChan=null;
 
+const REJ=new Set();   // records the server refused in this run
 let BIND=store.get('etl.bind',null);   // this device is the iPad of this aircraft
 let CREW=store.get('etl.crew',null);   // who is logged in on this iPad (one person); crew of a flight is chosen per flight
 UI.office=store.get('etl.office',false);UI.crewView='today';UI.startPic=null;UI.startSic=null;
 UI.draft=(()=>{const d=store.get('etl.draft',null);return d&&d.ac===BIND&&d.d?d.d:{}})();
 
-function persist(){store.set('etl.ev',EV);store.set('etl.out',OUT);store.set('etl.seq',SEQ)}
+function persist(){
+  if(EVS.db){if(NEWEV.length)EVS.put(NEWEV);const sig=OUT.join();if(sig!==outSig){outSig=sig;store.set('etl.ev',Object.fromEntries(OUT.filter(id=>EV[id]).map(id=>[id,EV[id]])));store.set('etl.out',OUT)}}
+  else{store.set('etl.ev',EV);store.set('etl.out',OUT)}
+  NEWEV=[];if(store.get('etl.seq',0)!==SEQ)store.set('etl.seq',SEQ)}
+// what is waiting to be sent changed, the records did not: no need to replay the log
+function refreshOut(){if(!S)return;S.out=new Set(OUT);for(const ac of Object.values(S.ac))for(const pg of ac.pages||[])pg.pending=pg.legs.some(l=>S.out.has(l.ev))}
 function mode(){return UI.office?'office':'crew'}
 // Shared account (all iPads) → crew picks themselves and signs with PIN.
 // Personal account (web) → its e-mail matches a person in the log, who is signed in directly.
@@ -98,13 +142,13 @@ function saveDraft(){store.set('etl.draft',{ac:BIND,d:UI.draft})}
 /* ---------- event log ---------- */
 function emit(items,asId){
   const at=new Date().toISOString();const u=(asId&&S.users[asId])||me();
-  items.forEach(([type,p],i)=>{SEQ++;const ev={id:rid('ev'),type,p:JSON.parse(JSON.stringify(p)),at,n:i,by:u?u.id:'system',bn:u?u.name:'Systém',dev:DEV,seq:SEQ};EV[ev.id]=ev;OUT.push(ev.id)});
+  items.forEach(([type,p],i)=>{SEQ++;const ev={id:rid('ev'),type,p:JSON.parse(JSON.stringify(p)),at,n:i,by:u?u.id:'system',bn:u?u.name:'Systém',dev:DEV,seq:SEQ};addEv(ev);OUT.push(ev.id)});
   persist();rebuild();render();flush();
 }
 
 function rebuild(){
   // time, then for one device its own sequence (two records can share a millisecond), then the order inside one signature
-  const all=Object.values(EV).sort((a,b)=>a.at<b.at?-1:a.at>b.at?1:(a.dev&&a.dev===b.dev?(a.seq||0)-(b.seq||0):0)||((a.n||0)-(b.n||0))||(a.id<b.id?-1:1));
+  const all=ORD||(ORD=Object.values(EV).sort(evCmp));const pendFill={};
   // test mode: deleted records and everything before a reset are left out (the signatures stay in the log, so every device agrees)
   // a deletion covers only what existed before it: the same OFP uploaded again afterwards is a new record
   let cutAll=-1,cutOps=-1;const dead=new Map();
@@ -117,7 +161,8 @@ function rebuild(){
     switch(e.type){
       case 'ac.upsert':{const prev=s.ac[p.acId]||{};s.ac[p.acId]=Object.assign({},prev,p);if(p.live&&!prev.live)s.ac[p.acId].liveWho=who;break}
       case 'user.upsert':s.users[p.userId]=Object.assign({},s.users[p.userId]||{},p,{id:p.userId});break;
-      case 'leg.open':s.legs[p.legId]=Object.assign({},p,{state:'open',opened:who,signed:null,history:[],ev:e.id,openEv:e.id});break;
+      // a device with a slow clock can put the opening after the signature: a signed flight is never opened again
+      case 'leg.open':{const ex=s.legs[p.legId];if(ex&&ex.state==='closed'){ex.opened=who;ex.openEv=e.id;break}s.legs[p.legId]=Object.assign({},p,{state:'open',opened:who,signed:null,history:[],ev:e.id,openEv:e.id});break}
       case 'leg.sign':{const ex=s.legs[p.legId];s.legs[p.legId]=Object.assign({},ex||{},p,{state:'closed',signed:who,history:ex?ex.history:[],ev:e.id,openEv:ex?ex.openEv:null,opened:ex?ex.opened:null});break}
       case 'leg.amend':{const l=s.legs[p.legId];if(!l)break;const prev={};for(const k in p.changes)prev[k]=l[k];Object.assign(l,p.changes);l.history.push(Object.assign({},who,{reason:p.reason,changes:p.changes,prev}));break}
       case 'leg.void':{const l=s.legs[p.legId];if(l)l.void=Object.assign({},who,{reason:p.reason});break}
@@ -135,8 +180,10 @@ function rebuild(){
       case 'cfg.set':Object.assign(s.cfg,p);s.cfgSet=who;break;
       case 'user.prefs':{const x=s.users[p.userId],by=s.users[e.by];if(x&&p.prefs&&(e.by===p.userId||(by&&(by.roles||[]).includes('admin'))))x.prefs=Object.assign({},x.prefs||{},p.prefs);break}
       case 'crew.login':{const k=p.acId+'|'+p.date;const a=s.logins[k]||(s.logins[k]=[]);if(e.by&&!a.includes(e.by))a.push(e.by);s.loginEv.push(Object.assign({acId:p.acId,date:p.date},who));break}
-      case 'ofp.import':if(!s.ofps[p.ofpId])s.ofps[p.ofpId]=Object.assign({},p.data,{ofpId:p.ofpId,acId:p.acId,file:p.file,imported:who,fill:{},defs:p.defs||null,signed:null,void:null});break;
-      case 'ofp.fill':{const o=s.ofps[p.ofpId];if(o)Object.assign(o.fill,p.data);break}
+      case 'ofp.import':if(!s.ofps[p.ofpId]){const o=s.ofps[p.ofpId]=Object.assign({},p.data,{ofpId:p.ofpId,acId:p.acId,file:p.file,imported:who,fill:{},defs:p.defs||null,signed:null,void:null});
+        for(const d of pendFill[p.ofpId]||[])Object.assign(o.fill,d);delete pendFill[p.ofpId]}break;
+      // values typed on another device whose clock is behind the upload are kept for the OFP, not dropped
+      case 'ofp.fill':{const o=s.ofps[p.ofpId];if(o)Object.assign(o.fill,p.data);else(pendFill[p.ofpId]=pendFill[p.ofpId]||[]).push(p.data);break}
       case 'ofp.sign':{const o=s.ofps[p.ofpId];if(o&&!o.signed)o.signed=who;break}
       case 'ofp.void':{const o=s.ofps[p.ofpId];if(o)o.void=Object.assign({},who,{reason:p.reason});break}
       case 'ofp.close':{const o=s.ofps[p.ofpId];if(o){o.closed=who;o.missing=p.missing||[];if(p.defs&&!o.defs)o.defs=p.defs}break}
@@ -197,7 +244,7 @@ function deriveAc(s,ac){
   const lastC=[...s.crs].reverse().find(c=>c.acId===ac.acId);
   const grounded=lastG&&(!lastC||lastC.at<lastG.at)?lastG:null;
   ac.ofps=Object.values(s.ofps).filter(o=>o.acId===ac.acId).sort((a,b)=>(a.date+a.std)<(b.date+b.std)?-1:1);
-  for(const o of ac.ofps)o.leg=legs.find(l=>l.ofpId===o.ofpId&&!l.void)||null;
+  {const legOf={};for(const l of legs)if(l.ofpId&&!l.void&&!legOf[l.ofpId])legOf[l.ofpId]=l;for(const o of ac.ofps)o.leg=legOf[o.ofpId]||null}
   const openLegs=legs.filter(l=>l.state==='open'&&!l.void);
   const openLeg=openLegs[openLegs.length-1]||null;
   ac.openLegs=openLegs;
@@ -207,7 +254,7 @@ function deriveAc(s,ac){
   let prevArr='';
   for(const l of flown){
     const dep=new Date(new Date(legDepIso(l)).getTime()+5*60e3).toISOString();
-    if(!l.sec){const c=secs.filter(x=>x.at>prevArr&&x.at<=dep);const x=c[c.length-1];if(x)l.sec={time:x.time,place:x.from,result:x.result,notes:x.notes,byName:x.name,ev:x.ev}}
+    if(!l.sec){let lo=0,hi=secs.length;while(lo<hi){const m=(lo+hi)>>1;if(secs[m].at<=dep)lo=m+1;else hi=m}const x=lo>0&&secs[lo-1].at>prevArr?secs[lo-1]:null;if(x)l.sec={time:x.time,place:x.from,result:x.result,notes:x.notes,byName:x.name,ev:x.ev}}
     prevArr=legArrIso(l);
   }
   const ps=[...secs].reverse().find(x=>x.at>prevArr);
@@ -239,7 +286,7 @@ function hadSession(){try{return !!localStorage.getItem('etl.sb.auth')}catch(e){
 async function ensureSession(){
   if(!db||net.checking)return;net.checking=true;
   try{
-    const {data,error}=await db.auth.getSession();
+    const {data,error}=await withTimeout(db.auth.getSession(),15000);
     if(data&&data.session){net.email=data.session.user.email;if(!sbChan)startSync();else{pull();flush()}return}
     const retry=error&&(error.name==='AuthRetryableFetchError'||error.status===0||/fetch|network/i.test(String(error.message)));
     if(hadSession()&&(retry||navigator.onLine===false)){net.state='nosignal';net.err=null}
@@ -267,6 +314,8 @@ async function checkOffline(){
 }
 function cssMismatch(){try{const v2=getComputedStyle(document.documentElement).getPropertyValue('--etl-build').replace(/["'\s]/g,'');return v2!==String(window.ETL_VERSION||'')?(v2||'neznámá'):null}catch(e){return null}}
 function offlineNote(){
+  if(KV.fail)return `<div class="warnline warn wrap"><b>Zařízení neukládá záznamy</b> (${esc(KV.fail)}). Nezavírejte aplikaci, připojte se k síti a počkejte na „Synchronizováno“ – záznamy se tím uloží na server. Pak uvolněte místo v zařízení a aplikaci otevřete znovu.</div>`;
+  if(net.skew)return `<div class="warnline warn wrap"><b>Hodiny tohoto zařízení jdou o ${Math.abs(net.skew)} min ${net.skew>0?'napřed':'pozadu'}.</b> Časy podpisů a pořadí záznamů by byly chybně. Zapněte v nastavení zařízení automatické nastavení data a času.</div>`;
   if(!self.ETL_ATIS)return `<div class="warnline warn wrap"><b>Neúplná aktualizace.</b> Chybí soubor atis.js (zápis ATIS a clearance). Nahrajte na server všechny soubory z posledního zipu.</div>`;
   if(!self.ETL_FTL)return `<div class="warnline warn wrap"><b>Neúplná aktualizace.</b> Chybí soubor ftl.js (výpočet doby služby). Nahrajte na server všechny soubory z posledního zipu.</div>`;
   const cm=cssMismatch();if(cm)return `<div class="warnline warn wrap"><b>Neúplná aktualizace.</b> Vzhled (app.css) je z verze ${esc(cm)}, aplikace z verze ${esc(window.ETL_VERSION||'')}. Nahrajte na server všechny soubory z posledního zipu.</div>`;
@@ -283,44 +332,65 @@ function startSync(){
   pull().then(flush);
 }
 function merge(rows){
-  let changed=false,cur=store.get('etl.cursor',null);
+  let sent=false,cur=store.get(CURK,null);const cur0=cur,fresh=[];let inOrder=!!ORD;
   for(const r of rows){
     if(!r||!r.id||!r.type)continue;
-    if(!EV[r.id]){EV[r.id]=fromRow(r);changed=true}
-    if(OUT.includes(r.id)){OUT=OUT.filter(x=>x!==r.id);changed=true}
+    if(!EV[r.id]){const ev=fromRow(r);addEv(ev);fresh.push(ev);if(!ORD)inOrder=false}
+    if(OUT.includes(r.id)){OUT=OUT.filter(x=>x!==r.id);sent=true}
     if(r.created_at&&(!cur||r.created_at>cur))cur=r.created_at;
   }
-  if(cur)store.set('etl.cursor',cur);
-  if(changed){persist();rebuild();softRender()}else renderPill();
+  if(cur&&cur!==cur0)store.set(CURK,cur);
+  if(fresh.length){persist();
+    // values typed into an OFP on another device, newer than everything here: applied directly
+    if(inOrder&&S&&fresh.every(e=>e.type==='ofp.fill')){for(const e of fresh){const o=S.ofps[e.p.ofpId];if(o)Object.assign(o.fill,e.p.data);S.list.push(e)}refreshOut()}
+    else rebuild();softRender()}
+  else if(sent){persist();refreshOut();softRender()}else renderPill();
 }
 async function pull(){
   if(!db||SIMOFF||net.pulling)return;net.pulling=true;
   try{
     // overlap 2 min behind the cursor so rows committed out of order are not missed; duplicates are ignored by id
-    const cur=store.get('etl.cursor',null);const since=cur?new Date(new Date(cur).getTime()-120e3).toISOString():null;
+    const cur=store.get(CURK,null);const since=cur?new Date(new Date(cur).getTime()-120e3).toISOString():null;
     for(let from=0;;from+=PAGE){
       let q=db.from('events').select('*').order('created_at',{ascending:true}).order('id',{ascending:true}).range(from,from+PAGE-1);
       if(since)q=q.gte('created_at',since);
-      const {data,error}=await q;if(error)throw error;
+      const {data,error}=await withTimeout(q,30000);if(error)throw error;   // a request that never answers must not block the next ones
       merge(data||[]);if(!data||data.length<PAGE)break;
     }
     net.loaded=true;net.state='live';net.err=null;net.last=Date.now();store.set('etl.last',net.last);
-  }catch(e){net.err=sbErr(e);net.state=/vypršelo/.test(net.err)?'auth':navigator.onLine===false||/není dostupný/.test(net.err)?'nosignal':'error'}
+  }catch(e){net.err=e&&e.code==='timeout'?'Server není dostupný.':sbErr(e);net.state=/vypršelo/.test(net.err)?'auth':navigator.onLine===false||/není dostupný/.test(net.err)?'nosignal':'error'}
   finally{net.pulling=false;softRender()}
 }
 async function flush(){
   if(net.flushing||!db||net.state==='auth'||SIMOFF||!OUT.length||navigator.onLine===false)return;
+  if(OUT.some(id=>!EV[id])){OUT=OUT.filter(id=>EV[id]);persist();if(!OUT.length){refreshOut();renderPill();return}}   // ids without a record would wait for ever
   net.flushing=true;renderPill();
   try{
-    for(let i=0;i<OUT.length;i+=200){
-      const ids=OUT.slice(i,i+200).filter(id=>EV[id]);if(!ids.length)continue;
-      const {error}=await withTimeout(db.from('events').upsert(ids.map(id=>toRow(EV[id])),{onConflict:'id',ignoreDuplicates:true}),20000);
-      if(error)throw error;
-      OUT=OUT.filter(x=>!ids.includes(x));i-=ids.length;net.last=Date.now();store.set('etl.last',net.last);net.err=null;persist();
+    const send=ids=>withTimeout(db.from('events').upsert(ids.map(id=>toRow(EV[id])),{onConflict:'id',ignoreDuplicates:true}),20000);
+    const done=ids=>{const st=new Set(ids);OUT=OUT.filter(x=>!st.has(x));net.last=Date.now();store.set('etl.last',net.last);persist()};
+    net.err=null;
+    for(;;){
+      const ids=OUT.filter(id=>!REJ.has(id)).slice(0,200);if(!ids.length)break;
+      const {error}=await send(ids);
+      if(!error){done(ids);continue}
+      // the server refused the batch: one record it will never take must not hold back all the others –
+      // send them one by one, set the refused ones aside (they stay in the device and are tried again after a restart)
+      if(!/^(22|23|42|PGRST1|PGRST2)/.test(String(error.code||''))||/42501/.test(String(error.code||'')))throw error;
+      for(const id of ids){const r=await send([id]);if(!r.error)done([id]);else{REJ.add(id);net.rej=sbErr(r.error)}}
     }
+    if(REJ.size)net.err=`Server odmítl ${REJ.size} záznam${REJ.size>1?'ů':''}: ${net.rej||''}`;
   }catch(e){net.err=e&&e.code==='timeout'?'Server neodpověděl včas.':sbErr(e);if(/vypršelo/.test(net.err))net.state='auth'}
-  finally{net.flushing=false;rebuild();softRender()}
+  finally{net.flushing=false;refreshOut();softRender()}
 }
+// the order of records and the times of signatures come from the clock of the device: compare it with the server
+// (Date header of a small request) at start and then hourly, and say so when it is more than two minutes off
+async function checkClock(){
+  if(!db||navigator.onLine===false||SIMOFF)return;
+  try{const t0=Date.now();const r=await withTimeout(fetch('version.js?clock='+t0,{method:'HEAD',cache:'no-store'}),8000);const d=r&&r.headers&&r.headers.get('date');if(!d)return;
+    const srv=new Date(d).getTime();if(isNaN(srv))return;const t1=Date.now();if(t1-t0>5000)return;
+    const skew=Math.round(((t0+t1)/2-srv)/60000);const was=net.skew||0;net.skew=Math.abs(skew)>=2?skew:0;if(was!==net.skew)softRender()}catch(e){}
+}
+setTimeout(checkClock,5000);setInterval(checkClock,3600e3);
 function resume(){if(!db)return;if(net.state==='nosignal'||!sbChan)ensureSession();else if(net.state!=='auth'){pull();flush()}}
 window.addEventListener('online',()=>{renderPill();resume()});
 window.addEventListener('offline',renderPill);
@@ -341,6 +411,8 @@ function renderDeviceLogin(){
 }
 function syncInfo(){
   const n=OUT.length;const q=n?` · ${n} čeká`:'';
+  if(KV.fail)return {cls:'warn',t:'Zařízení neukládá'+q};
+  if(REJ.size&&navigator.onLine!==false&&net.state==='live')return {cls:'warn',t:`Chyba synchronizace · server odmítl ${REJ.size}`};
   if(SIMOFF)return {cls:'caution',t:'Offline (simulace)'+q};
   if(navigator.onLine===false)return {cls:'caution',t:'Offline'+q};
   if(net.state==='auth')return {cls:'warn',t:'Zařízení není přihlášené'+q};
@@ -848,7 +920,8 @@ function openDevWipe(){
     ${n?`<div class="warnline warn"><b>${n} záznamů z tohoto zařízení ještě není odeslaných</b> – smazáním se ztratí.</div>`:'<div class="warnline ok">Vše z tohoto zařízení je odeslané.</div>'}
     ${db?'':'<div class="warnline caution">Zařízení není napojené na databázi – data se nebudou mít odkud stáhnout.</div>'}${confirmField()}`,
     {submit:'Vymazat toto zařízení',sign:true,onSubmit:async()=>{confirmOk();await checkPin();
-      for(const k of ['etl.ev','etl.out','etl.cursor','etl.session','etl.crew','etl.bind','etl.draft','etl.ac'])store.set(k,k==='etl.ev'?{}:k==='etl.out'?[]:k==='etl.draft'?{}:null);
+      for(const k of ['etl.ev','etl.out','etl.cursor','etl.cur2','etl.session','etl.crew','etl.bind','etl.draft','etl.ac'])store.set(k,k==='etl.ev'?{}:k==='etl.out'?[]:k==='etl.draft'?{}:null);
+      if(EVS.db)await EVS.clear();
       closeSheet();setTimeout(()=>location.reload(),300)}});
 }
 /* paper ATL pages transcribed into the e-log (with the paper page number, crew, times and the transition point).
@@ -1157,6 +1230,19 @@ function noteBtn(o,key,wpt,LK){const t=ofpVal(o,key);
 // ATC instructions in flight: the row "TEĎ" sits after the point flown last (by ATO, or by ETO when ATO is missing);
 // what is written there goes to that point's note with the UTC time
 function nowRow(o,key,wpt,label,cols){return `<tr class="nowrow"><td colspan="${cols}"><div class="nowin"><span class="nowtag">▶ TEĎ</span><span class="mono">${esc(label)}</span><button type="button" class="btn sm primary" data-act="ofp-atc" data-id="${esc(o.ofpId)}|${esc(key)}|${esc(wpt)}|${esc(label)}">+ ATC instrukce</button><span class="muted">zapíše se k ${esc(wpt)} s časem UTC</span></div></td></tr>`}
+// ATO typed as minutes only, like on paper ("40"): the hour comes from the ETO of that point – the time with those
+// minutes nearest to it (ETO 11:01, typed 59 → 10:59; ETO 12:58, typed 01 → 13:01). Without an ETO: the first such
+// time after the previous ATO (or the takeoff), and with nothing to go by the one nearest to now.
+function atoFromMin(o,key,mm,el){
+  if(!o||!(mm>=0&&mm<=59))return null;const fmt=t=>{t=((t%1440)+1440)%1440;return pad(Math.floor(t/60))+':'+pad(t%60)};
+  const near=ref=>{let best=null;for(const h of [-1,0,1]){const t=(Math.floor(ref/60)+h)*60+mm;if(best==null||Math.abs(t-ref)<Math.abs(best-ref))best=t}return fmt(best)};
+  const after=ref=>{let t=Math.floor(ref/60)*60+mm;if(t<ref)t+=60;return fmt(t)};
+  const m=/^w(\d+)_ato$/.exec(key);
+  if(m){const {W,etoAdj,atd}=ofpCalc(o);const i=+m[1];const eto=W[i]?parseHM(etoAdj(W[i].tAcc,i)):null;if(eto!=null)return near(eto);
+    let prev=atd;for(let k=0;k<i;k++){const a=parseHM(ofpVal(o,'w'+k+'_ato'));if(a!=null&&W[k]&&!W[k].rvsm)prev=a}if(prev!=null)return after(prev)}
+  else if(el){const tb=el.closest('tbody');const ins=tb?[...tb.querySelectorAll('input[data-of$="_ato"]')]:[];let prev=null;for(const x of ins){if(x===el)break;const a=parseHM(x.value);if(a!=null)prev=a}
+    if(prev==null)prev=parseHM(ofpVal(o,'dv_start'));if(prev!=null)return after(prev)}
+  return near(parseHM(nowHM()))}
 function ofpLanded(o){const l=o.leg;return !!(l&&l.state==='closed')||parseHM(ofpVal(o,'x_on'))!=null}
 // points ahead of a note, offered after DCT on the keypad
 function atcPts(o,key){if(!o)return [];let m=/^w(\d+)_note$/.exec(key);const ok=p=>p&&p.wpt&&!p.rvsm&&!/^TO[CD]$/.test(p.wpt);
@@ -1242,7 +1328,10 @@ function ofpOver(o){const out=[];for(const [k,lb,n] of OFP_FIELDS){if(!n)continu
 function ofpFlush(){
   const d=UI.ofpDirty;clearTimeout(ofpFlush.t);if(!d||!Object.keys(d.data).length)return;UI.ofpDirty=null;
   SEQ++;const u=me();const ev={id:rid('ev'),type:'ofp.fill',p:{ofpId:d.id,data:d.data},at:new Date().toISOString(),n:0,by:u?u.id:'system',bn:u?u.name:'Systém',dev:DEV,seq:SEQ};
-  EV[ev.id]=ev;OUT.push(ev.id);persist();rebuild();softRender();flush();
+  addEv(ev);OUT.push(ev.id);persist();
+  // the newest record, on an OFP that is here: applied directly instead of replaying the whole log
+  const o=S.ofps[d.id];if(ORD&&ORD[ORD.length-1]===ev&&o){Object.assign(o.fill,d.data);S.list.push(ev);S.out.add(ev.id)}else rebuild();
+  softRender();flush();
 }
 function ofpSet(id,k,val){const oo=ofpOf(id);if(oo&&(oo.closed||oo.void))return;if(!UI.ofpDirty||UI.ofpDirty.id!==id){ofpFlush();UI.ofpDirty={id,data:{}}}UI.ofpDirty.data[k]=val;clearTimeout(ofpFlush.t);ofpFlush.t=setTimeout(ofpFlush,2500)}
 window.addEventListener('pagehide',()=>{try{ofpFlush()}catch(e){}});
@@ -1250,11 +1339,13 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 
 function ofpStatus(o){if(o.void)return ['mute','zrušeno'];if(o.closed)return ['ok','uzavřeno'];if(o.leg&&o.leg.state==='closed')return ['ok','let uzavřen'];if(o.leg)return ['info','let probíhá'];return ['caution','plánováno']}
 function viewOfpList(ac){
-  const list=[...(ac.ofps||[])].reverse();
+  // the newest 40; older ones on request (the list grows by hundreds a year)
+  const allO=[...(ac.ofps||[])].reverse();const list=UI.ofpAll?allO:allO.slice(0,40);const more=allO.length-list.length;
   return `<div class="panel"><div class="panel-head"><div><p class="label">Elektronické OFP</p><h2>${esc(ac.reg)}</h2></div><div class="chips"><button class="btn primary" data-act="ofp-pick">${ICON.plus}Nahrát OFP (PDF)</button></div></div>
     <input type="file" id="ofp-file" accept="application/pdf,.pdf" hidden>
     ${list.length?`<div class="sres">${list.map(o=>{const [c,t]=ofpStatus(o);return `<button type="button" data-act="ofp-open" data-id="${esc(o.ofpId)}"><span class="k">${esc(o.flt)}</span><span>${esc(o.dep)} → ${esc(o.des)} · ${ofpDateTxt(o)} · STD ${esc(o.std)}Z <span class="ann ${c}" style="font-size:.66rem">${t}</span>${o.signed?' <span class="ann ok" style="font-size:.66rem">podepsáno</span>':''}</span><span class="d">OFP ${esc(o.ofpId)} · MREQ ${fmtN(o.fuel.rampMreq)} lbs · trip ${fmtN(o.fuel.trip&&o.fuel.trip.fuel)} lbs · ${esc(o.cmd||'')}</span></button>`}).join('')}</div>`
-    :'<div class="empty"><p>Zatím žádné OFP. Nahrajte PDF z NAVsystemu – jeden soubor může obsahovat všechny lety dne.</p></div>'}</div>`;
+    :'<div class="empty"><p>Zatím žádné OFP. Nahrajte PDF z NAVsystemu – jeden soubor může obsahovat všechny lety dne.</p></div>'}
+    ${more>0?`<div class="chips" style="margin-top:10px"><button type="button" class="btn" data-act="ofp-all">Zobrazit i starší (${more})</button></div>`:''}</div>`;
 }
 function plannedOfps(ac){const lim=addDays(todayISO(),-7);return (ac.ofps||[]).filter(o=>!o.void&&!o.leg&&o.date>=lim)}
 function ofpIn(o,k,label,opt){opt=opt||{};const val=ofpVal(o,k);if(o.closed||o.void)opt.ro=true;
@@ -2868,7 +2959,7 @@ function openGoLive(acId){
    The package is a set of signed records. Records only ever get added and each has its own id,
    so taking over the same data twice, or in both directions, never duplicates or overwrites anything.
    Records taken over are queued for upload here too: whichever iPad gets signal first sends them. */
-const HO_TYPES=new Set(['leg.split','rec.del','rec.reset','crs.prep','crs.prep.drop','oil.add','crew.login','user.upsert','ac.upsert','cfg.set','leg.open','leg.sign','leg.amend','leg.void','defect.report','defect.defer','defect.rectify','crs.issue','ac.ground','daily.sign','sec.sign','ofp.import','ofp.fill','ofp.sign','ofp.void','ofp.close','ofp.reopen']);
+const HO_TYPES=new Set(['user.prefs','leg.split','rec.del','rec.reset','crs.prep','crs.prep.drop','oil.add','crew.login','user.upsert','ac.upsert','cfg.set','leg.open','leg.sign','leg.amend','leg.void','defect.report','defect.defer','defect.rectify','crs.issue','ac.ground','daily.sign','sec.sign','ofp.import','ofp.fill','ofp.sign','ofp.void','ofp.close','ofp.reopen']);
 const HO_HOURS=36,HO_CHUNK=900;
 let hoRun=null;
 function hoAcId(){return mode()==='crew'?BIND:UI.acId}
@@ -2896,7 +2987,7 @@ function hoMerge(pkg){
   for(const e of pkg.ev){
     if(!e||typeof e.id!=='string'||!HO_TYPES.has(e.type)||typeof e.at!=='string'||!e.p||typeof e.p!=='object')continue;
     if(EV[e.id])continue;
-    EV[e.id]={id:e.id,type:e.type,p:e.p,at:e.at,n:+e.n||0,by:e.by,bn:e.bn,dev:e.dev,seq:+e.seq||0};OUT.push(e.id);added++;
+    addEv({id:e.id,type:e.type,p:e.p,at:e.at,n:+e.n||0,by:e.by,bn:e.bn,dev:e.dev,seq:+e.seq||0});OUT.push(e.id);added++;
   }
   if(added){persist();rebuild();render();flush()}
   return {added,total:pkg.ev.length,reg:pkg.reg||''};
@@ -3119,7 +3210,7 @@ function exportJson(){
 function importJson(file){
   const r=new FileReader();
   r.onload=()=>{try{const d=JSON.parse(r.result);if(d.format!=='silesia-etechlog-backup'||!Array.isArray(d.events))throw 0;let n=0;
-    for(const e of d.events){if(e&&e.id&&e.type&&!EV[e.id]){EV[e.id]=e;OUT.push(e.id);n++}}
+    for(const e of d.events){if(e&&typeof e.id==='string'&&typeof e.type==='string'&&typeof e.at==='string'&&e.p&&typeof e.p==='object'&&!EV[e.id]){addEv({id:e.id,type:e.type,p:e.p,at:e.at,n:+e.n||0,by:e.by,bn:e.bn,dev:e.dev,seq:+e.seq||0});OUT.push(e.id);n++}}
     persist();rebuild();render();flush();toast(n?`Obnoveno ${n} záznamů`:'Záloha neobsahuje nic nového');
   }catch(e){toast('Soubor není záloha eTechLogu')}};
   r.readAsText(file);
@@ -3201,6 +3292,7 @@ document.addEventListener('click',e=>{
     case 'ftl-user':UI.ftlUser=id||null;UI.ftlPer=UI.ftlPer||'28';render();window.scrollTo(0,0);break;
     case 'ftl-per':UI.ftlPer=id;render();break;
     case 'ftl-export':exportFtl();break;
+    case 'ofp-all':UI.ofpAll=true;render();break;
     case 'ofp-note':{const [oid,key,...w]=id.split('|');const wp=w.join('|');if(self.ETL_ATIS&&ETL_ATIS.openAtc){ETL_ATIS.openAtc(oid,key,wp,atcPts(ofpOf(oid),key),wp);break}openNoteEditor(oid,key,wp);break}
     case 'ofp-atc':{const [oid,key,wp,...lb]=id.split('|');if(self.ETL_ATIS&&ETL_ATIS.openAtc)ETL_ATIS.openAtc(oid,key,lb.join('|'),atcPts(ofpOf(oid),key),wp);else openNoteEditor(oid,key,wp);break}
     case 'note-tab':case 'note-fl':case 'note-add':case 'note-del':noteAction(act,id);break;
@@ -3325,7 +3417,9 @@ document.addEventListener('focusout',e=>{
   const t=e.target;
   if(t.classList&&t.classList.contains('t-hm')&&t.value){t.value=normHM(t.value);t.classList.toggle('bad',parseHM(t.value)==null);if(sheetLive)sheetLive()}
   if(t.classList&&t.classList.contains('t-date')&&t.value){const d=parseDate(t.value);t.classList.toggle('bad',!d);if(d){t.value=fmtDate(d);if(t.dataset.k){UI.draft[t.dataset.k]=t.value;saveDraft()}}}
-  if(t.classList&&t.classList.contains('t4')&&t.value){const n=normHM(t.value);t.value=n;t.classList.toggle('bad',parseHM(n)==null);if(t.dataset.k){UI.draft[t.dataset.k]=n;saveDraft();crewLive()}else if(t.dataset.of){const c=t.closest('[data-ofp]');if(c)ofpSet(c.dataset.ofp,t.dataset.of,n)}else if(sheetLive)sheetLive()}
+  if(t.classList&&t.classList.contains('t4')&&t.value){let n=normHM(t.value);
+    if(t.dataset.of&&/_ato$/.test(t.dataset.of)&&/^\d{1,2}$/.test(t.value.trim())){const c=t.closest('[data-ofp]');const full=c&&atoFromMin(ofpOf(c.dataset.ofp),t.dataset.of,+t.value,t);if(full)n=full}
+    t.value=n;t.classList.toggle('bad',parseHM(n)==null);if(t.dataset.k){UI.draft[t.dataset.k]=n;saveDraft();crewLive()}else if(t.dataset.of){const c=t.closest('[data-ofp]');if(c)ofpSet(c.dataset.ofp,t.dataset.of,n)}else if(sheetLive)sheetLive()}
   if(renderPending)setTimeout(()=>{if(renderPending)softRender()},60);
 });
 // Enter in an ordinary field goes to the next one (the iPad keyboard says "další"/next); after the last field of a form
@@ -3371,7 +3465,7 @@ document.addEventListener('submit',async e=>{
     if(name.length<3||!/^\d{4,6}$/.test(pin)){err.textContent='Vyplňte jméno a PIN o 4–6 číslicích.';err.hidden=false;return}
     const userId=rid('usr');const pinHash=await sha(userId+':'+pin);
     SEQ++;const ev={id:rid('ev'),type:'user.upsert',p:{userId,name,roles:['admin','camo','crew'],licence:'',pinHash,active:true},at:new Date().toISOString(),n:0,by:userId,bn:name,dev:DEV,seq:SEQ};
-    EV[ev.id]=ev;OUT.push(ev.id);SESSION={userId,at:Date.now()};store.set('etl.session',SESSION);setOffice(true);persist();rebuild();UI.tab='setup';render();flush();
+    addEv(ev);OUT.push(ev.id);SESSION={userId,at:Date.now()};store.set('etl.session',SESSION);setOffice(true);persist();rebuild();UI.tab='setup';render();flush();
   }
 });
 
