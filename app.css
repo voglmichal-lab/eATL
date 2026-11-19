@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.6.15"}
+:root{--etl-build:"0.6.17"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -15,7 +15,7 @@ html,body{overscroll-behavior-y:none}
   --band:#13202c; --band-ink:#e9eff5; --band-muted:#9fb1c2;
   --shadow:0 1px 2px rgba(20,33,45,.06),0 6px 24px rgba(20,33,45,.08);
   --s1:#2a78d6; --s2:#eb6834;
-  --dock:#1b2834; --key:#2c3b49; --key-2:#23313d; --key-ink:#eef3f8; --key-muted:#a9b9c8; --key-hi:#3f73b4; --key-ok:#1f7a4d;
+  --dock:#1b2834; --key:#2c3b49; --key-2:#23313d; --key-ink:#eef3f8; --key-muted:#a9b9c8; --key-hi:#3f73b4; --key-ok:#1f7a4d; --key-on:#f2f6fa; --key-on-ink:#10202e;
   --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
   --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
@@ -27,7 +27,7 @@ html,body{overscroll-behavior-y:none}
   --band:#0a0f14; --band-ink:#e4ebf2; --band-muted:#8a9bab;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 28px rgba(0,0,0,.35);
   --s1:#3987e5; --s2:#d95926;
-  --dock:#0b1117; --key:#1f2b37; --key-2:#18222c; --key-ink:#e4ebf2; --key-muted:#93a4b5; --key-hi:#2f5f9c; --key-ok:#1c6b45;
+  --dock:#0b1117; --key:#1f2b37; --key-2:#18222c; --key-ink:#e4ebf2; --key-muted:#93a4b5; --key-hi:#2f5f9c; --key-ok:#1c6b45; --key-on:#dfe8f1; --key-on-ink:#0b1622;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0d1319; --surface:#141c24; --surface-2:#19232d; --ink:#e4ebf2; --muted:#93a4b5; --line:#26333f; --line-strong:#3b4c5c;
@@ -36,7 +36,7 @@ html,body{overscroll-behavior-y:none}
   --band:#0a0f14; --band-ink:#e4ebf2; --band-muted:#8a9bab;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 28px rgba(0,0,0,.35);
   --s1:#3987e5; --s2:#d95926;
-  --dock:#0b1117; --key:#1f2b37; --key-2:#18222c; --key-ink:#e4ebf2; --key-muted:#93a4b5; --key-hi:#2f5f9c; --key-ok:#1c6b45;
+  --dock:#0b1117; --key:#1f2b37; --key-2:#18222c; --key-ink:#e4ebf2; --key-muted:#93a4b5; --key-hi:#2f5f9c; --key-ok:#1c6b45; --key-on:#dfe8f1; --key-on-ink:#0b1622;
   color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
@@ -314,6 +314,17 @@ table.ofplog .ofp-notebtn span{background:var(--surface-2);border-radius:4px;pad
 table.ofplog .ofp-notebtn:disabled{cursor:default;border-style:solid;opacity:.85}
 table.ofplog tr.skip td{color:var(--muted);text-decoration:line-through;background:var(--surface-2)}
 table.ofplog tr.skip td:first-child,table.ofplog tr.skip td:last-child{text-decoration:none}
+/* a skipped point (direct): its name is struck, the instructions written at it stay readable – they were given */
+table.ofplog tr.skip td:nth-child(2){text-decoration:none}
+table.ofplog tr.skip td:nth-child(2)>b,table.ofplog tr.skip td:nth-child(2)>span{text-decoration:line-through}
+table.ofplog .ofp-notebtn span i{font-style:normal;font-weight:500;color:var(--muted);margin-right:5px}
+table.ofplog .ofp-notebtn.editing{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+/* where the aircraft is now: instructions from ATC go to this leg */
+table.ofplog tr.nowrow td{padding:6px 8px;background:var(--accent-soft);border-top:2px solid var(--accent);border-bottom:2px solid var(--accent)}
+.nowin{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap}
+.nowtag{font-family:var(--f-display);font-weight:700;letter-spacing:.08em;color:var(--accent);font-size:.82rem}
+.nowin .mono{font-weight:600}
+.nowin .muted{font-size:.82rem}
 table.ofplog td{vertical-align:middle}
 table.ofplog input{min-height:40px;padding:4px 6px;font-family:var(--f-mono);font-size:.95rem;text-align:center}
 table.ofplog input.ofp-t{width:76px;font-size:.95rem;min-height:40px;letter-spacing:0}
@@ -515,6 +526,15 @@ table.ftl-duties td,table.ftl-tab td{vertical-align:top}
 .ak-key.sm{font-size:1rem;letter-spacing:.02em}
 .ak-key.s2{grid-column:span 2}
 .ak-key.hl{box-shadow:inset 0 0 0 2px var(--key-hi);background:var(--key-2)}
+/* lit = what is set now (the wind has gusts, the last layer is BKN), like a shift key that is on */
+.ak-key.on{background:var(--key-on);color:var(--key-on-ink);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+.ak-key.on small{color:#3d5266}
+.ak-chip.on{background:var(--key-on);color:var(--key-on-ink)}
+.ak-ctx.r5{grid-template-rows:repeat(5,minmax(0,1fr))}
+.ak-ctx.r5 .ak-key{min-height:46px}
+.ak-ent{display:inline-flex;align-items:center;gap:2px;min-height:38px;padding:0 2px 0 12px;border-radius:999px;background:var(--key-2);font-family:var(--f-mono);font-size:.95rem;font-weight:600}
+.ak-ent button{min-width:36px;min-height:36px;border:0;background:transparent;color:var(--key-muted);font-size:1.25rem;cursor:pointer;touch-action:manipulation}
+.ak-slot .sv.svwrap{white-space:normal;overflow-wrap:break-word}
 .ak-key.nx{background:var(--key-hi)}
 .ak-key.okk{background:var(--key-ok)}
 .ak-key.bk{font-family:var(--f-body);font-size:1.9rem}

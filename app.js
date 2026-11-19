@@ -1148,9 +1148,25 @@ function ofpOf(id){return S.ofps[id]||null}
 const NOTE_SEP=' · ';
 function noteParts(t){return String(t||'').split(NOTE_SEP).map(x=>x.trim()).filter(Boolean)}
 function noteBtn(o,key,wpt,LK){const t=ofpVal(o,key);
-  return `<button type="button" class="ofp-notebtn${t?'':' empty'}" data-act="ofp-note" data-id="${esc(o.ofpId)}|${esc(key)}|${esc(wpt)}" aria-label="Poznámka ${esc(wpt)}" ${LK?'disabled':''}>${t?noteParts(t).map(x=>`<span>${esc(x)}</span>`).join(''):'+ pozn.'}</button>`}
+  return `<button type="button"${self.ETL_ATIS&&ETL_ATIS.nbId?` id="${ETL_ATIS.nbId(o.ofpId,key)}"`:''} class="ofp-notebtn${t?'':' empty'}" data-act="ofp-note" data-id="${esc(o.ofpId)}|${esc(key)}|${esc(wpt)}" aria-label="Poznámka ${esc(wpt)}" ${LK?'disabled':''}>${t?noteParts(t).map(x=>{const m=/^(\d{2}:\d{2}) (.+)$/.exec(x);return `<span>${m?`<i>${m[1]}</i>${esc(m[2])}`:esc(x)}</span>`}).join(''):'+ pozn.'}</button>`}
+// ATC instructions in flight: the row "TEĎ" sits after the point flown last (by ATO, or by ETO when ATO is missing);
+// what is written there goes to that point's note with the UTC time
+function nowRow(o,key,wpt,label,cols){return `<tr class="nowrow"><td colspan="${cols}"><div class="nowin"><span class="nowtag">▶ TEĎ</span><span class="mono">${esc(label)}</span><button type="button" class="btn sm primary" data-act="ofp-atc" data-id="${esc(o.ofpId)}|${esc(key)}|${esc(wpt)}|${esc(label)}">+ ATC instrukce</button><span class="muted">zapíše se k ${esc(wpt)} s časem UTC</span></div></td></tr>`}
+function ofpLanded(o){const l=o.leg;return !!(l&&l.state==='closed')||parseHM(ofpVal(o,'x_on'))!=null}
+// points ahead of a note, offered after DCT on the keypad
+function atcPts(o,key){if(!o)return [];let m=/^w(\d+)_note$/.exec(key);const ok=p=>p&&p.wpt&&!p.rvsm&&!/^TO[CD]$/.test(p.wpt);
+  if(m){const {W,skip}=ofpCalc(o);return W.map((p,j)=>j>+m[1]&&!skip.has(j)&&ok(p)?p.wpt:null).filter(Boolean).slice(0,12)}
+  m=/^(a|b\d+_)(\d+)_note$/.exec(key);if(m){const r=divRoute(o);return r?r.wpts.map((p,j)=>j>+m[2]&&ok(p)?p.wpt:null).filter(Boolean).slice(0,12):[]}
+  return []}
+// "DCT BISBA" written on the keypad shortens the route like the DCT button, when BISBA is a point ahead
+function atcDone(oid,key,t){const m=/(?:^| )DCT ([A-Z0-9]{2,7})(?= |$)/.exec(t);const k=/^w(\d+)_note$/.exec(key);if(!m||!k)return;
+  const o=ofpOf(oid);if(!o||o.closed||o.void||ofpVal(o,'dv'))return;const {W,skip,lastPassed}=ofpCalc(o);
+  const at=+k[1];const j=W.findIndex((p,i)=>i>Math.max(lastPassed,at)&&!p.rvsm&&!skip.has(i)&&p.wpt===m[1]);if(j<0||ofpVal(o,'w'+j+'_dct'))return;ofpDct(oid,j,at)}
+// direct from the last point with an ATO – or from the leg the instruction was written at, when that is further on
+function ofpDct(oid,i,at){const o=ofpOf(oid);if(!o)return;let from=0;o.wpts.forEach((p,k)=>{if(k<i&&!p.rvsm&&parseHM(ofpVal(o,'w'+k+'_ato'))!=null)from=k});if(at!=null&&at<i&&at>from&&!o.wpts[at].rvsm)from=at;ofpSet(oid,'w'+i+'_dct','1');ofpSet(oid,'w'+i+'_dctFrom',String(from));toast(`Direct to ${o.wpts[i].wpt} z ${o.wpts[from].wpt}`)}
 // 133355 → 133,355 · 13335 → 133,35 · also accepts 133.355 / 133,355
-function fmtFreq(x){const t=String(x||'').trim().replace(/\s/g,'');const m=t.match(/^(\d{3})[.,]?(\d{1,3})$/);if(!m)return null;const mhz=+m[1];if(mhz<108||mhz>137)return null;return m[1]+','+m[2]}
+// the leading 1 may be left out (33355 → 133,355; 230 → 123,00), like on the keypad
+function fmtFreq(x){let t=String(x||'').trim().replace(/\s/g,'');if(/^[23]/.test(t)||/^1[89]/.test(t))t='1'+t;const m=t.match(/^(\d{3})[.,]?(\d{0,3})$/);if(!m)return null;const mhz=+m[1];if(mhz<108||mhz>137)return null;return m[1]+','+m[2].padEnd(2,'0')}
 function fmtLevel(x,fl){const t=String(x||'').replace(/\s/g,'');if(!/^\d+$/.test(t))return null;const n=+t;
   if(fl){if(n<10||n>600)return null;return 'FL'+String(n).padStart(3,'0')}
   if(n<100||n>60000)return null;return String(n)}
@@ -1162,7 +1178,7 @@ function openNoteEditor(ofpId,key,wpt){
     <div class="ntabs" role="tablist">${tabs.map(([k,l])=>`<button type="button" class="ntab${k==='alt'?' on':''}" data-act="note-tab" data-id="${k}">${l}</button>`).join('')}</div>
     <div class="note-pane" data-pane="alt"><div class="note-in"><button type="button" class="nfl" id="n-flbtn" data-act="note-fl" aria-pressed="false">FL</button><input type="text" id="n-alt" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="výška ft, např. 4000"></div>
       <div class="note-acts"><button type="button" class="btn big" data-act="note-add" data-id="alt|up">CLB ↑</button><button type="button" class="btn big" data-act="note-add" data-id="alt|down">DESC ↓</button></div></div>
-    <div class="note-pane" data-pane="freq" hidden><div class="note-in"><input type="text" id="n-freq" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="např. 133355 → 133,355"></div>
+    <div class="note-pane" data-pane="freq" hidden><div class="note-in"><input type="text" id="n-freq" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="např. 33355 → 133,355"></div>
       <div class="note-acts"><button type="button" class="btn big" data-act="note-add" data-id="freq|">Přidat frekvenci</button></div></div>
     <div class="note-pane" data-pane="hdg" hidden><div class="note-in"><span class="nfl static">HDG</span><input type="text" id="n-hdg" inputmode="numeric" maxlength="3" autocomplete="off" placeholder="0–360"></div>
       <div class="note-acts three"><button type="button" class="btn big" data-act="note-add" data-id="hdg|left">← vlevo</button><button type="button" class="btn big" data-act="note-add" data-id="hdg|">Přidat</button><button type="button" class="btn big" data-act="note-add" data-id="hdg|right">vpravo →</button></div></div>
@@ -1182,7 +1198,7 @@ function noteAction(act,id){const e=UI.noteEd;if(!e)return;const o=ofpOf(e.ofpId
   if(act==='note-del'){parts.splice(+id,1);noteSave(parts);return}
   const [kind,dir]=id.split('|');let t=null;
   if(kind==='alt'){t=fmtLevel(v('n-alt'),e.fl);if(!t)return bad(e.fl?'Hladinu zadejte číslem, např. 240.':'Výšku zadejte ve stopách, např. 4000 (pro hladinu stiskněte FL).');t+=dir==='up'?' ↑':' ↓';document.getElementById('n-alt').value=''}
-  if(kind==='freq'){t=fmtFreq(v('n-freq'));if(!t)return bad('Frekvenci zadejte číslicemi, např. 133355 (= 133,355).');document.getElementById('n-freq').value=''}
+  if(kind==='freq'){t=fmtFreq(v('n-freq'));if(!t)return bad('Frekvenci zadejte číslicemi, např. 33355 (= 133,355).');document.getElementById('n-freq').value=''}
   if(kind==='hdg'){t=fmtHdg(v('n-hdg'));if(!t)return bad('Kurz zadejte jako 0–360.');if(dir==='left')t+=' ←';if(dir==='right')t+=' →';document.getElementById('n-hdg').value=''}
   if(kind==='txt'){t=v('n-txt').replace(/\s*·\s*/g,' ');if(!t)return bad('Napište poznámku.');document.getElementById('n-txt').value=''}
   parts.push(t);noteSave(parts);toast('Přidáno: '+t)}
@@ -1332,6 +1348,10 @@ function viewOfp(o,u){
   const fr=(k,lab)=>f[k]?`<tr><td>${lab}</td><td class="r mono">${esc(f[k].time||'')}</td><td class="r mono">${fmtN(f[k].fuel)}</td></tr>`:'';
   const [sc,st]=ofpStatus(o);
   const LK=!!(o.closed||o.void);
+  const nowI=(()=>{if(LK||ofpVal(o,'dv')||ofpLanded(o)||!W.length)return -1;let r=lastPassed;
+    if(atd!=null){const n=parseHM(nowHM());W.forEach((p,i)=>{if(i>r&&!p.rvsm&&!skip.has(i)){const e=parseHM(etoAdj(p.tAcc,i));if(e!=null&&((n-e+1440)%1440)<360)r=i}})}
+    return r})();
+  const nowLbl=i=>{const nx=W.findIndex((p,j)=>j>i&&!p.rvsm&&!skip.has(j));return nx<0?'po '+W[i].wpt:W[i].wpt+' → '+W[nx].wpt};
   const wrows=W.map((p,i)=>{
     if(p.rvsm)return `<tr class="rvsmrow rvsm-only" ${nonR?'hidden':''}><td colspan="3"><b>RVSM</b> ALT DIFF (ft)</td><td colspan="6"><span class="inline" style="gap:6px;max-width:360px">${['lh','sb','rh'].map(x=>`<input type="text" data-of="r${i}_${x}" value="${esc(ofpVal(o,'r'+i+'_'+x))}" inputmode="numeric" placeholder="${x.toUpperCase()}" aria-label="RVSM ${x.toUpperCase()}">`).join('')}</span></td></tr>`;
     const sk=skip.has(i);const isDct=!!ofpVal(o,'w'+i+'_dct');const d=dcts.find(x=>x.to===i);
@@ -1341,7 +1361,7 @@ function viewOfp(o,u){
     const dctBtn=sk?'<span class="muted" style="font-size:.78rem">vynecháno</span>':LK?(isDct?'<span class="ann info" style="font-size:.62rem">DCT</span>':''):isDct?(passed?`<span class="muted" style="font-size:.78rem" title="Pro zrušení nejdřív smažte ATO u tohoto bodu">DCT přeletěno</span>`:`<button type="button" class="btn sm" data-act="ofp-dct-undo" data-id="${esc(o.ofpId)}|${i}">Zrušit DCT</button>`):(i>0&&i<lastPassed&&!passed)?'<span class="muted" style="font-size:.78rem">bez ATO</span>':(i>lastPassed&&i>0&&!o.void?`<button type="button" class="btn sm" data-act="ofp-dct" data-id="${esc(o.ofpId)}|${i}" title="ATC: direct to ${esc(p.wpt)}">DCT</button>`:'');
     return `<tr class="${sk?'skip':''}"><td>${dctBtn}</td><td><b class="mono">${esc(p.wpt)}</b>${isDct?' <span class="ann info" style="font-size:.62rem;padding:0 4px">DCT</span>':''}${p.name?`<br><span class="muted" style="font-size:.78rem">${esc(p.name)}</span>`:''}${d?`<br><span style="font-size:.78rem;color:var(--ok)">z ${esc(W[d.from].wpt)} −${d.saved} NM · −${d.min} min</span>`:''}<div class="wnote">${noteBtn(o,'w'+i+'_note',p.wpt,LK)}</div></td><td class="mono" style="font-size:.84rem">${esc(p.awy)}<br>${esc(p.fl)}</td><td class="r mono">${p.distInt??''}<br><span class="muted">${p.distAcc??''}</span></td><td class="r mono">${esc(p.tAcc)}</td><td class="r mono">${sk?'–':(etoAdj(p.tAcc,i)||'–')}</td>
       <td><input type="text" class="t4 ofp-t" data-of="w${i}_ato" value="${esc(ofpVal(o,'w'+i+'_ato'))}" inputmode="numeric" maxlength="5" placeholder="––:––" aria-label="ATO ${esc(p.wpt)}" ${sk||LK?'disabled':''}></td>
-      <td class="r mono">${fmtN(p.mreq)}</td><td><input type="text" class="ofp-n" data-of="w${i}_fuel" value="${esc(ofpVal(o,'w'+i+'_fuel'))}" inputmode="numeric" aria-label="Palivo ${esc(p.wpt)}" ${sk||LK?'disabled':''}><span class="wdiff mono" id="wd-${i}" style="color:${diff==null?'inherit':diff<0?'var(--warn)':'var(--ok)'}">${diff==null?'':(diff>0?'+':'')+fmtN(diff)}</span></td></tr>`}).join('');
+      <td class="r mono">${fmtN(p.mreq)}</td><td><input type="text" class="ofp-n" data-of="w${i}_fuel" value="${esc(ofpVal(o,'w'+i+'_fuel'))}" inputmode="numeric" aria-label="Palivo ${esc(p.wpt)}" ${sk||LK?'disabled':''}><span class="wdiff mono" id="wd-${i}" style="color:${diff==null?'inherit':diff<0?'var(--warn)':'var(--ok)'}">${diff==null?'':(diff>0?'+':'')+fmtN(diff)}</span></td></tr>`}).map((h,i)=>i===nowI?h+nowRow(o,'w'+i+'_note',W[i].wpt,nowLbl(i),9):h).join('');
   const dctSum=dcts.length?`<div class="warnline info">${dcts.map(d=>`DCT <b class="mono">${esc(W[d.from].wpt)} → ${esc(W[d.to].wpt)}</b>: zkráceno o ${d.saved} NM, ~${d.min} min`).join('<br>')}. ETO dalších bodů je posunuté. Plánované palivo (MREQ) zůstává podle OFP.</div>`:'';
   const atl=l?`<dl class="kvgrid"><dt>Ramp ACT (palivo na odlet)</dt><dd class="mono">${fmtN(l.fuelBlk)} lbs <span class="muted">plán ${fmtN(f.rampEst)} · MREQ ${fmtN(f.rampMreq)}</span></dd>
       <dt>Used ACT (spáleno)</dt><dd class="mono">${l.state==='closed'?fmtN(l.fuelBurn)+' lbs':'–'} <span class="muted">plán ${fmtN(f.usedCalc)}</span>${l.state==='closed'&&l.fuelBurn!=null&&f.usedCalc?` <b style="color:${l.fuelBurn>f.usedCalc?'var(--caution)':'var(--ok)'}">${l.fuelBurn>f.usedCalc?'+':''}${fmtN(l.fuelBurn-f.usedCalc)}</b>`:''}</dd>
@@ -1390,8 +1410,8 @@ function viewOfp(o,u){
   </section>
   ${!o.closed&&!o.void?`<div class="chips" style="justify-content:flex-end"><button type="button" class="btn primary" data-act="ofp-ph" data-id="${esc(o.ofpId)}|flight">Pokračovat: Let ›</button></div>`:''}`)}
   ${sec('flight',`${!l&&mode()==='crew'&&!o.closed&&!o.void?`<div class="warnline caution">Let ještě není zahájený – palivo a security search jsou v části <button type="button" class="linkbtn" style="display:inline;min-height:0;padding:0" data-act="ofp-goto" data-id="pre|fuel">Před letem</button>.</div>`:''}
-  <section class="panel ostep ${done.dep?'done':''}" id="ofps-dep">${stepH('dep','Před odletem','ATIS, clearance a kontrola výškoměrů.',`<button type="button" class="btn sm" data-act="deice" data-id="${esc(o.ofpId)}">DEICE</button>`)}
-    ${self.ETL_ATIS?`<div class="atf-pair">${ETL_ATIS.field(o,'atisDep',LK)}${ETL_ATIS.field(o,'clr',LK)}</div>`:`<div class="fgrid wide">${ofpIn(o,'atisDep','ATIS DEP',{area:true})}${ofpIn(o,'clr','ATC clearance',{area:true})}</div>`}
+  <section class="panel ostep ${done.dep?'done':''}" id="ofps-dep">${stepH('dep','Před odletem','ATIS, clearance, taxi a kontrola výškoměrů.',`<button type="button" class="btn sm" data-act="deice" data-id="${esc(o.ofpId)}">DEICE</button>`)}
+    ${self.ETL_ATIS?`<div class="atf-pair">${ETL_ATIS.field(o,'atisDep',LK)}${ETL_ATIS.field(o,'clr',LK)}${ETL_ATIS.field(o,'taxiDep',LK)}</div>`:`<div class="fgrid wide">${ofpIn(o,'atisDep','ATIS DEP',{area:true})}${ofpIn(o,'clr','ATC clearance',{area:true})}</div>`}
     <div><p class="label">Kontrola výškoměrů (ft)</p>
       <p class="muted" style="margin:4px 0 0;font-weight:600">On ground</p><div class="fgrid">${ofpIn(o,'rg_lh','LH',{num:true})}${ofpIn(o,'rg_sb','SBY',{num:true})}${ofpIn(o,'rg_rh','RH',{num:true})}</div>
       <p class="muted" style="margin:8px 0 0;font-weight:600">RVSM</p>
@@ -1404,7 +1424,7 @@ function viewOfp(o,u){
   </section>
   ${ofpDivertPanel(o,LK)}
   <section class="panel ostep ${done.arr?'done':''}" id="ofps-arr">${stepH('arr','Přílet a přistání'+(ofpVal(o,'dv')?' – DIVERT '+esc(divTo(o)):''))}
-    ${self.ETL_ATIS?`<div class="atf-pair">${ETL_ATIS.field(o,'atisArr',LK)}${ofpVal(o,'dv')?ETL_ATIS.field(o,'atisDiv',LK):''}${ETL_ATIS.field(o,'clrArr',LK)}</div>`:`<div class="fgrid wide">${ofpIn(o,'atisArr','ATIS ARR',{area:true})}</div>`}
+    ${self.ETL_ATIS?`<div class="atf-pair">${ETL_ATIS.field(o,'atisArr',LK)}${ofpVal(o,'dv')?ETL_ATIS.field(o,'atisDiv',LK):''}${ETL_ATIS.field(o,'clrArr',LK)}${ETL_ATIS.field(o,'taxiArr',LK)}</div>`:`<div class="fgrid wide">${ofpIn(o,'atisArr','ATIS ARR',{area:true})}</div>`}
     <div><p class="label">Přistávací data</p><div class="fgrid">${ofpIn(o,'ld_w','LD weight',{num:true})}${ofpIn(o,'ld_dist','LD dist',{num:true})}${ofpIn(o,'vref','VREF',{num:true})}${ofpIn(o,'vapp','VAPP',{num:true})}${ofpIn(o,'vfs','VFS',{num:true})}${ofpIn(o,'magrad','MA grad')}${ofpIn(o,'ld167','LD × 1,67',{num:true})}</div></div>
     <div><p class="label">Přistání</p>${ofpLandingStep(o)}</div>
   </section>
@@ -1479,6 +1499,7 @@ async function ofpPdf(o){
   // --- before departure ---
   section('Před odletem');
   cells([['ATC clearance',val('clr')],['ATIS DEP',val('atisDep')]],2);
+  if(val('taxiDep'))cells([['Taxi '+(o.dep||''),val('taxiDep')]],1);
   cells([['Výškoměry on ground LH',val('rg_lh')],['SBY',val('rg_sb')],['RH',val('rg_rh')]].concat(nonR?[['RVSM','let není prováděn v RVSM',{font:'b'}]]:[['RVSM entry FL LH',val('re_lh')],['SBY',val('re_sb')],['RH',val('re_rh')]]),6);
   cells([['TO weight',val('to_w')],['TO dist',val('to_dist')],['Power',val('to_pwr')],['Flaps',val('to_flaps')],['V1',val('v1')],['VR',val('vr')],['V2',val('v2')],['VFTO',val('vfto')],['EMR VREF',val('emr_vref')],['EMR VAPP',val('emr_vapp')]],6);
   const offb=l&&l.state==='closed'?l.out:val('x_out'),tko=l&&parseHM(l.off)!=null?l.off:(val('x_off')||val('atd'));
@@ -1523,7 +1544,8 @@ async function ofpPdf(o){
   }
   // --- arrival ---
   section('Přílet'+(val('dv')?' – divert '+divTo(o):''));
-  {const ac=[['ATIS ARR '+(o.des||''),val('atisArr')]];if(val('atisDiv'))ac.push(['ATIS divert '+divTo(o),val('atisDiv')]);if(val('clrArr'))ac.push(['Příletová clearance',val('clrArr')]);cells(ac,ac.length)}
+  {const ac=[['ATIS ARR '+(o.des||''),val('atisArr')]];if(val('atisDiv'))ac.push(['ATIS divert '+divTo(o),val('atisDiv')]);if(val('clrArr'))ac.push(['Příletová clearance',val('clrArr')]);cells(ac,ac.length);
+   if(val('taxiArr'))cells([['Taxi '+(val('dv')?divTo(o):(o.des||'')),val('taxiArr')]],1)}
   cells([['LD weight',val('ld_w')],['LD dist',val('ld_dist')],['VREF',val('vref')],['VAPP',val('vapp')],['VFS',val('vfs')],['MA grad',val('magrad')],['LD × 1,67',val('ld167')]],7);
   // --- ATL ---
   section('Technický deník (ATL)');
@@ -1657,18 +1679,21 @@ function ofpDivertPanel(o,LK){
   const m=divMode(o);const to=divTo(o);
   const head=`<div class="panel-head"><div><p class="label">Divert${m==='x'?' – jiné letiště':' – route to alternate'}</p><h2 class="mono">→ ${esc(to||'????')}</h2></div>${LK?'':`<button type="button" class="btn sm" data-act="ofp-divert-undo" data-id="${oid}">Zrušit divert</button>`}</div>`;
   const startF=`<label class="fld"><span>Začátek divertu (UTC)</span><input type="text" class="t4 ofp-t" data-of="dv_start" value="${esc(ofpVal(o,'dv_start'))}" inputmode="numeric" maxlength="5" placeholder="––:––" ${LK?'disabled':''}></label>`;
+  const live=!LK&&!ofpLanded(o);
   if(m==='x'){
-    const rows=divManual(o);
+    const rows=divManual(o);let li=0;rows.forEach(r=>{if(parseHM(r.ato)!=null)li=r.i});
+    const nxt=rows.find(r=>r.i>li&&r.wpt);const lbM=r=>r.wpt||('bod '+(r.i+1));
     return `<div class="panel divert">${head}
       <div class="t4grid" style="max-width:520px;grid-template-columns:repeat(2,minmax(0,1fr))">${startF}<label class="fld"><span>Letiště (ICAO)</span><input type="text" class="icao" data-of="dv_to" value="${esc(ofpVal(o,'dv_to'))}" maxlength="4" placeholder="____" autocapitalize="characters" ${LK?'disabled':''}></label></div>
       <p class="muted" style="font-size:.86rem">Routing zapište ručně – bod, čas přeletu a palivo. Letiště přistání se do ATL přenese jako ${esc(to||'zadané letiště')}.</p>
       <div class="scroll-x"><table class="plain ofplog manual"><thead><tr><th>#</th><th>Bod · poznámka</th><th>Čas přeletu</th><th>Palivo (lbs)</th></tr></thead><tbody>
       ${rows.map(r=>`<tr><td class="muted mono">${r.i+1}</td><td><input type="text" data-of="m${r.i}_wpt" value="${esc(r.wpt)}" autocapitalize="characters" placeholder="BOD" style="max-width:160px" ${LK?'disabled':''}><div class="wnote">${noteBtn(o,'m'+r.i+'_note',r.wpt||('bod '+(r.i+1)),LK)}</div></td>
         <td><input type="text" class="t4 ofp-t" data-of="m${r.i}_ato" value="${esc(r.ato)}" inputmode="numeric" maxlength="5" placeholder="––:––" ${LK?'disabled':''}></td>
-        <td><input type="text" class="ofp-n" data-of="m${r.i}_fuel" value="${esc(r.fuel)}" inputmode="numeric" ${LK?'disabled':''}></td></tr>`).join('')}</tbody></table></div>
+        <td><input type="text" class="ofp-n" data-of="m${r.i}_fuel" value="${esc(r.fuel)}" inputmode="numeric" ${LK?'disabled':''}></td></tr>${live&&r.i===li?nowRow(o,'m'+r.i+'_note',lbM(r),lbM(r)+(nxt?' → '+lbM(nxt):''),4):''}`).join('')}</tbody></table></div>
       ${LK?'':`<div class="chips"><button type="button" class="btn sm" data-act="ofp-dv-add" data-id="${oid}">${ICON.plus}Další bod</button></div>`}</div>`;
   }
-  const rows=divRows(o);
+  const rows=divRows(o);let li=-1;rows.forEach(r=>{if(!r.rvsm){if(li<0)li=r.i;if(parseHM(ofpVal(o,r.pre+r.i+'_ato'))!=null)li=r.i}});
+  const nxA=i=>{const r=rows.find(x=>!x.rvsm&&x.i>i);return r?' → '+r.p.wpt:''};
   return `<div class="panel divert">${head}
     <div class="t4grid" style="max-width:260px;grid-template-columns:1fr">${startF}</div>
     <p class="muted" style="font-size:.86rem">ETO = začátek divertu + plánovaný čas z OFP, po vyplnění ATO od skutečného času. Letiště přistání se do ATL přenese jako ${esc(to)}.</p>
@@ -1676,7 +1701,7 @@ function ofpDivertPanel(o,LK){
     ${rows.filter(r=>!r.rvsm).map(({p,i,eto,diff,pre})=>`<tr><td><b class="mono">${esc(p.wpt)}</b>${p.name?`<br><span class="muted" style="font-size:.78rem">${esc(p.name)}</span>`:''}<div class="wnote">${noteBtn(o,pre+i+'_note',p.wpt,LK)}</div></td><td class="mono">${esc(p.awy||'')}<br><span class="muted">${esc(p.fl||'')}</span></td>
       <td class="r mono">${p.distInt??''}<br><span class="muted">${p.distAcc??''}</span></td><td class="r mono">${esc(p.tAcc||'')}</td><td class="r mono"><b>${eto||'–'}</b></td>
       <td><input type="text" class="t4 ofp-t" data-of="${pre}${i}_ato" value="${esc(ofpVal(o,pre+i+'_ato'))}" inputmode="numeric" maxlength="5" placeholder="––:––" aria-label="ATO ${esc(p.wpt)}" ${LK?'disabled':''}></td>
-      <td class="r mono">${fmtN(p.mreq)}</td><td><input type="text" class="ofp-n" data-of="${pre}${i}_fuel" value="${esc(ofpVal(o,pre+i+'_fuel'))}" inputmode="numeric" aria-label="Palivo ${esc(p.wpt)}" ${LK?'disabled':''}><span class="wdiff mono" style="color:${diff==null?'inherit':diff<0?'var(--warn)':'var(--ok)'}">${diff==null?'':(diff>0?'+':'')+fmtN(diff)}</span></td></tr>`).join('')}</tbody></table></div></div>`;
+      <td class="r mono">${fmtN(p.mreq)}</td><td><input type="text" class="ofp-n" data-of="${pre}${i}_fuel" value="${esc(ofpVal(o,pre+i+'_fuel'))}" inputmode="numeric" aria-label="Palivo ${esc(p.wpt)}" ${LK?'disabled':''}><span class="wdiff mono" style="color:${diff==null?'inherit':diff<0?'var(--warn)':'var(--ok)'}">${diff==null?'':(diff>0?'+':'')+fmtN(diff)}</span></td></tr>${live&&i===li?nowRow(o,pre+i+'_note',p.wpt,p.wpt+nxA(i),8):''}`).join('')}</tbody></table></div></div>`;
 }
 function ofpMissing(o){
   const m=[];const v=k=>String(ofpVal(o,k)||'').trim();
@@ -3127,7 +3152,7 @@ document.addEventListener('click',e=>{
     case 'ofp-open':ofpFlush();UI.ofpId=id;closeSheet();if(mode()==='crew'){const o=ofpOf(id);if(o&&o.acId!==BIND){BIND=o.acId;store.set('etl.bind',BIND)}UI.crewView='ofp'}else{const o=ofpOf(id);if(o){UI.acId=o.acId;store.set('etl.ac',o.acId)}UI.tab='ofp'}render();window.scrollTo(0,0);
       UI.ofpPh=null;render();setTimeout(()=>{const nx=document.querySelector('.ophase:not([hidden]) .ostep:not(.done)');const first=document.querySelector('.ophase:not([hidden]) .ostep');if(nx&&nx!==first)nx.scrollIntoView({block:'start',behavior:'smooth'})},60);break;
     case 'ofp-dct':case 'ofp-dct-undo':{const [oid,ix]=String(id).split('|');const o=ofpOf(oid);if(!o)break;const i=+ix;
-      if(act==='ofp-dct'){let from=0;o.wpts.forEach((p,k)=>{if(k<i&&!p.rvsm&&parseHM(ofpVal(o,'w'+k+'_ato'))!=null)from=k});ofpSet(oid,'w'+i+'_dct','1');ofpSet(oid,'w'+i+'_dctFrom',String(from));toast(`Direct to ${o.wpts[i].wpt} z ${o.wpts[from].wpt}`)}
+      if(act==='ofp-dct')ofpDct(oid,i);
       else{ofpSet(oid,'w'+i+'_dct','');ofpSet(oid,'w'+i+'_dctFrom','')}
       ofpFlush();render();break}
     case 'ofp-back':ofpFlush();UI.ofpId=null;render();window.scrollTo(0,0);break;
@@ -3165,7 +3190,8 @@ document.addEventListener('click',e=>{
     case 'ftl-user':UI.ftlUser=id||null;UI.ftlPer=UI.ftlPer||'28';render();window.scrollTo(0,0);break;
     case 'ftl-per':UI.ftlPer=id;render();break;
     case 'ftl-export':exportFtl();break;
-    case 'ofp-note':{const [oid,key,...w]=id.split('|');openNoteEditor(oid,key,w.join('|'));break}
+    case 'ofp-note':{const [oid,key,...w]=id.split('|');const wp=w.join('|');if(self.ETL_ATIS&&ETL_ATIS.openAtc){ETL_ATIS.openAtc(oid,key,wp,atcPts(ofpOf(oid),key),wp);break}openNoteEditor(oid,key,wp);break}
+    case 'ofp-atc':{const [oid,key,wp,...lb]=id.split('|');if(self.ETL_ATIS&&ETL_ATIS.openAtc)ETL_ATIS.openAtc(oid,key,lb.join('|'),atcPts(ofpOf(oid),key),wp);else openNoteEditor(oid,key,wp);break}
     case 'note-tab':case 'note-fl':case 'note-add':case 'note-del':noteAction(act,id);break;
     case 'rec-del':openRecDel(id);break;
     case 'rec-del-ac':openRecDelAc(id);break;
@@ -3327,7 +3353,7 @@ document.addEventListener('submit',async e=>{
 });
 
 /* ---------- boot ---------- */
-if(self.ETL_ATIS)ETL_ATIS.bind({prefs:()=>{const u=me();return u&&u.prefs||null},ofpOf,ofpVal,ofpSet,ofps:()=>Object.values((S&&S.ofps)||{}),arrApt:o=>ofpVal(o,'dv')?divTo(o):o.des});
+if(self.ETL_ATIS)ETL_ATIS.bind({prefs:()=>{const u=me();return u&&u.prefs||null},ofpOf,ofpVal,ofpSet,ofps:()=>Object.values((S&&S.ofps)||{}),arrApt:o=>ofpVal(o,'dv')?divTo(o):o.des,noteBtn,atcDone,noteSheet:(oid,key,wpt)=>{openNoteEditor(oid,key,wpt);noteAction('note-tab','txt')}});
 themeApply(themeGet());try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themeGet()==='auto')themeApply('auto')})}catch(e){}
 rebuild();render();initDb();
 checkOffline();if('serviceWorker' in navigator){navigator.serviceWorker.ready.then(()=>setTimeout(checkOffline,500)).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>setTimeout(checkOffline,500))}

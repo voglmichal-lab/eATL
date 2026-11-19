@@ -58,6 +58,8 @@ Nahrajte znovu všechny soubory ze zipu předchozí změny (např. `eatl-Z-026-v
 - PIN změněný v Můj účet platí i v 0.6.13. Nastavení účtu 0.6.13 nezná – v auditu se ukáže jako „user.prefs“ a jinak se ignoruje.
 - Text, který někdo mezitím upraví v 0.6.13, má po návratu na 0.6.14 přednost: objeví se jako poznámka pole, nic se neztratí.
 - Soubor `atis.js` může na serveru zůstat, 0.6.13 ho nenačítá.
+- Z 0.6.16 zpět na 0.6.15 nebo 0.6.13: TAXI DEP / TAXI ARR starší verze nezobrazí (v datech zůstanou), ATC instrukce
+  za letu ukáže jako poznámky u bodů i s časem, ATIS s větrem v TEMPO je běžný text.
 
 ## Jak funguje offline a synchronizace
 - Každý podpis se nejdřív uloží v zařízení (IndexedDB) a pak odešle. Bez signálu se
@@ -84,8 +86,8 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
 4. OFP je rozdělené podle fáze letu (otevře se na té aktuální); kroky jsou očíslované, hotový krok má štítek „hotovo“:
    - **Před letem**: 1 Posádka a kontrola OFP · 2 Palivo a olej před odletem (natankováno, na odlet, minimum; olej
      doplněný před letem v litrech, motor L a P – vše jde upravit až do uzavření letu) · 3 Performance.
-   - **Let**: 4 Před odletem (ATIS, clearance, výškoměry) · 5 Odlet a trať (navigační log, divert) ·
-     6 Přílet a přistání (ATIS ARR, přistávací data, čas přistání, on-block, palivo po přistání, přiblížení, počet přistání).
+   - **Let**: 4 Před odletem (ATIS, clearance, taxi, výškoměry) · 5 Odlet a trať (navigační log s řádkem TEĎ pro ATC instrukce, divert) ·
+     6 Přílet a přistání (ATIS ARR, příletová clearance, taxi, přistávací data, čas přistání, on-block, palivo po přistání, přiblížení, počet přistání).
    - **Shrnutí a uzavření**: 7 Shrnutí letu – časy odletu a příletu i palivo jdou opravit, block/flight, posádka, PF,
      olej, závady, chybějící položky OFP → *Potvrdit a zapsat do ATL* (podpis kapitána).
    Navigační log: DCT, který je už přeletěný (cílový bod má ATO), nejde zrušit jedním klepnutím – pro opravu nejdřív
@@ -203,14 +205,21 @@ Závada zjištěná na zemi (záložka Závady → *Zapsat závadu*) se zapíše
 (výchozí je poslední let), v tabulce je jako „na zemi po letu N“. Volba *nepřiřazovat k letu* ji nechá jen v záložce Závady.
 
 ## ATIS a clearance – klávesnice eTechLogu
-V OFP (Let → Před odletem, Přílet a přistání) se ATIS DEP, ATC clearance, ATIS ARR, **Příletová clearance** a při divertu **ATIS DIVERT** píšou
+V OFP (Let → Před odletem, Přílet a přistání) se ATIS DEP, ATC clearance, **TAXI DEP**, ATIS ARR, **Příletová clearance**, **TAXI ARR** a při divertu **ATIS DIVERT** píšou
 na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na políčko se klávesnice vysune zespodu.
 - **Pořadí nehraje roli.** Každé tlačítko ví, do kterého pole patří (ILS, CAVOK, BKN, VRB…), číslice jdou tam, kde je kurzor.
   Přiblížení může zaznít před dráhou i po ní. Když pole v ATIS nezazní, číslice skočí do dalšího.
 - **Zápis jako na papír, výsledek jednotný:** FEW 2 0 i FEW 2 0 0 0 → FEW020, viditelnost 1 0 → 9999, 2 5 0 0 8 → 250/08,
   1 2 5 → 12/05, QNH 9 8 9 i 1 0 1 3. Pomlčka u jevů = slabý (light): − SH RA = −SHRA, plus = silný (heavy).
-- **ILS** s variantou Z / Y / X a **CAT II**, stav dráhy (DRY, WET, SLUSH… + RWYCC 5/5/5), RVR, vítr s nárazy (gusting) a variable between (240V320), trend.
-- Číslice mimo rozsah klávesnice nenabídne: dráha 01–36, směr větru a kurz 000–360, QNH 930–1069, čas 0000–2359.
+- **ILS** s variantou Z / Y / X a **CAT II**, stav dráhy (DRY, WET, SLUSH… + RWYCC 5/5/5), RVR, vítr s nárazy (gusting) a variable between (240V320).
+- **Trend:** TEMPO / BECMG nahoře, pak stejně jako v ATIS – vítr 2 5 0 1 7 G 2 7 = 250/17G27, dohlednost, jevy, oblačnost
+  (`TEMPO 250/17G27 4000 −SHRA BKN015CB`). NOSIG jedním ťuknutím.
+- **Rozsvícená klávesa** ukazuje, co je zapsané: G = vítr má nárazy, VRB, V, CAVOK / 9999, druh poslední vrstvy oblačnosti,
+  ILS / CAT II / L-C-R, FL. Klávesy už nemají trvalý modrý rámeček.
+- Číslice mimo rozsah klávesnice nenabídne: dráha 01–36, směr větru a kurz 000–360, QNH 930–1069, čas 0000–2359,
+  frekvence 118.000–136.975.
+- **Frekvence bez úvodní 1:** 2 0 5 3 = 120.53, 2 3 0 = 123.00, 1 8 0 0 5 = 118.005. S jedničkou (1 2 0 5 3) to funguje taky –
+  1 a pak 1, 2 nebo 3 znamená, že jednička je napsaná. Platí v clearance i v ATC instrukcích (FREQ).
 - **Nový ATIS:** tlačítko *Nový ATIS* u pole (nebo nové písmeno v INFO). Hodnoty zůstanou, přepíšete jen co se změnilo;
   co je stejné jako v předchozím ATIS, je světlejší se značkou „= K“. Celý jiný ATIS: tlačítko *Celý jiný* hodnoty smaže.
   Předchozí ATIS zůstává pod polem přeškrtnutý (do OFP a PDF jde platný).
@@ -219,14 +228,35 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
 - **SID a STAR z OFP:** plánovaná procedura z navigačního logu (např. KOK7S, BISBA3X) je v políčku slabě a potvrdí se ✓.
   Jiná procedura: tlačítko s bodem z OFP (KOK…) a doplní se číslo a písmeno. Bez SID: STRAIGHT (straight ahead), PASSING a výška,
   LEFT / RIGHT a HDG s kurzem, nebo jen HDG a tři číslice. Clearance limit se nezapisuje.
+  Místo STAR jen bod příletové tratě: **DCT** a bod (W W 6 7 3 = DCT WW673).
   Přiblížení a dráhu v příletové clearance nabídne z ATIS ARR. Dříve použité hodnoty na letišti (SID, dráhy, TL, výšky,
   frekvence) se nabízejí z ostatních OFP.
 - Do OFP, PDF a kontroly vyplnění jde jeden normalizovaný řádek (např. `INFO K · ILS · RWY 26 · TL60 · 240/10 · 9999 · FEW020 · 12/05 · Q1018 · NOSIG`).
   Pod polem je poznámka (klávesnice iPadu) a rychlé poznámky (BIRDS, GNSS RFI…).
 
+### Taxi clearance
+**TAXI DEP** (Před odletem) a **TAXI ARR** (Přílet; při divertu pro letiště divertu) – stejná klávesnice s písmeny:
+- Pojezdové dráhy, jak zazní: B A 2 = `B, A2`. Každé písmeno začne další dráhu, číslice patří k té předchozí.
+  Dvoupísmenná dráha: T A a **SPOJIT** = `TA`.
+- **RWY** – dráha (TAXI DEP ji nabídne z ATIS DEP ✓; L / C / R písmenem hned za číslem), **HP** – holding point / intersection (A 1),
+  **STAND** – stání (1 2). Číslice bez dráhy, ke které by patřily, jdou na odletu do RWY, na příletu do STAND.
+- **HOLD SHORT**, **CROSS**, **BKTRK** a dráha nebo pojezdová dráha: HOLD SHORT 3 3 = `HOLD SHORT RWY 33`.
+- Do OFP: `RWY 26 · HP A1 · VIA B, A2, HOLD SHORT RWY 33`, na příletu `VIA B2, A · STAND 12`. Dříve použité trasy
+  na letišti se nabízejí z ostatních OFP.
+
+## ATC instrukce za letu
+V navigačním logu je řádek **▶ TEĎ** za bodem, který letadlo přeletělo naposledy (podle ATO, chybí-li, podle ETO).
+**+ ATC instrukce** otevře klávesnici eTechLogu: CLB, DES, FL, HDG, LEFT / RIGHT, DCT, SPD, M., FREQ, QNH, SQ, HOLD,
+EXPECT, MAINT, OWN NAV, písmena (ABC) a číslice. **Přidat ›** zapíše instrukci s časem UTC (`06:30 CLB FL360`)
+a hned jde psát další; **Hotovo** zavře. Instrukce se ukládají jako poznámky toho bodu (i v PDF) – tlačítko poznámky
+u kteréhokoli bodu otevře stejnou klávesnici, volný text s diakritikou přes *Text z iPadu*.
+- **DCT** nabídne body tratě dál po trase; `DCT MOROK` z klávesnice zkrátí trať stejně jako tlačítko DCT v řádku
+  (od bodu, u kterého je instrukce zapsaná).
+- U vynechaného bodu (direct) je přeškrtnutý jen název – instrukce zapsané u něj zůstávají čitelné.
+
 ## Můj účet
 Tlačítko **Můj účet** v horní liště (posádka i kancelář):
-- **Zápis ATIS a clearance** – pořadí polí (šipky), vypnutí polí, předvolby ICAO / Evropa a USA, rychlé poznámky.
+- **Zápis ATIS a clearance** – pořadí polí (šipky), vypnutí polí (i taxi), předvolby ICAO / Evropa a USA, rychlé poznámky.
   Platí pro přihlášeného pilota na všech iPadech. Čas ATIS je ve výchozím stavu vypnutý.
 - **Změna PINu** – současný PIN a dvakrát nový.
 
@@ -255,5 +285,5 @@ V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signál
 | `fonts/pdf/` | písma pro PDF s českou diakritikou (SIL OFL) |
 | `fonts/`, `fonts.css` | písma (lokálně kvůli offline) |
 | `ftl.js` | výpočet doby letu a služby (ORO.FTL / CS FTL.1) |
-| `atis.js` | zápis ATIS a clearance klávesnicí eTechLogu |
+| `atis.js` | zápis ATIS, clearance, taxi a ATC instrukcí klávesnicí eTechLogu |
 | `supabase/schema.sql` | databáze, pravidla přístupu a živá synchronizace |
