@@ -13,8 +13,12 @@ const APP_BASE = ['ILS', 'RNP', 'LOC', 'VOR', 'NDB', 'VISUAL', 'CIRCL'];
 const CT = ['FEW', 'SCT', 'BKN', 'OVC', 'VV'];
 const PRECIP = ['RA', 'SN', 'DZ', 'GR', 'PL'];
 const ROUTE_RE = /^[A-Z]{2,5}\d[A-Z]$/;
-const isHdg = r => r === 'RWY HDG' || /^HDG\d*$/.test(r || '');
-const REM_DEF = ['BIRDS', 'GNSS RFI', 'WORKS', 'TWY CLSD', 'LVP'];
+// a route that is not a SID: heading, straight ahead (with "when passing", turn and heading), or RWY HDG from 0.6.14
+const isStr = r => /^STRAIGHT/.test(r || '');
+const isHdg = r => r === 'RWY HDG' || /^HDG\d*$/.test(r || '') || isStr(r);
+function strParse(r) { const o = { p: null, t: '', h: null }; for (const x of String(r || '').split(' ').slice(1)) { if (/^P\d*$/.test(x)) o.p = x.slice(1); else if (x === 'L' || x === 'R') o.t = x; else if (/^HDG\d*$/.test(x)) o.h = x.slice(3) } return o }
+const strMake = o => 'STRAIGHT' + (o.p !== null ? ' P' + o.p : '') + (o.t ? ' ' + o.t : '') + (o.h !== null ? ' HDG' + o.h : '');
+const REM_DEF = ['BIRDS', 'GNSS RFI', 'WORKS', 'TWY _ CLSD', 'LVP'];
 
 // dig = takes digits; skip = optional, reached through its key and shown only once used
 const DEF = {
@@ -25,7 +29,7 @@ const DEF = {
     rwy: { l: 'RWY', ph: '24', dig: 1, h: 'Dráha, dvě číslice. L, C nebo R přidáte tlačítkem.' },
     cond: { l: 'STAV RWY', ph: 'WET', dig: 1, skip: 1, h: 'Povrch ťukněte jednou, pro třetiny zvlášť jen když se liší. Číslice = RWYCC 0–6: 5 5 5 = 5/5/5.' },
     tl: { l: 'TL', ph: '70', dig: 1, h: 'Převodní hladina: 7 0 = FL70, 1 1 0 = FL110.' },
-    wind: { l: 'VÍTR', ph: '25008', dig: 1, h: 'Směr a rychlost bez lomítka: 2 5 0 0 8. Nárazy G, proměnlivý VRB, rozmezí V a šest číslic (2 4 0 3 2 0).' },
+    wind: { l: 'VÍTR', ph: '25008', dig: 1, h: 'Směr a rychlost bez lomítka: 2 5 0 0 8. Gusting G, variable VRB, variable between V a šest číslic (2 4 0 3 2 0).' },
     vis: { l: 'VIS', ph: 'CAVOK', dig: 1, h: 'CAVOK nebo 9999 jedním ťuknutím. Kilometry (1 0) i metry (4 0 0 0). Nízká dohlednost: RVR.' },
     rvr: { l: 'RVR', ph: '550', dig: 1, skip: 1, h: 'RVR v metrech, třetiny dráhy oddělte lomítkem: 5 5 0 / 6 0 0 / 5 0 0.' },
     wx: { l: 'JEVY', ph: '−RA', skip: 1, h: '− = slabý (light), + = silný (heavy). Pak popis a jev: − SH RA = −SHRA, light shower rain. Pak rovnou oblačnost.' },
@@ -35,8 +39,7 @@ const DEF = {
     trend: { l: 'TREND', ph: 'NOSIG', dig: 1, skip: 1, h: 'NOSIG jedním ťuknutím, nebo TEMPO / BECMG a jev.' }
   },
   clr: {
-    lim: { l: 'LIMIT', ph: 'ICAO', h: 'Clearance limit. Je předvyplněný z OFP, přepíšete ho písmeny.' },
-    route: { l: 'SID / HDG', ph: 'SID', dig: 1, w: 1, ghost: 'sid', fix: 'sidFix', h: 'Plán z OFP potvrdíte ✓. Jiný SID: ťukněte bod a doplňte číslo a písmeno. Kurz po odletu: HDG a tři číslice.' },
+    route: { l: 'SID / TRAŤ', ph: 'SID', dig: 1, w: 1, ghost: 'sid', fix: 'sidFix', h: 'SID: plán z OFP potvrdíte ✓, jiný = bod z OFP a číslo s písmenem. Bez SID: STRAIGHT (straight ahead), nebo HDG a tři číslice.' },
     alt: { l: 'VÝŠKA', ph: '5000', dig: 1, h: 'Počáteční výška ve stopách, nebo FL a číslo.' },
     sq: { l: 'SQUAWK', ph: '4521', dig: 1, h: 'Squawk, čtyři číslice 0–7.' },
     freq: { l: 'FREKVENCE', ph: '120.53', dig: 1, h: 'Odletová frekvence, tečku doplní aplikace. Když nezazněla, ťukněte Hotovo.' }
@@ -50,16 +53,16 @@ const DEF = {
 };
 const TYPE_NAME = { atis: 'ATIS (DEP i ARR)', clr: 'Odletová clearance', star: 'Příletová clearance' };
 const PRESETS = {
-  icao: { atis: ['info', 'time', 'app', 'rwy', 'cond', 'tl', 'wind', 'vis', 'rvr', 'wx', 'cld', 'tdp', 'qnh', 'trend'], clr: ['lim', 'route', 'alt', 'sq', 'freq'], star: ['route', 'alt', 'app', 'rwy'] },
-  us: { atis: ['info', 'time', 'wind', 'vis', 'rvr', 'wx', 'cld', 'tdp', 'qnh', 'app', 'rwy', 'cond', 'tl', 'trend'], clr: ['lim', 'route', 'alt', 'sq', 'freq'], star: ['route', 'alt', 'app', 'rwy'] }
+  icao: { atis: ['info', 'time', 'app', 'rwy', 'cond', 'tl', 'wind', 'vis', 'rvr', 'wx', 'cld', 'tdp', 'qnh', 'trend'], clr: ['route', 'alt', 'sq', 'freq'], star: ['route', 'alt', 'app', 'rwy'] },
+  us: { atis: ['info', 'time', 'wind', 'vis', 'rvr', 'wx', 'cld', 'tdp', 'qnh', 'app', 'rwy', 'cond', 'tl', 'trend'], clr: ['route', 'alt', 'sq', 'freq'], star: ['route', 'alt', 'app', 'rwy'] }
 };
 const OFF_DEF = { atis: ['time'] };
-const FIELDS = { atisDep: { type: 'atis', title: 'ATIS DEP' }, clr: { type: 'clr', title: 'ATC clearance' }, atisArr: { type: 'atis', title: 'ATIS ARR' }, clrArr: { type: 'star', title: 'Příletová clearance' } };
+const FIELDS = { atisDep: { type: 'atis', title: 'ATIS DEP' }, clr: { type: 'clr', title: 'ATC clearance' }, atisArr: { type: 'atis', title: 'ATIS ARR' }, clrArr: { type: 'star', title: 'Příletová clearance' }, atisDiv: { type: 'atis', title: 'ATIS DIVERT' } };
 
 function presetCfg(p) { const o = { rem: REM_DEF.slice() }; for (const t in PRESETS[p]) o[t] = PRESETS[p][t].map(k => ({ k, on: !(OFF_DEF[t] || []).includes(k) })); return o }
 function sanitize(c) {
   c = c && typeof c === 'object' ? c : {};
-  const o = { rem: Array.isArray(c.rem) ? c.rem.filter(x => typeof x === 'string' && x.trim()).slice(0, 12) : REM_DEF.slice() };
+  const o = { rem: Array.isArray(c.rem) ? c.rem.filter(x => typeof x === 'string' && x.trim()).map(x => x === 'TWY CLSD' ? 'TWY _ CLSD' : x).slice(0, 12) : REM_DEF.slice() };
   for (const t of Object.keys(DEF)) {
     const seen = new Set();
     o[t] = (Array.isArray(c[t]) ? c[t] : []).filter(x => x && DEF[t][x.k] && !seen.has(x.k) && seen.add(x.k)).map(x => ({ k: x.k, on: x.on !== false }));
@@ -74,7 +77,7 @@ const slotsOf = (type, cfg) => (cfg || userCfg())[type].map(c => Object.assign({
 const noCond = () => ({ cc: '', s: [], last: '' });
 function empty(type, dest) {
   if (type === 'atis') return { info: '', time: '', app: '', rwy: '', cond: noCond(), tl: '', wind: '', vis: '', rvr: '', wx: [], cld: [], tdp: '', qnh: '', trend: [] };
-  if (type === 'clr') return { lim: dest || '', route: '', alt: '', sq: '', freq: '' };
+  if (type === 'clr') return { route: '', alt: '', sq: '', freq: '' };
   return { route: '', alt: '', app: '', rwy: '' };
 }
 
@@ -99,7 +102,12 @@ function fmtVis(v, live) { if (!v || live || !/^\d{1,2}$/.test(v)) return v || '
 function fmtTdp(r, live) { if (!r) return ''; return r.split('/').map(p => { if (p === '') return ''; const neg = p.startsWith('-'); const n = p.replace('-', ''); return (neg ? '−' : '') + (live || !n ? n : pad(n, 2)) }).join('/') }
 const collapse = s => s.length > 1 && s.every(x => x === s[0]) ? [s[0]] : s;
 function fmtCond(c) { if (!c) return ''; return [c.cc && 'RWYCC ' + c.cc.split('').join('/'), collapse(c.s || []).join('/')].filter(Boolean).join(' ') }
-const fmtRoute = r => (r = r || '', /^HDG\d+$/.test(r) ? 'HDG ' + r.slice(3) : r);
+function fmtRoute(r) {
+  r = r || ''; if (/^HDG\d+$/.test(r)) return 'HDG ' + r.slice(3); if (!isStr(r)) return r;
+  const o = strParse(r), a = [];
+  if (o.p !== null) a.push('PASSING ' + (o.p ? o.p + ' FT' : '…')); if (o.t) a.push(o.t === 'L' ? 'TURN LEFT' : 'TURN RIGHT'); if (o.h !== null) a.push('HDG ' + (o.h || '…'));
+  return 'STRAIGHT AHEAD' + (a.length ? ', ' + a.join(' ') : '');
+}
 const fmtAlt = v => !v ? '' : v.startsWith('FL') ? v : v + ' ft';
 const fmtFreq = d => (d = d || '', d.length > 3 ? d.slice(0, 3) + '.' + d.slice(3) : d);
 const prefixOnly = g => !!g && /^[−+]?(VC)?(SH|TS|FZ)?$/.test(g);
@@ -135,20 +143,21 @@ function plan(o) {
   const fix = n => n ? n.replace(/\d[A-Z]$/, '') : '';
   return { sid, sidFix: fix(sid) || toks[0] || '', star, starFix: fix(star) || toks[toks.length - 1] || '' };
 }
-const aptOf = (o, key) => key === 'atisDep' || key === 'clr' ? (o.dep || '') : (API.arrApt(o) || '');
+// destination ATIS and arrival clearance stay with the destination; a divert gets its own ATIS
+const aptOf = (o, key) => key === 'atisDep' || key === 'clr' ? (o.dep || '') : key === 'atisDiv' ? (API.arrApt(o) || '') : (o.des || '');
 function load(o, key) {
   const t = FIELDS[key].type; let st = null;
   try { st = JSON.parse(API.ofpVal(o, 'k_' + key) || 'null') } catch (e) { st = null }
   const e = empty(t, key === 'clr' ? o.des : ''), text = String(API.ofpVal(o, key) || '');
   // the keyed values count only while the stored line is theirs; a line written elsewhere (an older version, by hand) wins and becomes the note
-  if (!st || typeof st !== 'object' || !st.v || st.line !== text) return { v: e, note: text, saved: false, text };
+  if (!st || typeof st !== 'object' || !st.v || st.line !== text) return { v: e, note: text, saved: false, text, prev: [] };
   const v = Object.assign(e, st.v);
   if (t === 'atis') { if (!v.cond || typeof v.cond !== 'object') v.cond = noCond(); for (const a of ['wx', 'cld', 'trend']) if (!Array.isArray(v[a])) v[a] = [] }
-  return { v, note: String(st.note || ''), saved: true, text };
+  return { v, note: String(st.note || ''), saved: true, text, prev: Array.isArray(st.prev) ? st.prev.slice(-5) : [] };
 }
 function save(o, key, st) {
   const line = lineOf(FIELDS[key].type, st.v, (st.note || '').trim());
-  API.ofpSet(o.ofpId, 'k_' + key, JSON.stringify({ v: st.v, note: st.note || '', line }));
+  API.ofpSet(o.ofpId, 'k_' + key, JSON.stringify(Object.assign({ v: st.v, note: st.note || '', line }, st.prev && st.prev.length ? { prev: st.prev.slice(-5) } : {})));
   API.ofpSet(o.ofpId, key, line);
 }
 function ghostVal(f, k) {
@@ -160,7 +169,7 @@ const fixVal = (f, k) => { const x = DEF[f.type][k] && DEF[f.type][k].fix; retur
 // earlier entries from all OFPs at the same airport, newest first
 function history(f, k) {
   const apt = aptOf(f.o, f.key), out = [];
-  const keys = f.type === 'atis' || k === 'rwy' ? ['atisDep', 'atisArr', 'clrArr'] : f.type === 'clr' ? ['clr'] : ['clrArr'];
+  const keys = f.type === 'atis' || k === 'rwy' ? ['atisDep', 'atisArr', 'atisDiv', 'clrArr'] : f.type === 'clr' ? ['clr'] : ['clrArr'];
   const list = API.ofps().filter(x => x.ofpId !== f.o.ofpId).sort((a, b) => String(b.date || '') + (b.std || '') > String(a.date || '') + (a.std || '') ? 1 : -1);
   for (const x of list) for (const kk of keys) {
     if (aptOf(x, kk) !== apt) continue; const raw = x.fill && x.fill['k_' + kk]; if (!raw) continue;
@@ -215,6 +224,7 @@ function apply(f, code) {
     case 'chip': f.v[k] = val; ACT.fresh = false; adv(f); break;
     case 'gh': { const g = ghostVal(f, k); if (g) { f.v[k] = g; ACT.fresh = false; adv(f) } break }
     case 'pre': f.v.route = val; ACT.fresh = false; HINT = 'Doplňte číslo a písmeno procedury, např. 7 S.'; break;
+    case 'clean': { const info = f.v.info; Object.assign(f.v, empty(f.type, f.type === 'clr' ? f.o.des : ''), { info }); ACT.newAtis = null; ACT.s = 0; ACT.fresh = false; adv(f); break }
   }
 }
 function backspace(f, k) {
@@ -227,16 +237,57 @@ function backspace(f, k) {
   }
   if (k === 'wx' || k === 'trend') { if (v[k].length) v[k].pop(); else back1(f); return }
   if (k === 'app') { const p = appParts(v.app); if (!v.app) { back1(f); return } if (p.c) p.c = false; else if (p.x) p.x = ''; else p.b = ''; v.app = appStr(p); return }
+  if (k === 'route' && isStr(v.route)) {
+    const o = strParse(v.route);
+    if (o.h !== null) o.h = o.h ? o.h.slice(0, -1) : null; else if (o.t) o.t = ''; else if (o.p !== null) o.p = o.p ? o.p.slice(0, -1) : null; else { v.route = ''; return }
+    v.route = strMake(o); return;
+  }
   const s = v[k] || ''; if (!s) { back1(f); return }
   v[k] = k === 'info' || ['CAVOK', 'VRB', 'FL', 'RWY HDG', 'HDG'].includes(s) ? '' : s.slice(0, -1);
 }
 function letter(f, k, L) {
   const v = f.v, fresh = ACT.fresh; ACT.fresh = false;
-  if (k === 'info') { v.info = L; adv(f); return }
-  if (k === 'lim') { if (fresh || v.lim.length >= 4) v.lim = ''; v.lim += L; if (v.lim.length === 4) adv(f); return }
+  if (k === 'info') {
+    const others = f.L.some((s, i) => s.k !== 'info' && hasVal(f, i));
+    if (f.type === 'atis' && v.info && L !== v.info && others && f.prev) {
+      const last = f.prev[f.prev.length - 1], snap = JSON.stringify(Object.assign({}, v, { info: '' }));
+      // a mistyped letter right after the switch is replaced, not archived
+      if (!(last && JSON.stringify(Object.assign({}, last.v, { info: '' })) === snap)) f.prev.push({ info: v.info, v: JSON.parse(JSON.stringify(v)), line: lineOf(f.type, v, '') });
+      const from = f.prev[f.prev.length - 1].info; v.info = L; ACT.newAtis = from;
+      HINT = `Nový ATIS ${L}: hodnoty z ${from} zůstaly. Přepište, co se změnilo – ťuknutím na pole nebo Další ›.`;
+      adv(f); return;
+    }
+    v.info = L; adv(f); return;
+  }
   if (k === 'route') { if (fresh || isHdg(v.route)) v.route = ''; if (v.route.length < 9) v.route += L; if (ROUTE_RE.test(v.route)) adv(f) }
 }
+// which digit may come next: directions 000–360, runway 01–36, ATIS time 0000–2359, QNH 930–1069, TL from 1
+const dirOk = (p, d) => p.length === 0 ? d <= 3 : p.length === 1 ? (p !== '3' || d <= 6) : p.length === 2 ? (p !== '36' || d === 0) : false;
+function okDigit(v, k, d, fresh) {
+  if (!/^\d$/.test(d)) return true; const n = +d;
+  const val = x => fresh ? '' : (v[x] || '');
+  switch (k) {
+    case 'rwy': { const p = /[LCR]$/.test(val('rwy')) || val('rwy').length >= 2 ? '' : val('rwy'); return p === '' ? n <= 3 : p === '0' ? n >= 1 : p === '3' ? n <= 6 : true }
+    case 'wind': {
+      const p = windParts(val('wind'));
+      if (p.v !== null) { if (p.v.length >= 6) return false; const g = p.v.slice(p.v.length - p.v.length % 3); return dirOk(g, n) }
+      if (p.g !== null || p.dir === 'VRB') return true;
+      const all = p.dir + p.spd; if (all.length >= 5) return dirOk('', n); return all.length < 3 ? dirOk(p.dir, n) : true;
+    }
+    case 'route': { const r = val('route'); if (isStr(r)) { const o = strParse(r); return o.h !== null ? o.h.length < 3 && dirOk(o.h, n) : true } return /^HDG\d{0,2}$/.test(r) ? dirOk(r.slice(3), n) : true }
+    case 'time': { const t = val('time').length >= 4 ? '' : val('time'); return t.length === 0 ? n <= 2 : t.length === 1 ? (t !== '2' || n <= 3) : t.length === 2 ? n <= 5 : true }
+    case 'qnh': { const q = val('qnh'), full = q.length >= (q[0] === '9' ? 3 : 4), x = full ? '' : q; return x === '' ? (n === 9 || n === 1) : x === '1' ? n === 0 : x === '10' ? n <= 6 : x === '9' ? n >= 3 : true }
+    case 'tl': { const t = val('tl'), full = t.length >= (t[0] === '1' ? 3 : 2); return (full || t === '') ? n >= 1 : true }
+    case 'sq': return n <= 7;
+    case 'cond': return n <= 6;
+  }
+  return true;
+}
+const DIG_HINT = { rwy: 'Dráha je 01 až 36.', wind: 'Směr větru je 000 až 360.', route: 'Kurz je 001 až 360.', time: 'Čas je 0000 až 2359.', qnh: 'QNH začíná 9 (930–999) nebo 10 (1000–1069).', tl: 'Převodní hladina nezačíná nulou.' };
+// the slot a digit would go to (fields without digits pass it on)
+function digTarget(f) { if (f.L[ACT.s] && f.L[ACT.s].dig) return ACT.s; return nextDig(f, ACT.s) }
 function digit(f, k, d) {
+  { const j = digTarget(f); if (j >= 0 && /^\d$/.test(d) && !okDigit(f.v, f.L[j].k, d, j === ACT.s ? ACT.fresh : freshOf(f, j))) { HINT = DIG_HINT[f.L[j].k] || null; return } }
   if (!f.L[ACT.s].dig) { if (d === '/' || d === '-') return; const j = nextDig(f, ACT.s); if (j < 0) return; setSlot(f, j); k = f.L[j].k }
   const v = f.v, fresh = ACT.fresh; ACT.fresh = false;
   if (d === '-' && k !== 'tdp') return; if (d === '/' && k !== 'tdp' && k !== 'rvr') return;
@@ -272,6 +323,13 @@ function digit(f, k, d) {
     case 'qnh': { const n = () => v.qnh[0] === '9' ? 3 : 4; if (v.qnh.length >= n()) v.qnh = ''; v.qnh += d; if (v.qnh.length === n()) adv(f); return }
     case 'trend': v.trend.push(d); return;
     case 'route': if (fresh || v.route === 'RWY HDG') v.route = '';
+      if (isStr(v.route)) {
+        const o = strParse(v.route);
+        if (o.h !== null) { if (o.h.length < 3) { o.h += d; v.route = strMake(o); if (o.h.length === 3) adv(f) } }
+        else if (o.p !== null) { if (o.p.length < 5) { o.p += d; v.route = strMake(o) } }
+        else { adv(f); if (f.L[ACT.s].k !== 'route') digit(f, f.L[ACT.s].k, d) }   // "continue straight ahead, climb 5000"
+        return;
+      }
       if (/^HDG\d{0,2}$/.test(v.route)) { v.route += d; if (v.route.length === 6) adv(f); return }
       if (v.route.length < 9) v.route += d; return;
     case 'alt': { if (fresh) v.alt = ''; const fl = v.alt.startsWith('FL'), n = v.alt.replace('FL', ''); if (n.length < (fl ? 3 : 5)) { v.alt += d; if (!fl && n.length + 1 === 4) adv(f) } return }
@@ -299,8 +357,10 @@ function token(f, k, val) {
     if (k === 'rwy') adv(f); return;
   }
   if (val === 'FL') { const n = (fresh ? '' : v.alt.replace('FL', '')).slice(0, 3); v.alt = v.alt.startsWith('FL') && !fresh ? n : 'FL' + n; return }
-  if (val === 'RWY HDG') { v.route = 'RWY HDG'; adv(f); return }
-  if (val === 'HDG') { v.route = 'HDG'; return }
+  if (val === 'STRAIGHT') { v.route = 'STRAIGHT'; return }
+  if (val === 'PASSING' || val === 'LEFT' || val === 'RIGHT') { const o = isStr(v.route) && !fresh ? strParse(v.route) : strParse(''); if (val === 'PASSING') { if (o.p === null) o.p = '' } else o.t = val === 'LEFT' ? 'L' : 'R'; v.route = strMake(o); return }
+  if (val === 'HDG') { if (isStr(v.route) && !fresh) { const o = strParse(v.route); if (o.h === null) o.h = ''; v.route = strMake(o) } else v.route = 'HDG'; return }
+  if (val === 'SID') { v.route = ''; return }
   if (f.type !== 'atis') return;
   const inTrend = k === 'trend';
   switch (val) {
@@ -327,14 +387,17 @@ function token(f, k, val) {
 const domId = (o, key) => 'atf-' + String(o.ofpId).replace(/[^A-Za-z0-9]/g, '_') + '-' + key;
 function ctxOf(oid, key) {
   const o = API.ofpOf(oid); if (!o || o.closed || o.void) return null;
-  const st = load(o, key); return { o, key, type: FIELDS[key].type, v: st.v, st, L: slotsOf(FIELDS[key].type) };
+  const st = load(o, key); return { o, key, type: FIELDS[key].type, v: st.v, st, prev: st.prev, L: slotsOf(FIELDS[key].type) };
 }
 function slotHTML(f, i, s) {
   const on = !!(ACT && ACT.oid === f.o.ofpId && ACT.key === f.key && ACT.s === i), val = fmtSlot(s.k, f.v[s.k], on);
   const g = !val && s.ghost ? ghostVal(f, s.k) : '';
-  let inner = val ? `<span class="sv">${esc(val)}</span>` : g ? `<span><span class="gh">${esc(fmtSlot(s.k, g, false))}</span><span class="gtag">${s.ghost === 'sid' || s.ghost === 'star' ? 'plán' : 'z ATIS'}</span></span>` : `<span class="pl">${esc(s.k === 'lim' ? (f.o.des || s.ph) : s.ph)}</span>`;
+  let inner = val ? `<span class="sv">${esc(val)}</span>` : g ? `<span><span class="gh">${esc(fmtSlot(s.k, g, false))}</span><span class="gtag">${s.ghost === 'sid' || s.ghost === 'star' ? 'plán' : 'z ATIS'}</span></span>` : `<span class="pl">${esc(s.ph)}</span>`;
   if (!val && s.k === 'cld' && f.v.vis === 'CAVOK') inner = '<span class="sv dim">v CAVOK</span>';
-  return `<button type="button" class="ak-slot${s.w ? ' wide' : ''}${g ? ' ghost' : ''}${on ? ' on' : ''}${on && ACT.fresh ? ' fresh' : ''}" data-ak-slot="${i}" data-ak-f="${f.key}" data-ak-o="${esc(f.o.ofpId)}" aria-pressed="${on}"><span class="sl">${esc(s.l)}</span>${inner}</button>`;
+  const last = f.type === 'atis' && f.prev && f.prev.length ? f.prev[f.prev.length - 1] : null;
+  const same = !!(last && val && s.k !== 'info' && last.info !== f.v.info && last.v && JSON.stringify(last.v[s.k]) === JSON.stringify(f.v[s.k]));
+  if (same) inner = `<span><span class="sv">${esc(val)}</span><span class="gtag">= ${esc(last.info)}</span></span>`;
+  return `<button type="button" class="ak-slot${s.w ? ' wide' : ''}${g ? ' ghost' : ''}${same ? ' carry' : ''}${on ? ' on' : ''}${on && ACT.fresh ? ' fresh' : ''}" data-ak-slot="${i}" data-ak-f="${f.key}" data-ak-o="${esc(f.o.ofpId)}" aria-pressed="${on}"><span class="sl">${esc(s.l)}</span>${inner}</button>`;
 }
 function slotsHTML(f) { return f.L.map((s, i) => (!s.skip || hasVal(f, i) || (ACT && ACT.oid === f.o.ofpId && ACT.key === f.key && ACT.s === i)) ? slotHTML(f, i, s) : '').join('') }
 function outHTML(f) {
@@ -343,42 +406,51 @@ function outHTML(f) {
 }
 function remsHTML(f) {
   const r = userCfg().rem; if (!r.length) return '';
-  return '<span class="label">Rychle do poznámky</span>' + r.map(x => `<button type="button" class="ak-rem" data-ak-rem="${esc(x)}" data-ak-f="${f.key}" data-ak-o="${esc(f.o.ofpId)}">${esc(x)}</button>`).join('');
+  return '<span class="label">Rychle do poznámky</span>' + r.map(x => `<button type="button" class="ak-rem" data-ak-rem="${esc(x)}" data-ak-f="${f.key}" data-ak-o="${esc(f.o.ofpId)}">${esc(x.replace(/_/g, '…'))}</button>`).join('');
+}
+// earlier ATIS of this flight (a new letter keeps the values; the old line stays here)
+function prevHTML(f) {
+  if (f.type !== 'atis' || !f.prev || !f.prev.length) return '';
+  return '<span class="label">Předchozí</span>' + f.prev.slice(-2).reverse().map(p => `<span class="mono">${esc(p.line)}</span>`).join('');
 }
 // the field inside the OFP view; locked (closed / voided) OFPs show only the stored line
 function field(o, key, locked) {
   const F0 = FIELDS[key]; if (!F0) return '';
   const apt = aptOf(o, key), id = domId(o, key);
-  const head = `<div class="atf-h"><span class="label">${esc(F0.title)}</span><span class="mono muted">${esc(apt)}${F0.type === 'clr' && o.des ? ' → ' + esc(o.des) : ''}</span></div>`;
+  const head = `<div class="atf-h"><span class="label">${esc(F0.title)}</span><span class="mono muted">${esc(apt)}${F0.type === 'clr' && o.des ? ' → ' + esc(o.des) : ''}</span>${F0.type === 'atis' && !(locked || o.closed || o.void) ? `<span class="sp"></span><button type="button" class="btn sm" data-ak-new="${key}" data-ak-o="${esc(o.ofpId)}">Nový ATIS</button>` : ''}</div>`;
   if (locked || o.closed || o.void) return `<div class="atf">${head}<p class="mono atf-ro">${esc(API.ofpVal(o, key) || '–')}</p></div>`;
-  const st = load(o, key), f = { o, key, type: F0.type, v: st.v, st, L: slotsOf(F0.type) };
+  const st = load(o, key), f = { o, key, type: F0.type, v: st.v, st, prev: st.prev, L: slotsOf(F0.type) };
   return `<div class="atf" id="${id}">${head}
     <div class="ak-slots" id="${id}-sl" role="group" aria-label="${esc(F0.title)}">${slotsHTML(f)}</div>
     <div class="atf-note" data-keep><input type="text" id="${id}-nt" data-ak-note="${key}" data-ak-o="${esc(o.ofpId)}" value="${esc(st.note)}" placeholder="Poznámka klávesnicí iPadu, jen výjimečně" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Poznámka ${esc(F0.title)}"></div>
     ${F0.type === 'atis' ? `<div class="ak-rems" id="${id}-rm">${remsHTML(f)}</div>` : ''}
-    <div class="atf-out" id="${id}-out">${outHTML(f)}</div></div>`;
+    <div class="atf-out" id="${id}-out">${outHTML(f)}</div>
+    ${F0.type === 'atis' ? `<div class="atf-prev" id="${id}-pv">${prevHTML(f)}</div>` : ''}</div>`;
 }
 function refreshField(oid, key) {
   const f = ctxOf(oid, key); if (!f) return; const id = domId(f.o, key);
   const sl = document.getElementById(id + '-sl'); if (sl) sl.innerHTML = slotsHTML(f);
   const out = document.getElementById(id + '-out'); if (out) out.innerHTML = outHTML(f);
+  const pv = document.getElementById(id + '-pv'); if (pv) pv.innerHTML = prevHTML(f);
+  const nt = document.getElementById(id + '-nt'); if (nt && document.activeElement !== nt && nt.value !== f.st.note) nt.value = f.st.note;
 }
 
 // keypad blocks: [label, caption, target field, spans two columns]
 const RWY_TOK = [['ILS', '', 'app'], ['RNP', '', 'app'], ['LOC', 'localizer', 'app'], ['VOR', '', 'app'], ['NDB', '', 'app'], ['VISUAL', 'visual', 'app'], ['CIRCL', 'circling', 'app'], ['CAT II', 'ILS CAT II', 'app'],
   ['Z', 'varianta', 'app'], ['Y', 'varianta', 'app'], ['X', 'varianta', 'app'], null, ['L', 'left', 'rwy'], ['C', 'centre', 'rwy'], ['R', 'right', 'rwy']];
-const MET_TOK = [['VRB', 'variable', 'wind'], ['G', 'gusting', 'wind'], ['V', 'rozmezí', 'wind'], ['CAVOK', '', 'vis'], ['9999', '10 km +', 'vis'],
+const MET_TOK = [['VRB', 'variable', 'wind'], ['G', 'gusting', 'wind'], ['V', 'var. between', 'wind'], ['CAVOK', '', 'vis'], ['9999', '10 km +', 'vis'],
   ['FEW', 'few', 'cld'], ['SCT', 'scattered', 'cld'], ['BKN', 'broken', 'cld'], ['OVC', 'overcast', 'cld'], ['NSC', 'no sig. cloud', 'cld'],
   ['CB', '', 'cld'], ['TCU', '', 'cld'], ['VV', 'vert. vis', 'cld'], ['RVR', 'runway vis.', 'rvr'], ['JEVY', 'déšť, mlha…', 'wx'],
   ['NOSIG', '', 'trend'], ['TEMPO', '', 'trend'], ['BECMG', '', 'trend'], ['STAV RWY', 'kontaminace · RWYCC', 'cond', 1]];
 const WX_TOK = [['−', 'light'], ['+', 'heavy'], ['VC', 'vicinity'], ['SH', 'showers'], ['TS', 'thunderstorm'], ['RA', 'rain'], ['SN', 'snow'], ['DZ', 'drizzle'], ['FZ', 'freezing'], ['GR', 'hail'], ['BR', 'mist'], ['FG', 'fog'], ['HZ', 'haze'], ['PL', 'ice pellets'], null];
 const CLD_ROW = [['FEW', 'few', 'cld'], ['SCT', 'scattered', 'cld'], ['BKN', 'broken', 'cld'], ['OVC', 'overcast', 'cld'], ['NSC', 'no sig. cloud', 'cld']];
+const TURN_TOK = [['STRAIGHT', 'straight ahead', null, 1], ['PASSING', 'when passing', null, 1], ['LEFT', 'turn left'], ['RIGHT', 'turn right'], ['HDG', 'heading'], ['SID', 'zpět na písmena']];
 const COND_TOK = [['DRY', 'dry'], ['WET', 'wet'], ['FROST', 'frost'], ['SLUSH', 'slush'], ['ST WATER', 'standing water'], ['DRY SNOW', 'dry snow'], ['WET SNOW', 'wet snow'], ['COMP SNOW', 'compacted snow'], ['ICE', 'ice'], ['WET ICE', 'wet ice'], null, null];
 function keyBtn(code, label, cls, small, dis) { return `<button type="button" class="ak-key${cls ? ' ' + cls : ''}" data-ak="${esc(code)}"${dis ? ' disabled' : ''}>${label}${small ? `<small>${esc(small)}</small>` : ''}</button>` }
 function grid(list, k, prefix) { return list.map(x => x ? keyBtn((prefix || 'tok:') + x[0], esc(x[0]), 't' + (x[2] && x[2] === k ? ' hl' : '') + (x[3] ? ' s2' : '') + (x[0].length > 5 ? ' sm' : ''), x[1]) : '<span></span>').join('') }
 function ctxKind(f, k) {
   if (f.type === 'atis') { if (k === 'info') return 'abc'; if (k === 'app' || k === 'rwy' || k === 'tl') return 'rwy'; if (k === 'cond') return 'cond'; if (k === 'wx' || k === 'trend') return 'wx'; if (k === 'time') return 'read'; return 'met' }
-  if (k === 'lim' || k === 'route') return 'abc'; if (f.type === 'star' && (k === 'app' || k === 'rwy')) return 'rwy'; return 'read';
+  if (k === 'route') return f.type === 'clr' && isStr(f.v.route) ? 'turn' : 'abc'; if (f.type === 'star' && (k === 'app' || k === 'rwy')) return 'rwy'; return 'read';
 }
 const chipLabel = (k, v) => k === 'rwy' ? 'RWY ' + v : k === 'tl' ? 'TL' + v : k === 'alt' ? fmtAlt(v) : k === 'freq' ? fmtFreq(v) : fmtRoute(v);
 function dockEl() {
@@ -395,7 +467,8 @@ function renderDock() {
   const f = ACT && ctxOf(ACT.oid, ACT.key);
   const sheetOpen = !!document.querySelector('#sheet:not([hidden])');
   if (!f || !document.getElementById(domId(f.o, f.key)) || sheetOpen) { if (!f || !document.getElementById(domId(f.o, f.key))) ACT = null; hideDock(); return }
-  if (ACT.s >= f.L.length) ACT.s = 0;
+  if (ACT.mode === 'note') { renderNote(f); return }
+  if (ACT.s < 0 || ACT.s >= f.L.length) ACT.s = 0;
   const s = f.L[ACT.s], k = s.k, d = dockEl();
   d.querySelector('#ak-title').textContent = FIELDS[f.key].title + ' · ' + s.l;
   const hint = d.querySelector('#ak-hint'); hint.textContent = HINT || s.h; hint.classList.toggle('warn', !!HINT);
@@ -407,21 +480,55 @@ function renderDock() {
     const hs = history(f, k).filter(x => x !== g);
     if (hs.length) ch += `<span class="ak-cl">Dříve na ${esc(aptOf(f.o, f.key))}:</span>` + hs.map(x => `<button type="button" class="ak-chip" data-ak="chip:${esc(x)}">${esc(chipLabel(k, x))}</button>`).join('');
   }
+  if (ACT.newAtis && f.type === 'atis') ch = `<button type="button" class="ak-chip pre" data-ak="clean:">Celý jiný<small>smazat hodnoty z ${esc(ACT.newAtis)}</small></button>` + ch;
   d.querySelector('#ak-chips').innerHTML = ch;
   const ctx = d.querySelector('#ak-ctx'), kind = ctxKind(f, k);
   if (kind === 'abc') {
-    const extra = k === 'route' ? [keyBtn('tok:HDG', 'HDG', 't sm', 'kurz + číslo'), f.type === 'clr' ? keyBtn('tok:RWY HDG', 'RWY HDG', 't sm') : '<span></span>'] : ['<span></span>', '<span></span>'];
+    const extra = k === 'route' ? [f.type === 'clr' ? keyBtn('tok:STRAIGHT', 'STRAIGHT', 't sm', 'straight ahead') : '<span></span>', keyBtn('tok:HDG', 'HDG', 't sm', 'kurz + číslo')] : ['<span></span>', '<span></span>'];
     ctx.className = 'ak-ctx abc'; ctx.innerHTML = Object.keys(PHON).map(x => keyBtn('let:' + x, x, 't', PHON[x])).join('') + extra.join('');
   } else if (kind === 'rwy') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(RWY_TOK, k) + (f.type === 'atis' ? keyBtn('tok:STAV RWY', 'STAV RWY', 't sm' + (k === 'cond' ? ' hl' : ''), 'kontaminace') : '<span></span>') }
   else if (kind === 'cond') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(COND_TOK, k, 'rc:') }
+  else if (kind === 'turn') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(TURN_TOK, k); if (!HINT) hint.textContent = 'Straight ahead: PASSING a výška, LEFT / RIGHT, HDG a tři číslice. Pak Další ›.' }
   else if (kind === 'met') { ctx.className = 'ak-ctx c5'; ctx.innerHTML = grid(MET_TOK, k) }
   else if (kind === 'wx') { ctx.className = 'ak-ctx c5'; ctx.innerHTML = grid(WX_TOK, k, 'wx:') + grid(CLD_ROW, k) }
   else { ctx.className = 'ak-ctx read'; ctx.innerHTML = `<div class="ak-readout"><span class="sl">${esc(s.l)}</span><span class="rv">${esc(fmtSlot(k, f.v[k], true) || '–')}</span></div>` + (k === 'alt' ? `<div class="ak-rrow">${keyBtn('tok:FL', 'FL', 't' + (String(f.v.alt).startsWith('FL') ? ' hl' : ''), 'flight level')}</div>` : '') }
-  const noDig = k === 'lim', tdp = k === 'tdp', slash = tdp || k === 'rvr', max = k === 'sq' ? 7 : k === 'cond' ? 6 : 9;
-  d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('d:' + n, n, '', null, noDig || +n > max)).join('') + keyBtn('d:-', '−', '', null, !tdp) + keyBtn('d:0', '0', '', null, noDig) + keyBtn('d:/', '/', '', null, !slash);
+  const noDig = false, tdp = k === 'tdp', slash = tdp || k === 'rvr', tj = digTarget(f);
+  const ok = n => !noDig && tj >= 0 && okDigit(f.v, f.L[tj].k, n, tj === ACT.s ? ACT.fresh : freshOf(f, tj));
+  d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('d:' + n, n, '', null, !ok(n))).join('') + keyBtn('d:-', '−', '', null, !tdp) + keyBtn('d:0', '0', '', null, !ok('0')) + keyBtn('d:/', '/', '', null, !slash);
   d.querySelector('#ak-act').innerHTML = keyBtn('bk', '⌫', 'bk', 'smazat') + keyBtn('next', 'Další ›', 't nx') + keyBtn('done', 'Hotovo', 't okk');
   const was = d.hidden; d.hidden = false;
   requestAnimationFrame(() => { document.body.style.paddingBottom = (d.offsetHeight + 16) + 'px'; if (was || VIS !== f.key + f.o.ofpId) { VIS = f.key + f.o.ofpId; ensureVisible(domId(f.o, f.key)) } });
+}
+// the note on the eTechLog keypad: letters, digits and a space (TWY _ CLSD puts the cursor where the taxiway goes)
+function renderNote(f) {
+  const d = dockEl(), note = f.st.note, pos = Math.max(0, Math.min(ACT.pos == null ? note.length : ACT.pos, note.length));
+  d.querySelector('#ak-title').textContent = FIELDS[f.key].title + ' · POZNÁMKA';
+  const hint = d.querySelector('#ak-hint'); hint.classList.remove('warn');
+  hint.innerHTML = `<span class="ak-noteread">${esc(note.slice(0, pos))}<span class="ak-caret"></span>${esc(note.slice(pos))}</span>`;
+  d.querySelector('#ak-chips').innerHTML = '';
+  const ctx = d.querySelector('#ak-ctx'); ctx.className = 'ak-ctx abc';
+  ctx.innerHTML = Object.keys(PHON).map(x => keyBtn('nt:' + x, x, 't', PHON[x])).join('') + keyBtn('nt:/', '/', 't') + keyBtn('nt:,', ',', 't');
+  d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('nt:' + n, n)).join('') + keyBtn('nt:-', '−') + keyBtn('nt:0', '0') + keyBtn('nt:.', '.');
+  d.querySelector('#ak-act').innerHTML = keyBtn('bk', '⌫', 'bk', 'smazat') + keyBtn('nt: ', 'Mezera', 't nx') + keyBtn('done', 'Hotovo', 't okk');
+  const was = d.hidden; d.hidden = false;
+  requestAnimationFrame(() => { document.body.style.paddingBottom = (d.offsetHeight + 16) + 'px'; if (was || VIS !== 'n' + f.key + f.o.ofpId) { VIS = 'n' + f.key + f.o.ofpId; ensureVisible(domId(f.o, f.key)) } });
+}
+function openNote(oid, key, tpl) {
+  const f = ctxOf(oid, key); if (!f) return;
+  let note = f.st.note.trim(), pos;
+  if (tpl) { const pre = note ? note + ', ' : '', t = tpl.replace(/_/g, ''); pos = pre.length + tpl.indexOf('_'); note = pre + t } else pos = note.length;
+  const prevAct = ACT && !(ACT.oid === oid && ACT.key === key) ? ACT : null;
+  ACT = { oid, key, s: -1, fresh: false, mode: 'note', pos }; HINT = null;
+  save(f.o, key, { v: f.v, note, prev: f.prev });
+  if (prevAct) refreshField(prevAct.oid, prevAct.key);
+  refreshField(oid, key); renderDock();
+}
+function notePress(f, code) {
+  let note = f.st.note, pos = Math.max(0, Math.min(ACT.pos == null ? note.length : ACT.pos, note.length));
+  if (code === 'done') { note = note.replace(/ {2,}/g, ' ').replace(/ ,/g, ',').trim(); save(f.o, f.key, { v: f.v, note, prev: f.prev }); close(); return }
+  if (code === 'bk') { if (pos > 0) { note = note.slice(0, pos - 1) + note.slice(pos); pos-- } }
+  else if (code.startsWith('nt:')) { const ch = code.slice(3); note = note.slice(0, pos) + ch + note.slice(pos); pos += ch.length }
+  ACT.pos = pos; save(f.o, f.key, { v: f.v, note, prev: f.prev }); refreshField(f.o.ofpId, f.key); renderDock();
 }
 function ensureVisible(id) {
   const el = document.getElementById(id), d = document.getElementById('akdock'); if (!el || !d) return;
@@ -440,10 +547,11 @@ function close() { const p = ACT; ACT = null; HINT = null; hideDock(); if (p) re
 function press(code) {
   if (!ACT) return; const f = ctxOf(ACT.oid, ACT.key); if (!f) { close(); return }
   HINT = null;
+  if (ACT.mode === 'note') { notePress(f, code); return }
   if (code === 'done') { close(); return }
   if (code === 'next') { const j = nextIdx(f); if (j < 0) { close(); return } setSlot(f, j); refreshField(f.o.ofpId, f.key); renderDock(); return }
   apply(f, code);
-  save(f.o, f.key, { v: f.v, note: f.st.note });
+  save(f.o, f.key, { v: f.v, note: f.st.note, prev: f.prev });
   refreshField(f.o.ofpId, f.key); renderDock();
 }
 
@@ -456,7 +564,7 @@ function cfgInner() {
       const d = DEF[t][x.k];
       return `<li class="ak-crow${x.on ? '' : ' off'}"><label><input type="checkbox" data-ak-cfg="${t}|${x.k}"${x.on ? ' checked' : ''}>${esc(d.l)}</label><span class="muted">${d.skip ? 'přes tlačítko' : ''}</span><span class="sp"></span><button type="button" class="ak-mv" data-ak-mv="${t}|${x.k}|-1" aria-label="${esc(d.l)} výš"${i === 0 ? ' disabled' : ''}>↑</button><button type="button" class="ak-mv" data-ak-mv="${t}|${x.k}|1" aria-label="${esc(d.l)} níž"${i === c[t].length - 1 ? ' disabled' : ''}>↓</button></li>`;
     }).join('')}</ol></div>`).join('')}</div>
-    <label class="fld"><span>Rychlé poznámky k ATIS (oddělte čárkou)</span><input type="text" id="ak-rem" value="${esc(c.rem.join(', '))}" autocomplete="off" spellcheck="false" autocapitalize="characters"></label>`;
+    <label class="fld"><span>Rychlé poznámky k ATIS (oddělte čárkou; _ = doplníte na klávesnici, např. TWY _ CLSD)</span><input type="text" id="ak-rem" value="${esc(c.rem.join(', '))}" autocomplete="off" spellcheck="false" autocapitalize="characters"></label>`;
 }
 function cfgEditor() { DRAFT = userCfg(); return `<div id="ak-cfgbox">${cfgInner()}</div>` }
 function cfgRedraw(focusSel) { const b = document.getElementById('ak-cfgbox'); if (!b) return; const rem = document.getElementById('ak-rem'); if (rem) DRAFT.rem = remList(rem.value); b.innerHTML = cfgInner(); if (focusSel) { const x = b.querySelector(focusSel); if (x && !x.disabled) x.focus() } }
@@ -467,13 +575,18 @@ function cfgResult() { const rem = document.getElementById('ak-rem'); if (rem) D
 function bind(api) {
   API = api;
   document.addEventListener('click', e => {
-    const b = e.target.closest('[data-ak],[data-ak-slot],[data-ak-rem],[data-ak-mv],[data-ak-preset]'); if (!b || b.disabled) return;
+    const b = e.target.closest('[data-ak],[data-ak-slot],[data-ak-rem],[data-ak-new],[data-ak-mv],[data-ak-preset]'); if (!b || b.disabled) return;
     if (b.dataset.ak != null) { press(b.dataset.ak); return }
     if (b.dataset.akSlot != null) { open(b.dataset.akO, b.dataset.akF, +b.dataset.akSlot); return }
     if (b.dataset.akRem != null) {
+      if (b.dataset.akRem.includes('_')) { openNote(b.dataset.akO, b.dataset.akF, b.dataset.akRem); return }
       const f = ctxOf(b.dataset.akO, b.dataset.akF); if (!f) return;
-      const note = (f.st.note.trim() ? f.st.note.trim() + ', ' : '') + b.dataset.akRem; save(f.o, f.key, { v: f.v, note });
-      const nt = document.getElementById(domId(f.o, f.key) + '-nt'); if (nt) nt.value = note; refreshField(f.o.ofpId, f.key); return;
+      const note = (f.st.note.trim() ? f.st.note.trim() + ', ' : '') + b.dataset.akRem; save(f.o, f.key, { v: f.v, note, prev: f.prev });
+      refreshField(f.o.ofpId, f.key); return;
+    }
+    if (b.dataset.akNew != null) {
+      const f = ctxOf(b.dataset.akO, b.dataset.akNew); if (!f) return; const i = idxOf(f, 'info'); if (i < 0) return;
+      open(b.dataset.akO, b.dataset.akNew, i); HINT = f.v.info ? `Písmeno nového ATIS. Hodnoty z ${f.v.info} zůstanou – přepíšete jen to, co se změnilo.` : null; renderDock(); return;
     }
     if (b.dataset.akPreset) { const rem = DRAFT.rem; DRAFT = presetCfg(b.dataset.akPreset); DRAFT.rem = rem; cfgRedraw(); return }
     if (b.dataset.akMv) { const [t, k, dd] = b.dataset.akMv.split('|'), L = DRAFT[t], i = L.findIndex(c => c.k === k), j = i + (+dd); if (j < 0 || j >= L.length) return; [L[i], L[j]] = [L[j], L[i]]; cfgRedraw(`[data-ak-mv="${t}|${k}|${dd}"]`) }
@@ -481,7 +594,7 @@ function bind(api) {
   document.addEventListener('change', e => { const c = e.target.closest && e.target.closest('[data-ak-cfg]'); if (!c || !DRAFT) return; const [t, k] = c.dataset.akCfg.split('|'); const it = DRAFT[t].find(x => x.k === k); if (it) { it.on = c.checked; cfgRedraw() } });
   document.addEventListener('input', e => {
     const n = e.target.closest && e.target.closest('[data-ak-note]'); if (!n) return;
-    const f = ctxOf(n.dataset.akO, n.dataset.akNote); if (!f) return; save(f.o, f.key, { v: f.v, note: n.value });
+    const f = ctxOf(n.dataset.akO, n.dataset.akNote); if (!f) return; save(f.o, f.key, { v: f.v, note: n.value, prev: f.prev });
     const out = document.getElementById(domId(f.o, f.key) + '-out'); if (out) out.innerHTML = outHTML(ctxOf(f.o.ofpId, f.key));
   });
   // typing anywhere else (the note, another OFP field) puts the keypad away
@@ -489,9 +602,11 @@ function bind(api) {
   document.addEventListener('keydown', e => {
     if (!ACT || e.metaKey || e.ctrlKey || e.altKey) return; if (e.target.closest && e.target.closest('input,textarea,select')) return;
     const d = document.getElementById('akdock'); if (!d || d.hidden) return;
-    const f = ctxOf(ACT.oid, ACT.key); if (!f) return; const k = f.L[ACT.s].k, key = e.key;
+    const f = ctxOf(ACT.oid, ACT.key); if (!f) return; const key = e.key;
+    if (ACT.mode === 'note') { if (key.length === 1 && /[A-Za-z0-9 \/,.\-]/.test(key)) press('nt:' + key.toUpperCase()); else if (key === 'Backspace') press('bk'); else if (key === 'Enter' || key === 'Escape') press('done'); else return; e.preventDefault(); return }
+    const k = f.L[ACT.s].k;
     if (/^[0-9]$/.test(key)) press('d:' + key); else if (key === 'Backspace') press('bk'); else if (key === 'Enter' || key === 'Tab') press('next'); else if (key === 'Escape') press('done');
-    else if (key === '/' || key === '-') press('d:' + key); else if (/^[a-zA-Z]$/.test(key) && ['info', 'lim', 'route'].includes(k)) press('let:' + key.toUpperCase()); else return;
+    else if (key === '/' || key === '-') press('d:' + key); else if (/^[a-zA-Z]$/.test(key) && ['info', 'route'].includes(k)) press('let:' + key.toUpperCase()); else return;
     e.preventDefault();
   });
   const sh = document.getElementById('sheet'); if (sh && typeof MutationObserver !== 'undefined') new MutationObserver(() => renderDock()).observe(sh, { attributes: true, attributeFilter: ['hidden'] });
@@ -502,6 +617,6 @@ function after() { if (ACT) renderDock(); else hideDock() }
 return {
   bind, field, after, cfgEditor, cfgResult, lineOf, plan, FIELDS,
   // for tests
-  _: { DEF, PRESETS, presetCfg, sanitize, empty, slotsOf, fmtSlot, outSlot, atomsStr, apply, setSlot, firstEmpty, nextIdx, get ACT() { return ACT }, set ACT(x) { ACT = x }, get HINT() { return HINT } }
+  _: { DEF, PRESETS, presetCfg, sanitize, empty, slotsOf, fmtSlot, outSlot, atomsStr, apply, setSlot, firstEmpty, nextIdx, fmtRoute, okDigit, get ACT() { return ACT }, set ACT(x) { ACT = x }, get HINT() { return HINT } }
 };
 })();

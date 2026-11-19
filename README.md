@@ -203,15 +203,22 @@ Závada zjištěná na zemi (záložka Závady → *Zapsat závadu*) se zapíše
 (výchozí je poslední let), v tabulce je jako „na zemi po letu N“. Volba *nepřiřazovat k letu* ji nechá jen v záložce Závady.
 
 ## ATIS a clearance – klávesnice eTechLogu
-V OFP (Let → Před odletem, Přílet a přistání) se ATIS DEP, ATC clearance, ATIS ARR a nová **Příletová clearance** píšou
+V OFP (Let → Před odletem, Přílet a přistání) se ATIS DEP, ATC clearance, ATIS ARR, **Příletová clearance** a při divertu **ATIS DIVERT** píšou
 na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na políčko se klávesnice vysune zespodu.
 - **Pořadí nehraje roli.** Každé tlačítko ví, do kterého pole patří (ILS, CAVOK, BKN, VRB…), číslice jdou tam, kde je kurzor.
   Přiblížení může zaznít před dráhou i po ní. Když pole v ATIS nezazní, číslice skočí do dalšího.
 - **Zápis jako na papír, výsledek jednotný:** FEW 2 0 i FEW 2 0 0 0 → FEW020, viditelnost 1 0 → 9999, 2 5 0 0 8 → 250/08,
   1 2 5 → 12/05, QNH 9 8 9 i 1 0 1 3. Pomlčka u jevů = slabý (light): − SH RA = −SHRA, plus = silný (heavy).
-- **ILS** s variantou Z / Y / X a **CAT II**, stav dráhy (DRY, WET, SLUSH… + RWYCC 5/5/5), RVR, vítr s nárazy a rozmezím (240V320), trend.
+- **ILS** s variantou Z / Y / X a **CAT II**, stav dráhy (DRY, WET, SLUSH… + RWYCC 5/5/5), RVR, vítr s nárazy (gusting) a variable between (240V320), trend.
+- Číslice mimo rozsah klávesnice nenabídne: dráha 01–36, směr větru a kurz 000–360, QNH 930–1069, čas 0000–2359.
+- **Nový ATIS:** tlačítko *Nový ATIS* u pole (nebo nové písmeno v INFO). Hodnoty zůstanou, přepíšete jen co se změnilo;
+  co je stejné jako v předchozím ATIS, je světlejší se značkou „= K“. Celý jiný ATIS: tlačítko *Celý jiný* hodnoty smaže.
+  Předchozí ATIS zůstává pod polem přeškrtnutý (do OFP a PDF jde platný).
+- **Divert:** ATIS ARR zůstává pro letiště určení, pro letiště divertu je zvlášť ATIS DIVERT (i v PDF).
+- **Rychlé poznámky** se šablonou (TWY _ CLSD) otevřou klávesnici s písmeny, číslicemi a mezerou – doplní se označení dráhy.
 - **SID a STAR z OFP:** plánovaná procedura z navigačního logu (např. KOK7S, BISBA3X) je v políčku slabě a potvrdí se ✓.
-  Jiná procedura: tlačítko s bodem z OFP (KOK…) a doplní se číslo a písmeno. Kurz po odletu: HDG a tři číslice.
+  Jiná procedura: tlačítko s bodem z OFP (KOK…) a doplní se číslo a písmeno. Bez SID: STRAIGHT (straight ahead), PASSING a výška,
+  LEFT / RIGHT a HDG s kurzem, nebo jen HDG a tři číslice. Clearance limit se nezapisuje.
   Přiblížení a dráhu v příletové clearance nabídne z ATIS ARR. Dříve použité hodnoty na letišti (SID, dráhy, TL, výšky,
   frekvence) se nabízejí z ostatních OFP.
 - Do OFP, PDF a kontroly vyplnění jde jeden normalizovaný řádek (např. `INFO K · ILS · RWY 26 · TL60 · 240/10 · 9999 · FEW020 · 12/05 · Q1018 · NOSIG`).
@@ -222,6 +229,9 @@ Tlačítko **Můj účet** v horní liště (posádka i kancelář):
 - **Zápis ATIS a clearance** – pořadí polí (šipky), vypnutí polí, předvolby ICAO / Evropa a USA, rychlé poznámky.
   Platí pro přihlášeného pilota na všech iPadech. Čas ATIS je ve výchozím stavu vypnutý.
 - **Změna PINu** – současný PIN a dvakrát nový.
+
+## Odmrazování (DEICE)
+V OFP v kroku *Před odletem* je tlačítko **DEICE** – zatím jen připravené místo pro záznam o odmrazování do ATL, obsah se doplní.
 
 ## PDF z OFP
 V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signálu). Z nabídky sdílení jde vytisknout (AirPrint), uložit do Souborů nebo poslat.

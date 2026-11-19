@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.6.14"}
+:root{--etl-build:"0.6.15"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -301,7 +301,12 @@ input.t4,input.big-in{font-family:var(--f-mono);font-size:1.45rem;text-align:cen
 .mode-note{font-size:.9rem;color:var(--muted)}
 .planned{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 .ofp{display:grid;gap:16px}
-table.ofplog{min-width:980px}
+table.ofplog{min-width:720px}
+table.ofplog.manual{min-width:0}
+table.ofplog .wnote{margin-top:4px}
+table.ofplog .wnote .ofp-notebtn{min-width:0;min-height:32px;padding:2px 8px;font-size:.82rem}
+table.ofplog .wdiff{display:block;font-size:.8rem;min-height:1em;margin-top:2px;text-align:center}
+.crewgrid{align-items:start}
 table.ofplog input.ofp-note{width:140px;text-align:left;font-family:var(--f-body)}
 table.ofplog .ofp-notebtn{min-width:140px;min-height:44px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;text-align:left;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);padding:4px 8px;font:600 .86rem var(--f-mono);cursor:pointer}
 table.ofplog .ofp-notebtn.empty{color:var(--muted);font-family:var(--f-body);font-weight:500;border-style:dashed}
@@ -471,6 +476,15 @@ table.ftl-duties td,table.ftl-tab td{vertical-align:top}
 .ak-slot .gtag{font-family:var(--f-display);font-weight:600;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-left:6px;vertical-align:2px}
 .ak-slot.ghost{border-style:dashed;border-color:var(--accent)}
 .ak-slot.on{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px var(--accent-soft)}
+.ak-slot.carry .sv{color:var(--muted);font-weight:500}
+.ak-slot.carry .gtag{color:var(--muted)}
+.atf-h .sp{flex:1 1 0}
+.atf-prev{display:flex;gap:4px 12px;align-items:baseline;flex-wrap:wrap;min-width:0;color:var(--muted)}
+.atf-prev .mono{font-size:.9rem;overflow-wrap:anywhere;text-decoration:line-through;text-decoration-color:var(--line-strong)}
+.atf-prev:empty{display:none}
+.ak-noteread{font-family:var(--f-mono);font-size:1.15rem;color:var(--key-ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.ak-caret{display:inline-block;width:2px;height:1.15em;margin:0 1px;vertical-align:-3px;background:var(--key-ink);animation:akblink 1s steps(1) infinite}
+@keyframes akblink{50%{opacity:0}}
 .ak-slot.on.fresh .sv{background:var(--accent-soft);border-radius:4px;box-shadow:0 0 0 3px var(--accent-soft)}
 .ak-rems{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .ak-rem{min-height:34px;padding:2px 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface-2);color:var(--ink);font-family:var(--f-mono);font-size:.85rem;cursor:pointer;touch-action:manipulation}

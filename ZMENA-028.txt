@@ -1,0 +1,43 @@
+eTechLog – změna Z-028
+Verze: 0.6.15 (navazuje na Z-027 / 0.6.14)
+Datum: 2026-11-19
+
+ATIS a clearance
+- Nový ATIS: tlačítko „Nový ATIS“ u pole, nebo nové písmeno v INFO. Hodnoty z předchozího zůstanou, přepíšete jen to,
+  co se změnilo (ťuknutím na pole). Stejné hodnoty jsou světlejší se značkou „= K“. Předchozí ATIS zůstane pod polem
+  přeškrtnutý, do OFP a PDF jde platný. Celý jiný ATIS: tlačítko „Celý jiný“ nad klávesnicí hodnoty smaže.
+- Klávesnice nenabídne číslice mimo rozsah: dráha 01–36, směr větru, variable between a kurz 000–360, QNH 930–1069,
+  čas 0000–2359.
+- Variable between (V) místo „rozmezí“.
+- Rychlá poznámka TWY _ CLSD otevře klávesnici s písmeny, číslicemi a mezerou; kurzor je tam, kam patří označení.
+  Vlastní šablony s _ jdou nastavit v Můj účet.
+- ATC clearance bez pole LIMIT. Bez SID: STRAIGHT (straight ahead), PASSING a výška, LEFT / RIGHT, HDG a kurz,
+  nebo jen HDG. Po samotném STRAIGHT jdou číslice rovnou do výšky („continue straight ahead, climb 5000“).
+
+OFP
+- Trať (navigační log): žádné posouvání do strany – poznámka je pod bodem, rozdíl paliva pod palivem. Stejně u route
+  to alternate. Ruční routing divertu má poznámky u každého bodu (i v PDF).
+- Divert: ATIS ARR zůstává pro letiště určení, pro letiště divertu je nové pole ATIS DIVERT (i v PDF).
+  Pole Začátek divertu je čitelné celé.
+- Posádka: PF je vidět i u SIC, bez vybraného SIC nejde zaškrtnout. Pole PIC, SIC a palubní průvodčí jsou zarovnaná.
+- Krok Před odletem: tlačítko DEICE vpravo – zatím jen připravené místo, obsah upřesníte.
+
+Návrat
+- Na 0.6.14: nahrajte znovu eatl-Z-027-v0.6.14.zip, na 0.6.13: eatl-Z-026-v0.6.13.zip. Zápisy zůstávají jako text
+  v původních polích; ATIS DIVERT a předchozí ATIS starší verze nezobrazí, ale v datech zůstanou.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-028.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js
