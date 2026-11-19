@@ -62,7 +62,7 @@ const DEF = {
     stand: { l: 'STAND', ph: '12', dig: 1, h: 'Stání: STAND a číslo (1 2), nebo písmeno a číslo (A 5).' }
   }
 };
-DEF.taxi.via.h = DEF.taxiA.via.h = 'Pojezdové dráhy, jak zazní: B A 1 = B, A1 – písmeno začne další dráhu, číslice patří k ní. Dvě písmena (TA): T A SPOJIT. HOLD SHORT / CROSS a dráha: 3 3.';
+DEF.taxi.via.h = DEF.taxiA.via.h = 'Pojezdové dráhy, jak zazní: B A 1 = B, A1 – písmeno začne další dráhu, číslice patří k ní. Dvě písmena (TA): T A SPOJIT. HOLD SHORT / CROSS a dráha: 3 3. EXIT a číslo: 1 5.';
 const TYPE_NAME = { atis: 'ATIS (DEP i ARR)', clr: 'Odletová clearance', star: 'Příletová clearance', taxi: 'Taxi – odlet', taxiA: 'Taxi – přílet' };
 const PRESETS = {
   icao: { atis: ['info', 'time', 'app', 'rwy', 'cond', 'tl', 'wind', 'vis', 'rvr', 'wx', 'cld', 'tdp', 'qnh', 'trend'], clr: ['route', 'alt', 'sq', 'freq'], star: ['route', 'alt', 'app', 'rwy'], taxi: ['rwy', 'hp', 'via'], taxiA: ['via', 'stand'] },
@@ -169,13 +169,13 @@ function fmtTrend(a, live) {
   return out.join(' ');
 }
 // taxi route: taxiways in order, HOLD SHORT / CROSS / BACKTRACK with the runway or taxiway they belong to
-const VKW = { HS: 'HOLD SHORT', CROSS: 'CROSS', BKTRK: 'BACKTRACK' };
+const VKW = { HS: 'HOLD SHORT', CROSS: 'CROSS', BKTRK: 'BACKTRACK', EXIT: 'EXIT' };
 const isRwyI = x => /^RWY/.test(x || '');
 function fmtVia(a) {
   const seg = []; let prev = null;
   for (const x of (a || [])) {
     const t = VKW[x] || (isRwyI(x) ? 'RWY ' + x.slice(3) : x);
-    if (prev && (prev === 'HS' || prev === 'CROSS' || (prev === 'BKTRK' && isRwyI(x)))) seg[seg.length - 1] += ' ' + t; else seg.push(t);
+    if (prev && (prev === 'HS' || prev === 'CROSS' || prev === 'EXIT' || (prev === 'BKTRK' && isRwyI(x)))) seg[seg.length - 1] += ' ' + t; else seg.push(t);
     prev = x;
   }
   return seg.join(', ').trim();
@@ -195,14 +195,18 @@ function outSlot(k, v) {
 function lineOf(type, v, note, cfg) { const a = slotsOf(type, cfg).map(s => outSlot(s.k, v[s.k])); if (note) a.push(note); return a.filter(Boolean).join(' · ') }
 
 // ---------- OFP context ----------
-// planned procedures: the nav log names the SID on its first leg and the STAR on its last (KOK7S, BISBA3X); the fix is the name without number and letter
+// planned procedures: the nav log names the SID on the leg out of the departure (KOK7S) and the STAR on the leg into the
+// destination (BISBA3X). When the last leg only says "STAR", there is no STAR plan – on a short flight the SID must not
+// be taken for it (LOWW–LKPR: LANUX6B). The fix is the name without number and letter, or the point before the destination.
 function plan(o) {
-  const W = (o.wpts || []).filter(p => !p.rvsm);
-  const sid = (W.slice(0, 4).find(p => ROUTE_RE.test(p.awy || '')) || {}).awy || '';
-  const star = (W.slice(-5).reverse().find(p => ROUTE_RE.test(p.awy || '')) || {}).awy || '';
+  const W = (o.wpts || []).filter(p => !p.rvsm), last = W.length - 1;
+  const sid = (W.slice(1, Math.min(4, last)).find(p => ROUTE_RE.test(p.awy || '')) || {}).awy || '';
+  const star = last > 1 && ROUTE_RE.test(W[last].awy || '') && W[last].awy !== sid ? W[last].awy : '';
+  const named = p => p && /^[A-Z]{2,5}$/.test(p.wpt || '') && !/^TO[CD]$/.test(p.wpt);
   const toks = String(o.route || '').split(/\s+/).map(t => t.split('/')[0]).filter(t => /^[A-Z]{2,5}$/.test(t) && t !== 'DCT');
+  const entry = (W.slice(1, last).reverse().find(named) || {}).wpt || '';
   const fix = n => n ? n.replace(/\d[A-Z]$/, '') : '';
-  return { sid, sidFix: fix(sid) || toks[0] || '', star, starFix: fix(star) || toks[toks.length - 1] || '' };
+  return { sid, sidFix: fix(sid) || toks[0] || '', star, starFix: fix(star) || entry || toks[toks.length - 1] || '' };
 }
 // destination ATIS and arrival clearance stay with the destination; a divert gets its own ATIS
 const aptOf = (o, key) => key === 'atisDep' || key === 'clr' || key === 'taxiDep' ? (o.dep || '') : key === 'atisDiv' || key === 'taxiArr' ? (API.arrApt(o) || '') : (o.des || '');
@@ -353,7 +357,9 @@ function taxiLetter(f, k, L, fresh) {
 function viaDigit(f, d) {
   const a = f.v.via, last = a[a.length - 1];
   if (last && isRwyI(last)) { if (/^RWY\d?$/.test(last)) { a[a.length - 1] = last + d; return true } return false }
+  if (last === 'EXIT') { a.push(d); return true }
   if (last && VKW[last]) { a.push('RWY' + d); return true }
+  if (last && /^\d$/.test(last)) { a[a.length - 1] = last + d; return true }   // exit 15
   if (last && viaTail.test(last)) { a[a.length - 1] = last + d; return true }
   return false;
 }
@@ -365,7 +371,7 @@ function taxiToken(f, k, val) {
       if (focusK(f, 'rwy')) ACT.fresh = hasVal(f, ACT.s); return;
     case 'HP': case 'STAND': { const key = val === 'HP' ? 'hp' : 'stand'; if (focusK(f, key)) ACT.fresh = hasVal(f, ACT.s); return }
     case 'VIA': focusK(f, 'via'); return;
-    case 'HS': case 'CROSS': case 'BKTRK': focusK(f, 'via'); a.push(val); return;
+    case 'HS': case 'CROSS': case 'BKTRK': case 'EXIT': focusK(f, 'via'); a.push(val); return;
     case 'SPOJIT': {
       focusK(f, 'via'); const b = a[a.length - 2];
       if (a.length >= 2 && /^[A-Z]$/.test(b) && /^[A-Z]\d{0,2}$/.test(last)) a.splice(-2, 2, b + last); else HINT = 'SPOJIT udělá ze dvou písmen jednu dráhu: T A → TA.';
@@ -384,6 +390,7 @@ function okDigit(v, k, d, fresh) {
     case 'via': {
       const a = v.via || [], last = a[a.length - 1];
       if (last && isRwyI(last)) return /^RWY\d?$/.test(last) && rwyOk(last.slice(3), n);
+      if (last === 'EXIT' || (last && /^\d$/.test(last))) return true;
       if (last && VKW[last]) return n <= 3;
       if (last && viaTail.test(last)) return true;
       if ('stand' in v) return true;   // arrival: goes to the stand
@@ -624,7 +631,7 @@ function dockEl() {
   let d = document.getElementById('akdock');
   if (!d) {
     d = document.createElement('div'); d.id = 'akdock'; d.className = 'ak-dock'; d.hidden = true;
-    d.innerHTML = '<div class="ak-in"><div class="ak-top"><span class="ak-title" id="ak-title"></span><span class="ak-hint" id="ak-hint"></span><div class="ak-chips" id="ak-chips"></div></div><div class="ak-grid"><div class="ak-ctx" id="ak-ctx"></div><div class="ak-dig" id="ak-dig"></div><div class="ak-act" id="ak-act"></div></div></div>';
+    d.innerHTML = '<div class="ak-in"><button type="button" class="ak-x" data-ak="x" aria-label="Zavřít klávesnici" title="Zavřít klávesnici">×</button><div class="ak-top"><span class="ak-title" id="ak-title"></span><span class="ak-hint" id="ak-hint"></span><div class="ak-chips" id="ak-chips"></div></div><div class="ak-grid"><div class="ak-ctx" id="ak-ctx"></div><div class="ak-dig" id="ak-dig"></div><div class="ak-act" id="ak-act"></div></div></div>';
     document.body.appendChild(d);
   }
   return d;
@@ -660,8 +667,8 @@ function renderDock() {
   } else if (kind === 'taxi') {
     const dep = f.type === 'taxi';
     ctx.className = 'ak-ctx abc r5';
-    ctx.innerHTML = letters('let:', null) + keyBtn('tok:SPOJIT', 'SPOJIT', 't sm s2', 'T A → TA')
-      + keyBtn('tok:RWY', 'RWY', 't' + (k === 'rwy' ? ' on' : ''), 'runway') + (dep ? keyBtn('tok:HP', 'HP', 't' + (k === 'hp' ? ' on' : ''), 'hold. point') : keyBtn('tok:STAND', 'STAND', 't sm' + (k === 'stand' ? ' on' : ''), 'stání'))
+    ctx.innerHTML = letters('let:', null) + keyBtn('tok:SPOJIT', 'SPOJIT', 't sm', 'T A → TA') + keyBtn('tok:EXIT', 'EXIT', 't sm', 'exit 15')
+      + keyBtn('tok:RWY', 'RWY', 't' + (k === 'rwy' ? ' on' : ''), 'runway') + (dep ? keyBtn('tok:HP', 'HP', 't' + (k === 'hp' ? ' on' : ''), 'hold. pt') : keyBtn('tok:STAND', 'STAND', 't sm' + (k === 'stand' ? ' on' : ''), 'stání'))
       + keyBtn('tok:HS', 'HOLD SHORT', 't sm s2', 'hold short of') + keyBtn('tok:CROSS', 'CROSS', 't sm', 'cross') + keyBtn('tok:BKTRK', 'BKTRK', 't sm', 'backtrack') + keyBtn('tok:VIA', 'VIA', 't' + (k === 'via' ? ' on' : ''), 'pojezd');
   }
   else if (kind === 'rwy') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(RWY_TOK, ON) + (f.type === 'atis' ? keyBtn('tok:STAV RWY', 'STAV RWY', 't sm', 'kontaminace') : '<span></span>') }
@@ -727,6 +734,8 @@ function close() { const p = ACT; ACT = null; HINT = null; hideDock(); leave(p) 
 function leave(p) { if (!p) return; if (p.mode === 'atc') { atcCommit(p); atcRefresh(p) } else refreshField(p.oid, p.key) }
 function press(code) {
   if (!ACT) return; HINT = null;
+  // × closes the keypad; what is typed stays, only an ATC instruction not yet added is dropped
+  if (code === 'x') { if (ACT.mode === 'atc') ACT.cur = ''; close(); return }
   if (ACT.mode === 'atc') { atcPress(code); return }
   const f = ctxOf(ACT.oid, ACT.key); if (!f) { close(); return }
   if (ACT.mode === 'note') { notePress(f, code); return }

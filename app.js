@@ -353,7 +353,7 @@ function syncInfo(){
   if(n)return {cls:'caution',t:n+' čeká na odeslání'};
   return {cls:'ok',t:'Synchronizováno'+(net.last?' '+fmtClock(net.last):'')};
 }
-function renderPill(){const el=document.getElementById('syncpill');if(!el)return;const s=syncInfo();el.innerHTML=`<span class="dot ${s.cls}"></span><span>${esc(s.t)}</span>`}
+function renderPill(){const el=document.getElementById('syncpill');if(!el)return;const s=syncInfo();const h=`<span class="dot ${s.cls}"></span><span>${esc(s.t)}</span>`;if(el.innerHTML!==h)el.innerHTML=h}
 
 /* ---------- permissions ---------- */
 const can={
@@ -411,12 +411,15 @@ function header(){
 }
 
 let renderPending=false;
+// a re-render from the background (sync every minute, offline check) replaces the page only when it really changed:
+// swapping the whole page with its sticky header made the iPad jump a little once a minute
+let LAST_HTML='';
 function softRender(){
   const a=document.activeElement;
   if(a&&a.closest&&a.closest('#app [data-keep]')&&a.matches&&a.matches('input,textarea,select')){renderPending=true;renderPill();return}
-  render();
+  render(true);
 }
-function render(){
+function render(soft){
   const app=$('#app');
   if(!S)return;
   renderPending=false;
@@ -439,7 +442,9 @@ function render(){
   }else body=renderApp();
   // a sync can re-render while someone is half-way through a form: keep what they typed
   const kept={};app.querySelectorAll('[data-keep] input[id],[data-keep] textarea[id]').forEach(el=>{if(el.type!=='checkbox'&&el.type!=='radio'&&el.type!=='file'&&el.value)kept[el.id]=el.value});
-  app.innerHTML=header()+(Object.keys(S.users).length?offlineNote():'')+body+`<p class="footnote wrap">Testovací verze. Neslouží jako úřední záznam – papírový technický deník platí dál. Zařízení <span class="mono">${esc(DEV)}</span> · časy v UTC.</p>`;
+  const html=header()+(Object.keys(S.users).length?offlineNote():'')+body+`<p class="footnote wrap">Testovací verze. Neslouží jako úřední záznam – papírový technický deník platí dál. Zařízení <span class="mono">${esc(DEV)}</span> · časy v UTC.</p>`;
+  if(soft===true&&html===LAST_HTML&&app.firstChild){renderPill();return}
+  LAST_HTML=html;app.innerHTML=html;
   for(const k in kept){const el=document.getElementById(k);if(el&&!el.value&&el.closest('[data-keep]'))el.value=kept[k]}
   renderPill();
   if(self.ETL_ATIS)ETL_ATIS.after();
@@ -1256,17 +1261,21 @@ function ofpIn(o,k,label,opt){opt=opt||{};const val=ofpVal(o,k);if(o.closed||o.v
   const mx=opt.num?ofpMax(o,k):null;const over=mx!=null&&num(val)!=null&&num(val)>mx;
   if(mx!=null)opt.cls=((opt.cls||'')+'" data-max="'+mx).trim();
   return `<label class="fld ${opt.full?'full':''} ${over?'over':''}"><span>${label}${mx!=null?` <small class="lim">max ${fmtN(mx)}</small>`:''}</span>${opt.area?`<textarea data-of="${esc(k)}" ${opt.ro?'readonly':''}>${esc(val)}</textarea>`:`<input type="text" data-of="${esc(k)}" value="${esc(val)}" ${opt.ro?'readonly':''} ${opt.num?'inputmode="numeric"':opt.dec?'inputmode="decimal"':''} ${opt.ph?`placeholder="${esc(opt.ph)}"`:''} ${opt.cls?`class="${opt.cls}"`:''}>`}</label>`}
+// the directs in force: one whose target a later direct leaves out is replaced by it
+// (DCT LANUX, then DCT VLM past LANUX: only LOWW → VLM counts, the saving is not added twice)
+function dctPairs(o){const W=o.wpts||[];const all=[];W.forEach((p,i)=>{if(!p.rvsm&&ofpVal(o,'w'+i+'_dct')){const a=num(ofpVal(o,'w'+i+'_dctFrom'));if(a!=null&&W[a]&&a<i)all.push({from:a,to:i})}});
+  return all.filter(d=>!all.some(e=>e!==d&&e.from<d.to&&d.to<e.to))}
 function ofpCalc(o){
   const l=o.leg;
   const atd=l&&parseHM(l.off)!=null?parseHM(l.off):parseHM(ofpVal(o,'x_off')||ofpVal(o,'atd'));
   const nonR=!!ofpVal(o,'nonRvsm');
   // DIRECT TO: points between the DCT origin and target are skipped; ETO downstream shortened by saved time
   const W=o.wpts||[];const dcts=[];const skip=new Set();
-  W.forEach((p,i)=>{if(!p.rvsm&&ofpVal(o,'w'+i+'_dct')){const a=num(ofpVal(o,'w'+i+'_dctFrom'));if(a==null||!W[a])return;
+  dctPairs(o).forEach(({from:a,to:i})=>{const p=W[i];
     for(let k=a+1;k<i;k++)if(!W[k].rvsm)skip.add(k);
     const route=(p.distAcc||0)-(W[a].distAcc||0);const pa=parsePos(W[a].pos),pb=parsePos(p.pos);const direct=pa&&pb?gcNm(pa,pb):route;
     const saved=Math.max(0,route-direct);const gs=num(p.gs)||num(W[a].gs)||(()=>{const tm=(parseHM(p.tAcc)||0)-(parseHM(W[a].tAcc)||0);return tm>0?route/tm*60:null})();
-    dcts.push({from:a,to:i,saved:Math.round(saved),min:gs?Math.round(saved/gs*60):0})}});
+    dcts.push({from:a,to:i,saved:Math.round(saved),min:gs?Math.round(saved/gs*60):0})});
   const savedBefore=i=>dcts.filter(d=>d.to<=i).reduce((x,d)=>x+d.min,0);
   const lastPassed=(()=>{let r=0;W.forEach((p,i)=>{if(!p.rvsm&&!skip.has(i)&&parseHM(ofpVal(o,'w'+i+'_ato'))!=null)r=i});return r})();
   // ETO: after a passed point, rebase on its actual ATO (+ planned time from there − DCT savings); before it, plan from ATD
@@ -1277,11 +1286,13 @@ function ofpCalc(o){
     t=((t%1440)+1440)%1440;return pad(Math.floor(t/60))+':'+pad(t%60)};
   return {atd,nonR,W,dcts,skip,lastPassed,etoAdj};
 }
-// The OFP is split by phase of flight; the crew sees what is current. Opens on the current phase.
+// The OFP is split by phase of flight; the crew sees what is current. Opens on the current phase and stays there
+// (viewOfp pins it) – typing on-block or V2 must not switch the page; the crew moves on with the tabs or Pokračovat.
 function ofpPhase(o){
   if(UI.ofpPh&&UI.ofpPh.id===o.ofpId)return UI.ofpPh.ph;
   const l=o.leg;if(o.closed||(l&&l.state==='closed'))return 'close';
-  if(ofpVal(o,'x_in'))return 'close';
+  if(ofpVal(o,'x_in')&&(ofpVal(o,'x_fuelRem')||ofpVal(o,'x_fuelBurn')))return 'close';
+  if(ofpVal(o,'x_on')||ofpVal(o,'x_in'))return 'flight';
   if(l&&(parseHM(l.off)!=null||ofpVal(o,'x_out')||ofpVal(o,'x_off')||(ofpVal(o,'to_w')&&ofpVal(o,'v1')&&ofpVal(o,'v2'))))return 'flight';
   return 'pre';
 }
@@ -1354,7 +1365,7 @@ function viewOfp(o,u){
   const nowLbl=i=>{const nx=W.findIndex((p,j)=>j>i&&!p.rvsm&&!skip.has(j));return nx<0?'po '+W[i].wpt:W[i].wpt+' → '+W[nx].wpt};
   const wrows=W.map((p,i)=>{
     if(p.rvsm)return `<tr class="rvsmrow rvsm-only" ${nonR?'hidden':''}><td colspan="3"><b>RVSM</b> ALT DIFF (ft)</td><td colspan="6"><span class="inline" style="gap:6px;max-width:360px">${['lh','sb','rh'].map(x=>`<input type="text" data-of="r${i}_${x}" value="${esc(ofpVal(o,'r'+i+'_'+x))}" inputmode="numeric" placeholder="${x.toUpperCase()}" aria-label="RVSM ${x.toUpperCase()}">`).join('')}</span></td></tr>`;
-    const sk=skip.has(i);const isDct=!!ofpVal(o,'w'+i+'_dct');const d=dcts.find(x=>x.to===i);
+    const sk=skip.has(i);const d=dcts.find(x=>x.to===i);const isDct=!!d;
     const act=num(ofpVal(o,'w'+i+'_fuel'));const diff=act!=null&&p.mreq!=null?act-p.mreq:null;
     const passed=parseHM(ofpVal(o,'w'+i+'_ato'))!=null;
     // a direct already flown (target has an ATO) is history: to correct it, clear that ATO first
@@ -1377,7 +1388,7 @@ function viewOfp(o,u){
     // the route is done when the flight is down: landing time, ATO at destination, or closed in the ATL
     route:!!(((l&&parseHM(l.off)!=null)||val2('x_off'))&&(val2('x_on')||(o.wpts&&o.wpts.length&&parseHM(val2('w'+(o.wpts.length-1)+'_ato'))!=null)||(l&&l.state==='closed'))),arr:!!((val2('ld_w')||val2('vref'))&&val2('x_on')&&val2('x_in')),close:!!o.closed};
   let n=0;const stepH=(key,title,sub,extra)=>{n++;return `<div class="ostep-h"><span class="ostep-n">${n}</span><div style="flex:1"><h2>${title}</h2>${sub?`<p class="muted">${sub}</p>`:''}</div>${extra||''}${done[key]?'<span class="ann ok">hotovo</span>':''}</div>`};
-  const ph=ofpPhase(o);const sec=(k,html)=>`<div class="ophase" data-ph="${k}" ${ph===k?'':'hidden'}>${html}</div>`;
+  const ph=ofpPhase(o);if(!UI.ofpPh||UI.ofpPh.id!==o.ofpId)UI.ofpPh={id:o.ofpId,ph};const sec=(k,html)=>`<div class="ophase" data-ph="${k}" ${ph===k?'':'hidden'}>${html}</div>`;
   const fUp=val2('f_up'),fBlk=val2('f_blk'),fMin=val2('f_min')||(f.rampMreq!=null?String(f.rampMreq):'');
   const lowF=num(fBlk)!=null&&num(fMin)!=null&&num(fBlk)<num(fMin);
   const fuelStep=`<div class="fgrid">${ofpIn(o,'f_up','Natankováno (L)',{num:true})}${ofpIn(o,'f_blk','Na odlet (lbs)',{num:true})}<label class="fld"><span>Min. required (lbs)</span><input type="text" data-of="f_min" value="${esc(fMin)}" inputmode="numeric" ${LK?'disabled':''}></label></div>
@@ -1513,7 +1524,7 @@ async function ofpPdf(o){
   W.forEach((p,i)=>{
     if(p.rvsm){if(nonR)return;if(need(14))head();
       T(`RVSM ALT DIFF (ft)   LH ${dash(val('r'+i+'_lh'))}   SBY ${dash(val('r'+i+'_sb'))}   RH ${dash(val('r'+i+'_rh'))}`,M+3,y,'m',8,C.ink);y-=6;HL(y);y-=9;return}
-    const sk=skip.has(i);const isD=!!val('w'+i+'_dct');const d=dcts.find(x=>x.to===i);
+    const sk=skip.has(i);const d=dcts.find(x=>x.to===i);const isD=!!d;
     const note=val('w'+i+'_note');const noteL=note?wrap(note,'ms',7,cols[10][1]-6):[];
     const rh=Math.max(20,8+Math.max(2,noteL.length)*9);if(need(rh))head();
     const act=num(val('w'+i+'_fuel'));const diff=act!=null&&p.mreq!=null?act-p.mreq:null;
@@ -1709,7 +1720,7 @@ function ofpMissing(o){
   if(!v('v1')||!v('vr')||!v('v2'))m.push('V1/VR/V2');if(!v('vref')||!v('vapp'))m.push('VREF/VAPP');
   if(!v('rg_lh')||!v('rg_rh'))m.push('kontrola výškoměrů on ground');
   if(!v('nonRvsm')&&(!v('re_lh')||!v('re_rh')))m.push('kontrola výškoměrů RVSM (nebo zaškrtnout let mimo RVSM)');
-  const W=o.wpts||[];const skip=new Set();W.forEach((p,i)=>{if(!p.rvsm&&ofpVal(o,'w'+i+'_dct')){const a=num(ofpVal(o,'w'+i+'_dctFrom'));if(a!=null)for(let k=a+1;k<i;k++)skip.add(k)}});
+  const W=o.wpts||[];const skip=new Set();dctPairs(o).forEach(({from:a,to:i})=>{for(let k=a+1;k<i;k++)skip.add(k)});
   // in a divert the main route ends at the last point flown – the rest was never flown
   const dvEnd=v('dv')?ofpCalc(o).lastPassed:Infinity;
   let ato=0,fu=0;W.forEach((p,i)=>{if(p.rvsm||skip.has(i)||i===0||i>dvEnd)return;if(parseHM(ofpVal(o,'w'+i+'_ato'))==null)ato++;if(num(ofpVal(o,'w'+i+'_fuel'))==null)fu++});
@@ -3317,9 +3328,21 @@ document.addEventListener('focusout',e=>{
   if(t.classList&&t.classList.contains('t4')&&t.value){const n=normHM(t.value);t.value=n;t.classList.toggle('bad',parseHM(n)==null);if(t.dataset.k){UI.draft[t.dataset.k]=n;saveDraft();crewLive()}else if(t.dataset.of){const c=t.closest('[data-ofp]');if(c)ofpSet(c.dataset.ofp,t.dataset.of,n)}else if(sheetLive)sheetLive()}
   if(renderPending)setTimeout(()=>{if(renderPending)softRender()},60);
 });
+// Enter in an ordinary field goes to the next one (the iPad keyboard says "další"/next); after the last field of a form
+// Enter still sends it, elsewhere the keyboard closes. Textareas keep their new line; ATIS notes are skipped as targets.
+const TYPE_NO=['checkbox','radio','file','button','submit','reset','range','color','hidden','image'];
+const isTyping=el=>!!el&&el.tagName==='INPUT'&&!TYPE_NO.includes(el.type);
+function nextField(t){
+  const scope=t.form||t.closest('#sheet')||t.closest('.ophase')||t.closest('.panel')||document.getElementById('app');if(!scope)return null;
+  const all=[...scope.querySelectorAll('input,textarea')].filter(el=>el===t||((isTyping(el)||el.tagName==='TEXTAREA')&&!el.disabled&&!el.readOnly&&!el.closest('.atf')&&!el.closest('[hidden]')&&el.getClientRects().length>0));
+  const i=all.indexOf(t);return i>=0?all[i+1]||null:null}
+document.addEventListener('focusin',e=>{const t=e.target;if(!isTyping(t))return;const nx=nextField(t);
+  if(nx)t.setAttribute('enterkeyhint','next');else if(t.form)t.removeAttribute('enterkeyhint');else t.setAttribute('enterkeyhint','done')});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet').hidden)closeSheet();
   if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button'&&e.target.tagName!=='BUTTON'&&e.target.dataset.act){e.preventDefault();e.target.click();return}
   // note editor: Enter adds the entry instead of closing the sheet
+  if(e.key==='Enter'&&!e.defaultPrevented&&!e.isComposing&&isTyping(e.target)&&!(UI.noteEd&&/^n-(alt|freq|hdg|txt)$/.test(e.target.id))){
+    const t=e.target,nx=nextField(t);if(nx){e.preventDefault();nx.focus();return}if(!t.form){e.preventDefault();t.blur();return}}
   if(e.key==='Enter'&&UI.noteEd&&e.target&&/^n-(alt|freq|hdg|txt)$/.test(e.target.id)){e.preventDefault();const k=e.target.id.slice(2);if(k==='alt'){const er=document.getElementById('n-err');if(er){er.textContent='Vyberte CLB ↑ nebo DESC ↓.';er.hidden=false}}else noteAction('note-add',k+'|')}});
 
 document.addEventListener('submit',async e=>{

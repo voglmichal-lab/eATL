@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.6.17"}
+:root{--etl-build:"0.6.20"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -501,7 +501,10 @@ table.ftl-duties td,table.ftl-tab td{vertical-align:top}
 .ak-rem{min-height:34px;padding:2px 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface-2);color:var(--ink);font-family:var(--f-mono);font-size:.85rem;cursor:pointer;touch-action:manipulation}
 .ak-dock{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--dock);color:var(--key-ink);padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -10px 30px rgba(0,0,0,.28)}
 .ak-in{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px 12px;display:grid;gap:10px}
-.ak-top{display:flex;gap:6px 14px;align-items:center;flex-wrap:wrap;min-height:42px}
+.ak-top{display:flex;gap:6px 14px;align-items:center;flex-wrap:wrap;min-height:42px;padding-right:56px}
+.ak-in{position:relative}
+.ak-x{position:absolute;top:8px;right:max(16px,env(safe-area-inset-right,0px));width:46px;height:46px;border:0;border-radius:50%;background:var(--key);color:var(--key-ink);font-size:1.7rem;line-height:1;cursor:pointer;touch-action:manipulation;display:grid;place-items:center;box-shadow:0 1px 0 rgba(0,0,0,.35)}
+.ak-x:active{background:var(--key-hi)}
 .ak-title{font-family:var(--f-display);font-weight:700;font-size:1.2rem;letter-spacing:.04em;white-space:nowrap}
 .ak-hint{color:var(--key-muted);font-size:.93rem;flex:1 1 280px;min-width:0}
 .ak-hint.warn{color:var(--caution)}

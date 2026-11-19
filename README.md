@@ -83,7 +83,8 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
 2. **Nahrát OFP** (PDF z NAVsystemu) → *Otevřít OFP*.
 3. **Security search** je v OFP úplně nahoře: výsledek (+ předletová prohlídka) → *Podepsat a odeslat security search*.
    Tím se let založí v ATL a firma vidí, že security je hotová. Pak je z karty jeden řádek a posádka pracuje jen v OFP.
-4. OFP je rozdělené podle fáze letu (otevře se na té aktuální); kroky jsou očíslované, hotový krok má štítek „hotovo“:
+4. OFP je rozdělené podle fáze letu (otevře se na té aktuální a při psaní na ní zůstane – další fázi otevřete záložkou
+   nebo *Pokračovat*; Shrnutí se samo otevře až při dalším otevření OFP s on-blockem a palivem po přistání); kroky jsou očíslované, hotový krok má štítek „hotovo“:
    - **Před letem**: 1 Posádka a kontrola OFP · 2 Palivo a olej před odletem (natankováno, na odlet, minimum; olej
      doplněný před letem v litrech, motor L a P – vše jde upravit až do uzavření letu) · 3 Performance.
    - **Let**: 4 Před odletem (ATIS, clearance, taxi, výškoměry) · 5 Odlet a trať (navigační log s řádkem TEĎ pro ATC instrukce, divert) ·
@@ -226,6 +227,8 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
 - **Divert:** ATIS ARR zůstává pro letiště určení, pro letiště divertu je zvlášť ATIS DIVERT (i v PDF).
 - **Rychlé poznámky** se šablonou (TWY _ CLSD) otevřou klávesnici s písmeny, číslicemi a mezerou – doplní se označení dráhy.
 - **SID a STAR z OFP:** plánovaná procedura z navigačního logu (např. KOK7S, BISBA3X) je v políčku slabě a potvrdí se ✓.
+  SID je u úseku z letiště odletu, STAR u úseku do letiště určení. Když OFP u příletu uvádí jen „STAR“, plán se nenabízí
+  a jako bod z OFP se nabídne poslední bod před letištěm (u LOWW–LKPR VLM…).
   Jiná procedura: tlačítko s bodem z OFP (KOK…) a doplní se číslo a písmeno. Bez SID: STRAIGHT (straight ahead), PASSING a výška,
   LEFT / RIGHT a HDG s kurzem, nebo jen HDG a tři číslice. Clearance limit se nezapisuje.
   Místo STAR jen bod příletové tratě: **DCT** a bod (W W 6 7 3 = DCT WW673).
@@ -241,8 +244,17 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
 - **RWY** – dráha (TAXI DEP ji nabídne z ATIS DEP ✓; L / C / R písmenem hned za číslem), **HP** – holding point / intersection (A 1),
   **STAND** – stání (1 2). Číslice bez dráhy, ke které by patřily, jdou na odletu do RWY, na příletu do STAND.
 - **HOLD SHORT**, **CROSS**, **BKTRK** a dráha nebo pojezdová dráha: HOLD SHORT 3 3 = `HOLD SHORT RWY 33`.
+- **EXIT** a číslo (nebo označení): M EXIT 1 5 B D = `M, EXIT 15, B, D`.
 - Do OFP: `RWY 26 · HP A1 · VIA B, A2, HOLD SHORT RWY 33`, na příletu `VIA B2, A · STAND 12`. Dříve použité trasy
   na letišti se nabízejí z ostatních OFP.
+
+## Ovládání na iPadu
+- **Enter = další pole.** V běžných polích (palivo, takeoff data, časy, formuláře) přeskočí Enter na další pole – klávesa
+  na klávesnici iPadu má nápis *další*. Za posledním polem fáze klávesnice zmizí, ve formuláři poslední Enter odešle.
+  Víceřádkové poznámky Enter dál zalamuje.
+- **× na klávesnici eTechLogu** (ATIS, clearance, taxi, ATC instrukce) ji zavře. Co je napsané, zůstane; jen ATC
+  instrukce, která ještě nebyla přidaná tlačítkem *Přidat ›*, se zahodí. *Hotovo* ji naopak zapíše.
+- Synchronizace běží každou minutu na pozadí; stránku překreslí jen tehdy, když se na ní opravdu něco změnilo.
 
 ## ATC instrukce za letu
 V navigačním logu je řádek **▶ TEĎ** za bodem, který letadlo přeletělo naposledy (podle ATO, chybí-li, podle ETO).
@@ -250,6 +262,7 @@ V navigačním logu je řádek **▶ TEĎ** za bodem, který letadlo přeletělo
 EXPECT, MAINT, OWN NAV, písmena (ABC) a číslice. **Přidat ›** zapíše instrukci s časem UTC (`06:30 CLB FL360`)
 a hned jde psát další; **Hotovo** zavře. Instrukce se ukládají jako poznámky toho bodu (i v PDF) – tlačítko poznámky
 u kteréhokoli bodu otevře stejnou klávesnici, volný text s diakritikou přes *Text z iPadu*.
+- Druhý direct za bod prvního directu ho nahradí (DCT LANUX, pak DCT VLM): počítá se jen ten platný, úspora se nesčítá.
 - **DCT** nabídne body tratě dál po trase; `DCT MOROK` z klávesnice zkrátí trať stejně jako tlačítko DCT v řádku
   (od bodu, u kterého je instrukce zapsaná).
 - U vynechaného bodu (direct) je přeškrtnutý jen název – instrukce zapsané u něj zůstávají čitelné.

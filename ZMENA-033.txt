@@ -1,0 +1,34 @@
+eTechLog – změna Z-033
+Verze: 0.6.20 (navazuje na Z-032 / 0.6.19; obsahuje i vše ze Z-029 až Z-032)
+Datum: 2026-11-19
+
+Ovládání na iPadu
+- Enter v běžných polích (palivo, takeoff data, časy, formuláře) přeskočí na další pole; klávesa na klávesnici iPadu
+  má nápis „další“. Za posledním polem fáze klávesnice zmizí, ve formuláři poslední Enter odešle. Víceřádkové
+  poznámky Enter dál zalamuje.
+- Klávesnice eTechLogu (ATIS, clearance, taxi, ATC instrukce) má vpravo nahoře ×: zavře ji, napsané zůstane.
+  Jen ATC instrukce, která ještě nebyla přidaná tlačítkem Přidat ›, se zahodí (Hotovo ji naopak zapíše).
+
+Oprava
+- Aplikace se každou minutu synchronizuje se serverem a po každé synchronizaci překreslila celou stránku, i když
+  nepřišlo nic nového. Na iPadu to mohlo vypadat jako lehké poskočení stránky dolů a nahoru. Teď se stránka
+  překreslí jen tehdy, když se na ní opravdu něco změnilo.
+
+Návrat
+- Na 0.6.19: eatl-Z-032-v0.6.19.zip. Data zůstávají.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-033.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js
