@@ -232,6 +232,9 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
   Jiná procedura: tlačítko s bodem z OFP (KOK…) a doplní se číslo a písmeno. Bez SID: STRAIGHT (straight ahead), PASSING a výška,
   LEFT / RIGHT a HDG s kurzem, nebo jen HDG a tři číslice. Clearance limit se nezapisuje.
   Místo STAR jen bod příletové tratě: **DCT** a bod (W W 6 7 3 = DCT WW673).
+- **Výška v clearance:** jedna až tři číslice = letová hladina (1 1 0 = FL110), čtyři a víc = stopy (5 0 0 0 = 5000 ft);
+  klávesa FL není nutná. Číslice napsané hned v prázdném poli SID / STAR jdou do výšky – plán SID / STAR zůstane
+  nabídnutý k potvrzení ✓.
   Přiblížení a dráhu v příletové clearance nabídne z ATIS ARR. Dříve použité hodnoty na letišti (SID, dráhy, TL, výšky,
   frekvence) se nabízejí z ostatních OFP.
 - Do OFP, PDF a kontroly vyplnění jde jeden normalizovaný řádek (např. `INFO K · ILS · RWY 26 · TL60 · 240/10 · 9999 · FEW020 · 12/05 · Q1018 · NOSIG`).
@@ -240,7 +243,7 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
 ### Taxi clearance
 **TAXI DEP** (Před odletem) a **TAXI ARR** (Přílet; při divertu pro letiště divertu) – stejná klávesnice s písmeny:
 - Pojezdové dráhy, jak zazní: B A 2 = `B, A2`. Každé písmeno začne další dráhu, číslice patří k té předchozí.
-  Dvoupísmenná dráha: T A a **SPOJIT** = `TA`.
+  Dvoupísmenná dráha: T A a **SPOJIT** = `TA` (SPOJIT a EXIT jsou ve spodní řadě číslic vedle 0).
 - **RWY** – dráha (TAXI DEP ji nabídne z ATIS DEP ✓; L / C / R písmenem hned za číslem), **HP** – holding point / intersection (A 1),
   **STAND** – stání (1 2). Číslice bez dráhy, ke které by patřily, jdou na odletu do RWY, na příletu do STAND.
 - **HOLD SHORT**, **CROSS**, **BKTRK** a dráha nebo pojezdová dráha: HOLD SHORT 3 3 = `HOLD SHORT RWY 33`.

@@ -1655,7 +1655,7 @@ function ofpCrewPanel(o,LK){const c=ofpCrew(o);const l=o.leg;
     <div class="fgrid crewgrid">
       <div class="fld"><span>Kapitán (PIC)</span><select data-of="c_pic" ${LK?'disabled':''}><option value="">–</option>${opt(crewOpts(false),c.pic)}</select>${ofpPfTog(o,'pic','crew')}</div>
       <div class="fld"><span>Druhý pilot (SIC)</span><select data-of="c_sic" ${LK?'disabled':''}><option value="">–</option>${opt(crewOpts(false).filter(x=>x[0]!==c.pic),sicCur)}<option value="-" ${sicCur==='-'?'selected':''}>bez druhého pilota</option><option value="?" ${sicCur==='?'?'selected':''}>Není v seznamu</option></select>${ofpPfTog(o,'sic','crew')}</div>
-      <label class="fld"><span>Palubní průvodčí (nepovinné)</span><select data-of="c_ca" ${LK?'disabled':''}><option value="">–</option><option value="-" ${caCur==='-'?'selected':''}>bez palubní průvodčí</option>${opt(cabinOpts(),caCur)}<option value="?" ${caCur==='?'?'selected':''}>Není v seznamu</option></select></label>
+      <label class="fld"><span>Palubní průvodčí</span><select data-of="c_ca" ${LK?'disabled':''}><option value="">– nepovinné –</option><option value="-" ${caCur==='-'?'selected':''}>bez palubní průvodčí</option>${opt(cabinOpts(),caCur)}<option value="?" ${caCur==='?'?'selected':''}>Není v seznamu</option></select></label>
     </div>
     <div class="fgrid">
       <label class="fld sic-txt" ${sicCur==='?'?'':'hidden'}><span>SIC – jméno a číslo licence (ověří CAMO)</span><input type="text" data-of="c_sicTxt" value="${esc(ofpVal(o,'c_sicTxt')||(c.sicTxt||''))}" placeholder="J. Novák, CZ.FCL.1234" ${LK?'disabled':''}></label>

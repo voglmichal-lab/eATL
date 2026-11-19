@@ -42,13 +42,13 @@ const DEF = {
   },
   clr: {
     route: { l: 'SID / TRAŤ', ph: 'SID', dig: 1, w: 1, ghost: 'sid', fix: 'sidFix', h: 'SID: plán z OFP potvrdíte ✓, jiný = bod z OFP a číslo s písmenem. Bez SID: STRAIGHT (straight ahead), nebo HDG a tři číslice.' },
-    alt: { l: 'VÝŠKA', ph: '5000', dig: 1, h: 'Počáteční výška ve stopách, nebo FL a číslo.' },
+    alt: { l: 'VÝŠKA', ph: '5000', dig: 1, h: 'Jedna až tři číslice = FL (8 0 = FL80), čtyři a víc = stopy (5 0 0 0 = 5000 ft).' },
     sq: { l: 'SQUAWK', ph: '4521', dig: 1, h: 'Squawk, čtyři číslice 0–7.' },
     freq: { l: 'FREKVENCE', ph: '120.53', dig: 1, h: 'Odletová frekvence – úvodní 1 a tečku doplní aplikace: 2 0 5 3 = 120.53, 2 3 0 = 123.00. Když nezazněla, ťukněte Hotovo.' }
   },
   star: {
     route: { l: 'STAR', ph: 'STAR', dig: 1, w: 1, ghost: 'star', fix: 'starFix', h: 'Plán z OFP potvrdíte ✓. Jiný STAR: ťukněte bod a doplňte číslo a písmeno. Jen bod tratě (WW673): DCT a bod. Kurz: HDG a tři číslice.' },
-    alt: { l: 'VÝŠKA', ph: 'FL110', dig: 1, h: 'Sestup: FL a číslo, nebo výška ve stopách.' },
+    alt: { l: 'VÝŠKA', ph: 'FL110', dig: 1, h: 'Jedna až tři číslice = FL (1 1 0 = FL110), čtyři a víc = stopy (4 0 0 0 = 4000 ft).' },
     app: { l: 'APP', ph: 'ILS', ghost: 'arrApp', h: 'Typ přiblížení. Hodnotu z ATIS ARR potvrdíte ✓.' },
     rwy: { l: 'RWY', ph: '24', dig: 1, ghost: 'arrRwy', h: 'Dráha. Hodnotu z ATIS ARR potvrdíte ✓.' }
   },
@@ -125,7 +125,8 @@ function fmtRoute(r) {
   if (o.p !== null) a.push('PASSING ' + (o.p ? o.p + ' FT' : '…')); if (o.t) a.push(o.t === 'L' ? 'TURN LEFT' : 'TURN RIGHT'); if (o.h !== null) a.push('HDG ' + (o.h || '…'));
   return 'STRAIGHT AHEAD' + (a.length ? ', ' + a.join(' ') : '');
 }
-const fmtAlt = v => !v ? '' : v.startsWith('FL') ? v : v + ' ft';
+// a cleared altitude of up to three digits is a flight level (110 = FL110), four and more are feet (5000 ft)
+const fmtAlt = (v, live) => !v ? '' : v.startsWith('FL') ? v : /^\d{1,3}$/.test(v) ? (live ? v : 'FL' + v) : v + ' ft';
 // VHF frequencies are 118.000–136.975, so the leading 1 may be left out: 2 0 5 3 = 120.53, 2 3 0 = 123.00.
 // Typed with the 1 it stays as it is – 1 then 1/2/3 means the 1 was typed, 2/3 or 1 then 8/9 means it was not.
 const freqNorm = d => (d = String(d || ''), /^[23]/.test(d) || /^1[89]/.test(d) ? '1' + d : d);
@@ -183,7 +184,7 @@ function fmtVia(a) {
 function fmtSlot(k, v, live) {
   switch (k) {
     case 'wind': return fmtWind(v, live); case 'cld': return fmtCld(v, live); case 'vis': return fmtVis(v, live); case 'tdp': return fmtTdp(v, live);
-    case 'cond': return fmtCond(v); case 'route': return fmtRoute(v); case 'alt': return fmtAlt(v); case 'freq': return fmtFreq(v, live);
+    case 'cond': return fmtCond(v); case 'route': return fmtRoute(v); case 'alt': return fmtAlt(v, live); case 'freq': return fmtFreq(v, live);
     case 'wx': return atomsStr(v); case 'trend': return fmtTrend(v, live); case 'via': return fmtVia(v); default: return v || '';
   }
 }
@@ -457,6 +458,8 @@ function digit(f, k, d) {
     case 'qnh': { const n = () => v.qnh[0] === '9' ? 3 : 4; if (v.qnh.length >= n()) v.qnh = ''; v.qnh += d; if (v.qnh.length === n()) adv(f); return }
     case 'trend': v.trend.push(d); return;
     case 'route': if (fresh || v.route === 'RWY HDG') v.route = '';
+      // no SID / STAR starts with a digit: digits at an empty route are the altitude (the plan stays offered)
+      if (!v.route) { const j = idxOf(f, 'alt'); if (j >= 0) { setSlot(f, j); digit(f, 'alt', d) } return }
       if (isStr(v.route)) {
         const o = strParse(v.route);
         if (o.h !== null) { if (o.h.length < 3) { o.h += d; v.route = strMake(o); if (o.h.length === 3) adv(f) } }
@@ -667,9 +670,10 @@ function renderDock() {
   } else if (kind === 'taxi') {
     const dep = f.type === 'taxi';
     ctx.className = 'ak-ctx abc r5';
-    ctx.innerHTML = letters('let:', null) + keyBtn('tok:SPOJIT', 'SPOJIT', 't sm', 'T A → TA') + keyBtn('tok:EXIT', 'EXIT', 't sm', 'exit 15')
-      + keyBtn('tok:RWY', 'RWY', 't' + (k === 'rwy' ? ' on' : ''), 'runway') + (dep ? keyBtn('tok:HP', 'HP', 't' + (k === 'hp' ? ' on' : ''), 'hold. pt') : keyBtn('tok:STAND', 'STAND', 't sm' + (k === 'stand' ? ' on' : ''), 'stání'))
-      + keyBtn('tok:HS', 'HOLD SHORT', 't sm s2', 'hold short of') + keyBtn('tok:CROSS', 'CROSS', 't sm', 'cross') + keyBtn('tok:BKTRK', 'BKTRK', 't sm', 'backtrack') + keyBtn('tok:VIA', 'VIA', 't' + (k === 'via' ? ' on' : ''), 'pojezd');
+    // SPOJIT and EXIT sit next to the 0 (the − and / keys are not used for taxi), so they are not lost among the letters
+    ctx.innerHTML = letters('let:', null) + keyBtn('tok:CROSS', 'CROSS', 't sm', 'cross') + keyBtn('tok:BKTRK', 'BKTRK', 't sm', 'backtrack')
+      + keyBtn('tok:RWY', 'RWY', 't s2' + (k === 'rwy' ? ' on' : ''), 'runway') + (dep ? keyBtn('tok:HP', 'HP', 't' + (k === 'hp' ? ' on' : ''), 'hold. pt') : keyBtn('tok:STAND', 'STAND', 't sm' + (k === 'stand' ? ' on' : ''), 'stání'))
+      + keyBtn('tok:HS', 'HOLD SHORT', 't sm s2', 'hold short of') + keyBtn('tok:VIA', 'VIA', 't s2' + (k === 'via' ? ' on' : ''), 'pojezdové dráhy');
   }
   else if (kind === 'rwy') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(RWY_TOK, ON) + (f.type === 'atis' ? keyBtn('tok:STAV RWY', 'STAV RWY', 't sm', 'kontaminace') : '<span></span>') }
   else if (kind === 'cond') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(COND_TOK, ON, 'rc:') }
@@ -680,7 +684,9 @@ function renderDock() {
   else { ctx.className = 'ak-ctx read'; ctx.innerHTML = `<div class="ak-readout"><span class="sl">${esc(s.l)}</span><span class="rv">${esc(fmtSlot(k, f.v[k], true) || '–')}</span></div>` + (k === 'alt' ? `<div class="ak-rrow">${keyBtn('tok:FL', 'FL', 't' + (String(f.v.alt).startsWith('FL') ? ' on' : ''), 'flight level')}</div>` : '') }
   const tdp = k === 'tdp', slash = tdp || k === 'rvr', tj = digTarget(f);
   const ok = n => tj >= 0 && okDigit(f.v, f.L[tj].k, n, tj === ACT.s ? ACT.fresh : freshOf(f, tj));
-  d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('d:' + n, n, '', null, !ok(n))).join('') + keyBtn('d:-', '−', '', null, !tdp) + keyBtn('d:0', '0', '', null, !ok('0')) + keyBtn('d:/', '/', '', null, !slash);
+  d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('d:' + n, n, '', null, !ok(n))).join('')
+    + (kind === 'taxi' ? keyBtn('tok:SPOJIT', 'SPOJIT', 't join', 'T A → TA') + keyBtn('d:0', '0', '', null, !ok('0')) + keyBtn('tok:EXIT', 'EXIT', 't', 'exit 15')
+      : keyBtn('d:-', '−', '', null, !tdp) + keyBtn('d:0', '0', '', null, !ok('0')) + keyBtn('d:/', '/', '', null, !slash));
   d.querySelector('#ak-act').innerHTML = keyBtn('bk', '⌫', 'bk', 'smazat') + keyBtn('next', 'Další ›', 't nx') + keyBtn('done', 'Hotovo', 't okk');
   const was = d.hidden; d.hidden = false;
   requestAnimationFrame(() => { document.body.style.paddingBottom = (d.offsetHeight + 16) + 'px'; if (was || VIS !== f.key + f.o.ofpId) { VIS = f.key + f.o.ofpId; ensureVisible(domId(f.o, f.key)) } });

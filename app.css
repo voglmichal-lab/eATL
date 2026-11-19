@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.6.20"}
+:root{--etl-build:"0.6.23"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -307,6 +307,8 @@ table.ofplog .wnote{margin-top:4px}
 table.ofplog .wnote .ofp-notebtn{min-width:0;min-height:32px;padding:2px 8px;font-size:.82rem}
 table.ofplog .wdiff{display:block;font-size:.8rem;min-height:1em;margin-top:2px;text-align:center}
 .crewgrid{align-items:start}
+/* one-line labels, so the three selects stay on one line even when a label is long */
+.crewgrid .fld>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 table.ofplog input.ofp-note{width:140px;text-align:left;font-family:var(--f-body)}
 table.ofplog .ofp-notebtn{min-width:140px;min-height:44px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;text-align:left;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);padding:4px 8px;font:600 .86rem var(--f-mono);cursor:pointer}
 table.ofplog .ofp-notebtn.empty{color:var(--muted);font-family:var(--f-body);font-weight:500;border-style:dashed}
@@ -532,6 +534,7 @@ table.ftl-duties td,table.ftl-tab td{vertical-align:top}
 /* lit = what is set now (the wind has gusts, the last layer is BKN), like a shift key that is on */
 .ak-key.on{background:var(--key-on);color:var(--key-on-ink);box-shadow:0 1px 0 rgba(0,0,0,.35)}
 .ak-key.on small{color:#3d5266}
+.ak-key.join{box-shadow:inset 0 0 0 2px var(--key-hi)}
 .ak-chip.on{background:var(--key-on);color:var(--key-on-ink)}
 .ak-ctx.r5{grid-template-rows:repeat(5,minmax(0,1fr))}
 .ak-ctx.r5 .ak-key{min-height:46px}

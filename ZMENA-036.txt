@@ -1,0 +1,29 @@
+eTechLog – změna Z-036
+Verze: 0.6.23 (navazuje na Z-035 / 0.6.22; obsahuje i vše ze Z-029 až Z-035)
+Datum: 2026-11-19
+
+Oprava – výška v clearance
+- Když bylo v poli STAR (nebo SID) jen nabídnuté plánované jméno a hned se psala výška, číslice se zapsaly do názvu
+  procedury a výška zůstala prázdná. Žádná SID ani STAR nezačíná číslicí, takže číslice v prázdném poli SID / STAR
+  teď jdou rovnou do výšky. Plán SID / STAR zůstane nabídnutý k potvrzení ✓.
+- Jedna až tři číslice = letová hladina (1 1 0 = FL110, 8 0 = FL80), čtyři a víc = stopy (5 0 0 0 = 5000 ft).
+  Klávesa FL dál funguje, ale není nutná.
+
+Návrat
+- Na 0.6.22: eatl-Z-035-v0.6.22.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-036.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js
