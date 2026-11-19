@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.7.0"}
+:root{--etl-build:"0.7.1"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -479,11 +479,13 @@ table.ftl-duties td,table.ftl-tab td{vertical-align:top}
 .atf-out{display:flex;gap:4px 12px;align-items:baseline;flex-wrap:wrap;min-width:0}
 .atf-out .mono{font-size:1rem;overflow-wrap:anywhere;min-width:0}
 .ak-slots{display:flex;flex-wrap:wrap;gap:8px}
-.ak-slot{display:grid;align-content:start;gap:2px;min-width:80px;min-height:64px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface-2);text-align:left;cursor:pointer;touch-action:manipulation;color:var(--ink)}
-.ak-slot.wide{flex:1 1 170px}
+/* a slot is as wide as its value (it never shrinks under it – it moves to the next line); a value longer than the whole row wraps inside */
+.ak-slot{display:grid;align-content:start;gap:2px;min-width:80px;max-width:100%;flex:0 0 auto;min-height:64px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface-2);text-align:left;cursor:pointer;touch-action:manipulation;color:var(--ink)}
+.ak-slot.wide{flex:1 0 auto;min-width:170px}
 .ak-slot .sl{font-family:var(--f-display);font-weight:600;font-size:.72rem;letter-spacing:.09em;color:var(--muted)}
-.ak-slot .sv{font-family:var(--f-mono);font-size:1.2rem;font-weight:600;line-height:1.25;white-space:nowrap}
+.ak-slot .sv{font-family:var(--f-mono);font-size:1.2rem;font-weight:600;line-height:1.25;white-space:normal;overflow-wrap:break-word}
 .ak-slot .sv.dim{color:var(--muted);font-weight:500}
+.ak-slot .pl,.ak-slot .gh{overflow-wrap:break-word}
 .ak-slot .pl{font-family:var(--f-mono);font-size:1.05rem;line-height:1.3;color:var(--muted);opacity:.5}
 .ak-slot .gh{font-family:var(--f-mono);font-size:1.05rem;line-height:1.3;color:var(--accent);opacity:.8}
 .ak-slot .gtag{font-family:var(--f-display);font-weight:600;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-left:6px;vertical-align:2px}
@@ -530,11 +532,13 @@ table.ftl-duties td,table.ftl-tab td{vertical-align:top}
 .ak-key.t{font-family:var(--f-display);font-weight:700;font-size:1.3rem;letter-spacing:.04em}
 .ak-key.sm{font-size:1rem;letter-spacing:.02em}
 .ak-key.s2{grid-column:span 2}
+.ak-key.s3{grid-column:span 3}
 .ak-key.hl{box-shadow:inset 0 0 0 2px var(--key-hi);background:var(--key-2)}
 /* lit = what is set now (the wind has gusts, the last layer is BKN), like a shift key that is on */
 .ak-key.on{background:var(--key-on);color:var(--key-on-ink);box-shadow:0 1px 0 rgba(0,0,0,.35)}
 .ak-key.on small{color:#3d5266}
 .ak-key.join{box-shadow:inset 0 0 0 2px var(--key-hi)}
+.fld.npad-on input{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 /* keys that open another keypad, not write a value: outlined */
 .ak-key.nav{background:transparent;box-shadow:inset 0 0 0 2px var(--key-muted)}
 .ak-key.nav:active{background:var(--key)}

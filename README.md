@@ -263,7 +263,7 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
 ### Taxi clearance
 **TAXI DEP** (Před odletem) a **TAXI ARR** (Přílet; při divertu pro letiště divertu) – stejná klávesnice s písmeny:
 - Pojezdové dráhy, jak zazní: B A 2 = `B, A2`. Každé písmeno začne další dráhu, číslice patří k té předchozí.
-  Dvoupísmenná dráha: T A a **SPOJIT** = `TA` (SPOJIT a EXIT jsou ve spodní řadě číslic vedle 0).
+  Dvoupísmenná dráha: T A a **SPOJIT** = `TA` (SPOJIT a RWY jsou ve spodní řadě číslic vedle 0).
 - **RWY** – dráha (TAXI DEP ji nabídne z ATIS DEP ✓; L / C / R písmenem hned za číslem), **HP** – holding point / intersection (A 1),
   **STAND** – stání (1 2). Číslice bez dráhy, ke které by patřily, jdou na odletu do RWY, na příletu do STAND.
 - **HOLD SHORT**, **CROSS**, **BKTRK** a dráha nebo pojezdová dráha: HOLD SHORT 3 3 = `HOLD SHORT RWY 33`.
@@ -275,6 +275,9 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
 - **ATO jen minutami.** U bodů trati stačí napsat minuty jako na papíře: „40“ → 10:40. Hodinu doplní aplikace podle
   ETO bodu – vezme čas s těmi minutami nejbližší k ETO (ETO 11:01, napsáno 59 → 10:59; ETO 12:58, napsáno 01 → 13:01).
   Bez ETO vezme první takový čas po předchozím ATO. Celý čas (1040) jde psát dál.
+- **Výkonnost (TO / LD weight, distance, flaps, V-rychlosti, VFTO, VREF…)** se píše na klávesnici eTechLogu jen s číslicemi
+  (klávesnice iPadu se neotevře); *Další ›* skočí na další pole výkonnosti. Power a MA grad zůstávají na klávesnici iPadu.
+- **Dlouhé hodnoty** (oblačnost, trend, stav dráhy): pole je tak široké, jak je třeba; když se nevejde, přejde na další řádek.
 - **Enter = další pole.** V běžných polích (palivo, takeoff data, časy, formuláře) přeskočí Enter na další pole – klávesa
   na klávesnici iPadu má nápis *další*. Za posledním polem fáze klávesnice zmizí, ve formuláři poslední Enter odešle.
   Víceřádkové poznámky Enter dál zalamuje.

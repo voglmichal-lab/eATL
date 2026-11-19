@@ -643,6 +643,7 @@ function hideDock() { const d = document.getElementById('akdock'); if (d && !d.h
 const letters = (code, on) => Object.keys(PHON).map(x => keyBtn(code + x, x, 't' + (on === x ? ' on' : ''), PHON[x])).join('');
 function renderDock() {
   if (ACT && ACT.mode === 'atc') { renderAtc(); return }
+  if (ACT && ACT.mode === 'num') { renderNum(); return }
   const f = ACT && ctxOf(ACT.oid, ACT.key);
   const sheetOpen = !!document.querySelector('#sheet:not([hidden])');
   if (!f || !document.getElementById(domId(f.o, f.key)) || sheetOpen) { if (!f || !document.getElementById(domId(f.o, f.key))) ACT = null; hideDock(); return }
@@ -672,8 +673,8 @@ function renderDock() {
     ctx.className = 'ak-ctx abc r5';
     // SPOJIT and EXIT sit next to the 0 (the − and / keys are not used for taxi), so they are not lost among the letters
     ctx.innerHTML = letters('let:', null) + keyBtn('tok:CROSS', 'CROSS', 't sm', 'cross') + keyBtn('tok:BKTRK', 'BKTRK', 't sm', 'backtrack')
-      + keyBtn('tok:RWY', 'RWY', 't s2' + (k === 'rwy' ? ' on' : ''), 'runway') + (dep ? keyBtn('tok:HP', 'HP', 't' + (k === 'hp' ? ' on' : ''), 'hold. pt') : keyBtn('tok:STAND', 'STAND', 't sm' + (k === 'stand' ? ' on' : ''), 'stání'))
-      + keyBtn('tok:HS', 'HOLD SHORT', 't sm s2', 'hold short of') + keyBtn('tok:VIA', 'VIA', 't s2' + (k === 'via' ? ' on' : ''), 'pojezdové dráhy');
+      + keyBtn('tok:EXIT', 'EXIT', 't s2', 'exit 15') + (dep ? keyBtn('tok:HP', 'HP', 't s2' + (k === 'hp' ? ' on' : ''), 'holding point') : keyBtn('tok:STAND', 'STAND', 't s2' + (k === 'stand' ? ' on' : ''), 'stání'))
+      + keyBtn('tok:HS', 'HOLD SHORT', 't s3', 'hold short of');
   }
   else if (kind === 'rwy') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(RWY_TOK, ON) + (f.type === 'atis' ? keyBtn('tok:STAV RWY', 'STAV RWY', 't sm nav', 'kontaminace ›') : '<span></span>') }
   else if (kind === 'cond') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(COND_TOK, ON, 'rc:') }
@@ -685,7 +686,7 @@ function renderDock() {
   const tdp = k === 'tdp', slash = tdp || k === 'rvr', tj = digTarget(f);
   const ok = n => tj >= 0 && okDigit(f.v, f.L[tj].k, n, tj === ACT.s ? ACT.fresh : freshOf(f, tj));
   d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('d:' + n, n, '', null, !ok(n))).join('')
-    + (kind === 'taxi' ? keyBtn('tok:SPOJIT', 'SPOJIT', 't join', 'T A → TA') + keyBtn('d:0', '0', '', null, !ok('0')) + keyBtn('tok:EXIT', 'EXIT', 't', 'exit 15')
+    + (kind === 'taxi' ? keyBtn('tok:SPOJIT', 'SPOJIT', 't join', 'T A → TA') + keyBtn('d:0', '0', '', null, !ok('0')) + keyBtn('tok:RWY', 'RWY', 't' + (k === 'rwy' ? ' on' : ''), 'runway')
       : keyBtn('d:-', '−', '', null, !tdp) + keyBtn('d:0', '0', '', null, !ok('0')) + keyBtn('d:/', '/', '', null, !slash));
   d.querySelector('#ak-act').innerHTML = keyBtn('bk', '⌫', 'bk', 'smazat') + keyBtn('next', 'Další ›', 't nx') + keyBtn('done', 'Hotovo', 't okk');
   const was = d.hidden; d.hidden = false;
@@ -737,12 +738,13 @@ function open(oid, key, i) {
 }
 function close() { const p = ACT; ACT = null; HINT = null; hideDock(); leave(p) }
 // the field the keypad leaves: an unfinished ATC instruction is written, the field shows its new state
-function leave(p) { if (!p) return; if (p.mode === 'atc') { atcCommit(p); atcRefresh(p) } else refreshField(p.oid, p.key) }
+function leave(p) { if (!p) return; if (p.mode === 'num') { numMark(p, false); return } if (p.mode === 'atc') { atcCommit(p); atcRefresh(p) } else refreshField(p.oid, p.key) }
 function press(code) {
   if (!ACT) return; HINT = null;
   // × closes the keypad; what is typed stays, only an ATC instruction not yet added is dropped
   if (code === 'x') { if (ACT.mode === 'atc') ACT.cur = ''; close(); return }
   if (ACT.mode === 'atc') { atcPress(code); return }
+  if (ACT.mode === 'num') { numPress(code); return }
   const f = ctxOf(ACT.oid, ACT.key); if (!f) { close(); return }
   if (ACT.mode === 'note') { notePress(f, code); return }
   if (code === 'done') { close(); return }
@@ -828,6 +830,46 @@ function renderAtc() {
   requestAnimationFrame(() => { document.body.style.paddingBottom = (d.offsetHeight + 16) + 'px'; if (was || VIS !== id) { VIS = id; ensureVisible(id) } });
 }
 
+// ---------- numbers only: performance fields (TO / LD weight, V-speeds, distances, flaps) ----------
+// The iPad has no keyboard with digits only; these fields (inputmode="none", class npad) get the eTechLog keypad instead.
+// The value goes into the field itself (input event), so saving and the limit check stay as for typing.
+const numEl = p => { const c = document.querySelector(`[data-ofp="${CSS.escape(p.ofp)}"]`); return c && c.querySelector(`input.npad[data-of="${CSS.escape(p.of)}"]`) };
+function numMark(p, on) { const el = numEl(p), f = el && el.closest('.fld'); if (f) f.classList.toggle('npad-on', on) }
+function openNum(el) {
+  if (el.readOnly || el.disabled) return; const c = el.closest('[data-ofp]'); if (!c || !el.dataset.of) return;
+  const p = ACT; if (p && p.mode === 'num' && p.of === el.dataset.of && p.ofp === c.dataset.ofp) return;
+  ACT = { mode: 'num', ofp: c.dataset.ofp, of: el.dataset.of, fresh: !!el.value }; HINT = null; leave(p); numMark(ACT, true); renderDock();
+}
+function numSet(el, v) { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })) }
+function numPress(code) {
+  const el = numEl(ACT); if (!el) { close(); return }
+  if (code === 'done') { close(); try { el.blur() } catch (e) { } return }
+  if (code === 'next') {
+    const ph = el.closest('.ophase') || document, all = [...ph.querySelectorAll('input.npad')].filter(x => !x.readOnly && !x.disabled && x.getClientRects().length), nx = all[all.indexOf(el) + 1];
+    if (nx) { const p = ACT; ACT = null; numMark(p, false); nx.focus(); openNum(nx) } else { close(); try { el.blur() } catch (e) { } } return;
+  }
+  if (code === 'bk') { numSet(el, ACT.fresh ? '' : el.value.slice(0, -1)); ACT.fresh = false }
+  else if (code.startsWith('n:')) { const d = code.slice(2); numSet(el, (ACT.fresh ? '' : el.value) + d); ACT.fresh = false }
+  renderNum();
+}
+function renderNum() {
+  const el = numEl(ACT); const sheetOpen = !!document.querySelector('#sheet:not([hidden])');
+  if (!el || el.readOnly || el.disabled || sheetOpen) { if (!el || el.readOnly || el.disabled) { const p = ACT; ACT = null; leave(p) } hideDock(); return }
+  numMark(ACT, true);
+  const d = dockEl(), f = el.closest('.fld'), lab = f ? (f.querySelector('span') || f).childNodes[0].textContent.trim() : ACT.of;
+  d.querySelector('#ak-title').textContent = lab;
+  const mx = el.dataset.max ? +el.dataset.max : null, over = mx != null && el.value !== '' && +el.value > mx;
+  const hint = d.querySelector('#ak-hint'); hint.classList.toggle('warn', over);
+  hint.textContent = over ? `Víc než maximum ${mx}.` : (ACT.fresh && el.value ? 'První číslice nahradí hodnotu. ' : '') + 'Další › = další pole, Hotovo zavře.' + (mx != null ? ` Max ${mx}.` : '');
+  d.querySelector('#ak-chips').innerHTML = '';
+  const ctx = d.querySelector('#ak-ctx'); ctx.className = 'ak-ctx read';
+  ctx.innerHTML = `<div class="ak-readout"><span class="sl">${esc(lab)}</span><span class="rv">${esc(el.value || '–')}</span></div>`;
+  d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('n:' + n, n)).join('') + '<span></span>' + keyBtn('n:0', '0') + '<span></span>';
+  d.querySelector('#ak-act').innerHTML = keyBtn('bk', '⌫', 'bk', 'smazat') + keyBtn('next', 'Další ›', 't nx') + keyBtn('done', 'Hotovo', 't okk');
+  const was = d.hidden; d.hidden = false; const key = 'num' + ACT.of;
+  requestAnimationFrame(() => { document.body.style.paddingBottom = (d.offsetHeight + 16) + 'px'; if (was || VIS !== key) { VIS = key; const r = el.getBoundingClientRect(), lim = innerHeight - d.offsetHeight - 12; if (r.bottom > lim || r.top < 130) window.scrollBy({ top: r.bottom > lim ? r.bottom - lim : r.top - 130, behavior: 'smooth' }) } });
+}
+
 // ---------- per-pilot settings (Můj účet) ----------
 let DRAFT = null;
 function cfgInner() {
@@ -871,11 +913,12 @@ function bind(api) {
     const out = document.getElementById(domId(f.o, f.key) + '-out'); if (out) out.innerHTML = outHTML(ctxOf(f.o.ofpId, f.key));
   });
   // typing anywhere else (the note, another OFP field) puts the keypad away
-  document.addEventListener('focusin', e => { if (ACT && e.target.matches && e.target.matches('input,textarea,select') && !e.target.closest('#akdock')) close() });
+  document.addEventListener('focusin', e => { const t = e.target; if (t && t.matches && t.matches('input.npad')) { openNum(t); return } if (ACT && t.matches && t.matches('input,textarea,select') && !t.closest('#akdock')) close() });
   document.addEventListener('keydown', e => {
     if (!ACT || e.metaKey || e.ctrlKey || e.altKey) return; if (e.target.closest && e.target.closest('input,textarea,select')) return;
     const d = document.getElementById('akdock'); if (!d || d.hidden) return;
     const key = e.key;
+    if (ACT.mode === 'num') { if (/^[0-9]$/.test(key)) press('n:' + key); else if (key === 'Backspace') press('bk'); else if (key === 'Enter' || key === 'Tab') press('next'); else if (key === 'Escape') press('done'); else return; e.preventDefault(); return }
     if (ACT.mode === 'atc') { if (/^[a-zA-Z0-9]$/.test(key)) press('at:' + key.toUpperCase()); else if (key === ' ' || key === '.' || key === '/') press('at:' + key); else if (key === 'Backspace') press('bk'); else if (key === 'Enter') press('add'); else if (key === 'Escape') press('done'); else return; e.preventDefault(); return }
     const f = ctxOf(ACT.oid, ACT.key); if (!f) return;
     if (ACT.mode === 'note') { if (key.length === 1 && /[A-Za-z0-9 \/,.\-]/.test(key)) press('nt:' + key.toUpperCase()); else if (key === 'Backspace') press('bk'); else if (key === 'Enter' || key === 'Escape') press('done'); else return; e.preventDefault(); return }
@@ -890,7 +933,7 @@ function bind(api) {
 function after() { if (ACT) renderDock(); else hideDock() }
 
 return {
-  bind, field, after, cfgEditor, cfgResult, lineOf, plan, FIELDS, openAtc, nbId,
+  bind, field, after, cfgEditor, cfgResult, lineOf, plan, FIELDS, openAtc, nbId, openNum,
   // for tests
   _: { DEF, PRESETS, presetCfg, sanitize, empty, slotsOf, fmtSlot, outSlot, atomsStr, apply, setSlot, firstEmpty, nextIdx, fmtRoute, okDigit, fmtTrend, fmtVia, atcType, atcBack, atcCommit, fmtFreq, get ACT() { return ACT }, set ACT(x) { ACT = x }, get HINT() { return HINT } }
 };

@@ -1348,10 +1348,13 @@ function viewOfpList(ac){
     ${more>0?`<div class="chips" style="margin-top:10px"><button type="button" class="btn" data-act="ofp-all">Zobrazit i starší (${more})</button></div>`:''}</div>`;
 }
 function plannedOfps(ac){const lim=addDays(todayISO(),-7);return (ac.ofps||[]).filter(o=>!o.void&&!o.leg&&o.date>=lim)}
+// performance fields get the eTechLog keypad with digits only (power and MA gradient keep the iPad keyboard)
+const NPAD=new Set(['to_w','to_dist','to_flaps','v1','vr','v2','vfto','emr_vref','emr_vapp','ld_w','ld_dist','vref','vapp','vfs','ld167']);
 function ofpIn(o,k,label,opt){opt=opt||{};const val=ofpVal(o,k);if(o.closed||o.void)opt.ro=true;
+  const pad=NPAD.has(k)&&!opt.area&&!!(self.ETL_ATIS&&ETL_ATIS.openNum);if(pad){opt.cls=((opt.cls||'')+' npad').trim();opt.num=opt.num||k==='to_flaps'}
   const mx=opt.num?ofpMax(o,k):null;const over=mx!=null&&num(val)!=null&&num(val)>mx;
   if(mx!=null)opt.cls=((opt.cls||'')+'" data-max="'+mx).trim();
-  return `<label class="fld ${opt.full?'full':''} ${over?'over':''}"><span>${label}${mx!=null?` <small class="lim">max ${fmtN(mx)}</small>`:''}</span>${opt.area?`<textarea data-of="${esc(k)}" ${opt.ro?'readonly':''}>${esc(val)}</textarea>`:`<input type="text" data-of="${esc(k)}" value="${esc(val)}" ${opt.ro?'readonly':''} ${opt.num?'inputmode="numeric"':opt.dec?'inputmode="decimal"':''} ${opt.ph?`placeholder="${esc(opt.ph)}"`:''} ${opt.cls?`class="${opt.cls}"`:''}>`}</label>`}
+  return `<label class="fld ${opt.full?'full':''} ${over?'over':''}"><span>${label}${mx!=null?` <small class="lim">max ${fmtN(mx)}</small>`:''}</span>${opt.area?`<textarea data-of="${esc(k)}" ${opt.ro?'readonly':''}>${esc(val)}</textarea>`:`<input type="text" data-of="${esc(k)}" value="${esc(val)}" ${opt.ro?'readonly':''} ${pad?'inputmode="none"':opt.num?'inputmode="numeric"':opt.dec?'inputmode="decimal"':''} ${opt.ph?`placeholder="${esc(opt.ph)}"`:''} ${opt.cls?`class="${opt.cls}"`:''}>`}</label>`}
 // the directs in force: one whose target a later direct leaves out is replaced by it
 // (DCT LANUX, then DCT VLM past LANUX: only LOWW → VLM counts, the saving is not added twice)
 function dctPairs(o){const W=o.wpts||[];const all=[];W.forEach((p,i)=>{if(!p.rvsm&&ofpVal(o,'w'+i+'_dct')){const a=num(ofpVal(o,'w'+i+'_dctFrom'));if(a!=null&&W[a]&&a<i)all.push({from:a,to:i})}});

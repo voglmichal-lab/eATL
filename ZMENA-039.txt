@@ -1,0 +1,30 @@
+eTechLog – změna Z-039
+Verze: 0.7.1 (navazuje na Z-038 / 0.7.0; obsahuje vše předchozí)
+Datum: 2026-11-19
+
+- Výkonnost (TO / LD weight, TO / LD dist, Flaps, V1, VR, V2, VFTO, EMR VREF / VAPP, VREF, VAPP, VFS, LD × 1,67):
+  klávesnice eTechLogu jen s číslicemi, klávesnice iPadu se neotevře. Další › skočí na další pole výkonnosti,
+  první číslice přepíše dosavadní hodnotu, překročené maximum se ukáže hned. Power a MA grad zůstávají na iPadu.
+- Pole ATIS a clearance s dlouhou hodnotou (oblačnost se čtyřmi vrstvami, trend) se už nepřekrývají s vedlejšími:
+  pole je tak široké, jak je potřeba, a když se nevejde, přejde na další řádek.
+- Taxi klávesnice: RWY vedle 0 (místo EXIT), EXIT, HP / STAND a HOLD SHORT ve spodní řadě písmen.
+  Klávesa VIA zrušena – písmeno skočí do pole VIA samo.
+
+Návrat
+- Na 0.7.0: eatl-Z-038-v0.7.0.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-039.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js
