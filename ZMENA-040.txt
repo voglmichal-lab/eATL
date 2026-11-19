@@ -1,0 +1,37 @@
+Z-040 · eTechLog 0.7.2 · 19. 11. 2026
+
+Angličtina
+- Můj účet → Jazyk aplikace / Language: čeština nebo angličtina, pro každého uživatele zvlášť (platí na všech iPadech).
+  Kdo jazyk nezvolil, má češtinu. Přihlašovací obrazovky jsou v jazyce naposledy použitém na zařízení (odkaz English / Čeština dole).
+- Anglicky celá aplikace včetně klávesnic, hlášek a PDF z OFP. Uložená data se nepřekládají.
+- Nové soubory: i18n.js, lang-en.js (nutné nahrát), tools/i18n-check.js (jen pro vývoj).
+
+Úpravy
+- Přihlášení do Kanceláře nabízí jen CAMO, mechaniky, správce, OPS a Safety manažera; posádky jen na úvodní obrazovce.
+- „Kdo jste?“ → „Přihlášení uživatele“; méně nápověd a poznámek u polí.
+- Security search: „Provedena, bez nálezu“ (Exterior / Baggage / Cabin) nebo „Nález – nahlášeno“; volba „Nebylo nutné“ zrušena
+  (starší záznamy s ní se dál zobrazují). Nový text: potvrzení se zaznamená na server a let se založí v ATL.
+- „Vyplněné údaje i každá změna se ukládají automaticky.“
+- SIC, který není v seznamu: jen jméno, bez licence.
+- Podpis OFP: „Velitel letadla potvrzuje převzetí OFP pro let SUA6L EBOS → LEBL.“
+- Natankováno 0 → palivo na odlet se převezme z paliva po přistání předchozího letu (téže letadlo, přistál tam, odkud se letí).
+  Ručně zapsaná hodnota se nepřepisuje.
+- Výkonnost: Další › z TO dist skočí na Power (klávesnice iPadu); Enter z Power na klapky, a když jsou předvyplněné, rovnou na V1.
+
+Návrat na 0.7.1: nahrát celý zip Z-039. Aplikace bude jen česky, data zůstávají.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  tools/i18n-check.js
+  vercel.json
+  version.js

@@ -60,6 +60,7 @@ Nahrajte znovu všechny soubory ze zipu předchozí změny (např. `eatl-Z-026-v
 - Soubor `atis.js` může na serveru zůstat, 0.6.13 ho nenačítá.
 - Z 0.6.16 zpět na 0.6.15 nebo 0.6.13: TAXI DEP / TAXI ARR starší verze nezobrazí (v datech zůstanou), ATC instrukce
   za letu ukáže jako poznámky u bodů i s časem, ATIS s větrem v TEMPO je běžný text.
+- Z 0.7.2 zpět na 0.7.1: aplikace je zase jen česky; volba jazyka zůstane v datech a 0.7.2 ji po návratu použije.
 - **Z 0.7 zpět na 0.6.x: jen se signálem.** 0.7 ukládá záznamy jinak (viz níže); 0.6 si po návratu stáhne deník ze
   serveru znovu a neodeslané záznamy z 0.7 odešle. Bez signálu by 0.6 ukázala prázdný deník, dokud se nepřipojí.
 
@@ -99,7 +100,7 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
 - **DIVERT**: pod navigačním logem je tlačítko pro každé alternate z OFP (až dvě – každé má svou route to alternate s ETO od začátku divertu) a *DIVERT – jiné letiště* s ručním routingem (bod, čas přeletu, palivo). Letiště přistání se do ATL přenese jako letiště divertu.
 
 ## Let na iPadu – postup
-1. **Přihlášení**: letadlo (iPad si ho pamatuje) → *Kdo jste?* → PIN. Přihlašuje se jen ten, kdo s iPadem pracuje.
+1. **Přihlášení**: letadlo (iPad si ho pamatuje) → *Přihlášení uživatele* (jen posádky) → PIN. Přihlašuje se jen ten, kdo s iPadem pracuje.
 2. **Nahrát OFP** (PDF z NAVsystemu) → *Otevřít OFP*.
 3. **Security search** je v OFP úplně nahoře: výsledek (+ předletová prohlídka) → *Podepsat a odeslat security search*.
    Tím se let založí v ATL a firma vidí, že security je hotová. Pak je z karty jeden řádek a posádka pracuje jen v OFP.
@@ -120,7 +121,7 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
 5. **Let podepisuje jen PIC.** Když je na iPadu přihlášený někdo jiný, PIC zadá svůj PIN při uzavření.
 
 Posádka se předvolí podle předchozího letu toho dne na stejném letadle, jinak podle přihlášení na iPadech letadla –
-vždy jen jako návrh ke kontrole. PIC se vybírá jen ze seznamu; SIC, který v systému není, jde napsat (jméno, licence)
+vždy jen jako návrh ke kontrole. PIC se vybírá jen ze seznamu; SIC, který v systému není, jde napsat (jen jméno)
 a v ATL je označený „ověřit“ pro CAMO – v seznamu volba *Není v seznamu*, pak se objeví pole pro jméno (stejně u palubní průvodčí). Palubní průvodčí se zakládají s rolí *Palubní průvodčí* (bez PINu).
 
 *Let bez OFP* (přelet, OFP nejde nahrát) zůstává jako záloha na úvodní obrazovce. V Kanceláři se po *Začít let*
@@ -276,7 +277,8 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
   ETO bodu – vezme čas s těmi minutami nejbližší k ETO (ETO 11:01, napsáno 59 → 10:59; ETO 12:58, napsáno 01 → 13:01).
   Bez ETO vezme první takový čas po předchozím ATO. Celý čas (1040) jde psát dál.
 - **Výkonnost (TO / LD weight, distance, flaps, V-rychlosti, VFTO, VREF…)** se píše na klávesnici eTechLogu jen s číslicemi
-  (klávesnice iPadu se neotevře); *Další ›* skočí na další pole výkonnosti. Power a MA grad zůstávají na klávesnici iPadu.
+  (klávesnice iPadu se neotevře); *Další ›* skočí na další pole v pořadí stránky – i na Power (klávesnice iPadu) a z něj Enterem dál. Předvyplněné klapky se přeskočí
+  (TO dist → Power → V1); prázdné klapky ne. Power a MA grad zůstávají na klávesnici iPadu.
 - **Dlouhé hodnoty** (oblačnost, trend, stav dráhy): pole je tak široké, jak je třeba; když se nevejde, přejde na další řádek.
 - **Enter = další pole.** V běžných polích (palivo, takeoff data, časy, formuláře) přeskočí Enter na další pole – klávesa
   na klávesnici iPadu má nápis *další*. Za posledním polem fáze klávesnice zmizí, ve formuláři poslední Enter odešle.
@@ -295,6 +297,16 @@ u kteréhokoli bodu otevře stejnou klávesnici, volný text s diakritikou přes
 - **DCT** nabídne body tratě dál po trase; `DCT MOROK` z klávesnice zkrátí trať stejně jako tlačítko DCT v řádku
   (od bodu, u kterého je instrukce zapsaná).
 - U vynechaného bodu (direct) je přeškrtnutý jen název – instrukce zapsané u něj zůstávají čitelné.
+
+## Jazyk – čeština / angličtina
+- Každý uživatel si volí jazyk v **Můj účet → Jazyk aplikace / Language**. Volba se synchronizuje (platí na všech iPadech) a
+  nepřepíše nastavení nikoho jiného. Kdo jazyk nezvolil, má češtinu – nikdy jazyk, který na iPadu nechal předchozí uživatel.
+- Přihlašovací obrazovky (před přihlášením) jsou v jazyce naposledy použitém na zařízení; odkaz *English / Čeština* dole.
+- Anglicky je celá aplikace včetně klávesnic, hlášek a **PDF z OFP**. Uložená data se nepřekládají a nemění –
+  zápis ATIS, clearance, závady, poznámky zůstávají, jak je kdo napsal.
+- Jak to funguje: aplikace píše česky; `i18n.js` každý text, který aplikace zobrazí, nahradí anglickým z `lang-en.js`
+  (dřív, než ho prohlížeč vykreslí). Text bez překladu zůstane česky, nic se nerozbije. Návrat na češtinu vrátí původní texty.
+- Po změně textů v aplikaci: `tools/i18n-check.js` vypíše české texty bez překladu (návod v souboru).
 
 ## Můj účet
 Tlačítko **Můj účet** v horní liště (posádka i kancelář):
@@ -341,4 +353,6 @@ V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signál
 | `fonts/`, `fonts.css` | písma (lokálně kvůli offline) |
 | `ftl.js` | výpočet doby letu a služby (ORO.FTL / CS FTL.1) |
 | `atis.js` | zápis ATIS, clearance, taxi a ATC instrukcí klávesnicí eTechLogu |
+| `i18n.js`, `lang-en.js` | angličtina: překladová vrstva a anglické texty |
+| `tools/i18n-check.js` | kontrola chybějících překladů (jen pro vývoj, aplikace ho nenačítá) |
 | `supabase/schema.sql` | databáze, pravidla přístupu a živá synchronizace |

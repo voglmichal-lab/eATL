@@ -845,8 +845,9 @@ function numPress(code) {
   const el = numEl(ACT); if (!el) { close(); return }
   if (code === 'done') { close(); try { el.blur() } catch (e) { } return }
   if (code === 'next') {
-    const ph = el.closest('.ophase') || document, all = [...ph.querySelectorAll('input.npad')].filter(x => !x.readOnly && !x.disabled && x.getClientRects().length), nx = all[all.indexOf(el) + 1];
-    if (nx) { const p = ACT; ACT = null; numMark(p, false); nx.focus(); openNum(nx) } else { close(); try { el.blur() } catch (e) { } } return;
+    // next field in page order, whichever keyboard it uses (Power, MA grad: iPad keyboard); a prefilled flaps field is jumped over
+    const nx = API && API.nextField ? API.nextField(el) : null;
+    if (nx) { const p = ACT; ACT = null; numMark(p, false); nx.focus(); if (nx.matches('input.npad')) openNum(nx); else hideDock() } else { close(); try { el.blur() } catch (e) { } } return;
   }
   if (code === 'bk') { numSet(el, ACT.fresh ? '' : el.value.slice(0, -1)); ACT.fresh = false }
   else if (code.startsWith('n:')) { const d = code.slice(2); numSet(el, (ACT.fresh ? '' : el.value) + d); ACT.fresh = false }

@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.7.1"}
+:root{--etl-build:"0.7.2"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -340,6 +340,7 @@ table.ofplog tr.rvsmrow input{width:80px}
 .tile input{width:22px;height:22px;accent-color:var(--accent);margin:0;flex:none}
 .tile:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
 .tile.found:has(input:checked){border-color:var(--warn);background:var(--warn-soft)}
+.tile .tile-sub{display:block;font-weight:500;font-size:.8rem;color:var(--muted);margin-top:2px;font-family:var(--f-mono)}
 .big-static{display:flex;align-items:center;gap:12px;min-height:60px;font-size:1.45rem;font-weight:600}
 .big-static .linkbtn{font-family:var(--f-body);font-size:.9rem}
 details summary{list-style:none;display:inline-block}
