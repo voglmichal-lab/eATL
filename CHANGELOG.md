@@ -41,3 +41,4 @@ Zip změny obsahuje jen změněné soubory ve správných složkách a popis `ZM
 | Z-034 | 0.6.21 | 2026-11-19 | Oprava: pole Palubní průvodčí v kroku Posádka bylo posunuté dolů (dvouřádkový popisek) – popisek je kratší, „nepovinné“ je ve výběru, popisky posádky se nezalamují. |
 | Z-035 | 0.6.22 | 2026-11-19 | Taxi klávesnice: SPOJIT a EXIT přesunuté do spodní řady číslic vedle 0 (místo nepoužívaných − a /), SPOJIT zvýrazněný; RWY a VIA jsou větší. |
 | Z-036 | 0.6.23 | 2026-11-19 | Oprava: výška v příletové (i odletové) clearance – číslice napsané v prázdném poli STAR / SID šly do názvu procedury; teď jdou do výšky. Jedna až tři číslice = FL (110 = FL110), čtyři a víc = stopy. |
+| Z-037 | 0.6.24 | 2026-11-19 | Příletová clearance bez pole VÝŠKA (STAR / DCT bod / HDG, APP, RWY); číslice v prázdném poli STAR jdou do RWY. Uložené pořadí polí v Můj účet se upraví samo. |

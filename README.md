@@ -232,9 +232,9 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
   Jiná procedura: tlačítko s bodem z OFP (KOK…) a doplní se číslo a písmeno. Bez SID: STRAIGHT (straight ahead), PASSING a výška,
   LEFT / RIGHT a HDG s kurzem, nebo jen HDG a tři číslice. Clearance limit se nezapisuje.
   Místo STAR jen bod příletové tratě: **DCT** a bod (W W 6 7 3 = DCT WW673).
-- **Výška v clearance:** jedna až tři číslice = letová hladina (1 1 0 = FL110), čtyři a víc = stopy (5 0 0 0 = 5000 ft);
-  klávesa FL není nutná. Číslice napsané hned v prázdném poli SID / STAR jdou do výšky – plán SID / STAR zůstane
-  nabídnutý k potvrzení ✓.
+- **Výška v odletové clearance:** jedna až tři číslice = letová hladina (8 0 = FL80), čtyři a víc = stopy (5 0 0 0 = 5000 ft);
+  klávesa FL není nutná. Číslice napsané hned v prázdném poli SID jdou do výšky – plán SID zůstane nabídnutý k potvrzení ✓.
+- **Příletová clearance** výšku nemá: STAR (nebo DCT bod / HDG), APP a RWY. Číslice v prázdném poli STAR jdou do RWY.
   Přiblížení a dráhu v příletové clearance nabídne z ATIS ARR. Dříve použité hodnoty na letišti (SID, dráhy, TL, výšky,
   frekvence) se nabízejí z ostatních OFP.
 - Do OFP, PDF a kontroly vyplnění jde jeden normalizovaný řádek (např. `INFO K · ILS · RWY 26 · TL60 · 240/10 · 9999 · FEW020 · 12/05 · Q1018 · NOSIG`).

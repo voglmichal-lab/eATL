@@ -1,0 +1,28 @@
+eTechLog – změna Z-037
+Verze: 0.6.24 (navazuje na Z-036 / 0.6.23; obsahuje i vše ze Z-029 až Z-036)
+Datum: 2026-11-19
+
+Příletová clearance
+- Pole VÝŠKA je pryč – zůstává STAR (nebo DCT bod / HDG), APP a RWY. Do OFP: BISBA3X · ILS CAT II · RWY 24R.
+- Číslice napsané v prázdném poli STAR jdou do RWY (2 4 = RWY 24); plán STAR zůstane nabídnutý k potvrzení ✓.
+- Uložené pořadí polí v Můj účet se upraví samo. Výška zapsaná dřív zmizí z řádku až při další úpravě clearance.
+- Odletová clearance se nemění (výška: 1–3 číslice = FL, 4 a víc = stopy).
+
+Návrat
+- Na 0.6.23: eatl-Z-036-v0.6.23.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-037.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  index.html
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

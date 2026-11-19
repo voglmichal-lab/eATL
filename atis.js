@@ -48,7 +48,6 @@ const DEF = {
   },
   star: {
     route: { l: 'STAR', ph: 'STAR', dig: 1, w: 1, ghost: 'star', fix: 'starFix', h: 'Plán z OFP potvrdíte ✓. Jiný STAR: ťukněte bod a doplňte číslo a písmeno. Jen bod tratě (WW673): DCT a bod. Kurz: HDG a tři číslice.' },
-    alt: { l: 'VÝŠKA', ph: 'FL110', dig: 1, h: 'Jedna až tři číslice = FL (1 1 0 = FL110), čtyři a víc = stopy (4 0 0 0 = 4000 ft).' },
     app: { l: 'APP', ph: 'ILS', ghost: 'arrApp', h: 'Typ přiblížení. Hodnotu z ATIS ARR potvrdíte ✓.' },
     rwy: { l: 'RWY', ph: '24', dig: 1, ghost: 'arrRwy', h: 'Dráha. Hodnotu z ATIS ARR potvrdíte ✓.' }
   },
@@ -65,8 +64,8 @@ const DEF = {
 DEF.taxi.via.h = DEF.taxiA.via.h = 'Pojezdové dráhy, jak zazní: B A 1 = B, A1 – písmeno začne další dráhu, číslice patří k ní. Dvě písmena (TA): T A SPOJIT. HOLD SHORT / CROSS a dráha: 3 3. EXIT a číslo: 1 5.';
 const TYPE_NAME = { atis: 'ATIS (DEP i ARR)', clr: 'Odletová clearance', star: 'Příletová clearance', taxi: 'Taxi – odlet', taxiA: 'Taxi – přílet' };
 const PRESETS = {
-  icao: { atis: ['info', 'time', 'app', 'rwy', 'cond', 'tl', 'wind', 'vis', 'rvr', 'wx', 'cld', 'tdp', 'qnh', 'trend'], clr: ['route', 'alt', 'sq', 'freq'], star: ['route', 'alt', 'app', 'rwy'], taxi: ['rwy', 'hp', 'via'], taxiA: ['via', 'stand'] },
-  us: { atis: ['info', 'time', 'wind', 'vis', 'rvr', 'wx', 'cld', 'tdp', 'qnh', 'app', 'rwy', 'cond', 'tl', 'trend'], clr: ['route', 'alt', 'sq', 'freq'], star: ['route', 'alt', 'app', 'rwy'], taxi: ['rwy', 'hp', 'via'], taxiA: ['via', 'stand'] }
+  icao: { atis: ['info', 'time', 'app', 'rwy', 'cond', 'tl', 'wind', 'vis', 'rvr', 'wx', 'cld', 'tdp', 'qnh', 'trend'], clr: ['route', 'alt', 'sq', 'freq'], star: ['route', 'app', 'rwy'], taxi: ['rwy', 'hp', 'via'], taxiA: ['via', 'stand'] },
+  us: { atis: ['info', 'time', 'wind', 'vis', 'rvr', 'wx', 'cld', 'tdp', 'qnh', 'app', 'rwy', 'cond', 'tl', 'trend'], clr: ['route', 'alt', 'sq', 'freq'], star: ['route', 'app', 'rwy'], taxi: ['rwy', 'hp', 'via'], taxiA: ['via', 'stand'] }
 };
 const OFF_DEF = { atis: ['time'] };
 const FIELDS = { atisDep: { type: 'atis', title: 'ATIS DEP' }, clr: { type: 'clr', title: 'ATC clearance' }, taxiDep: { type: 'taxi', title: 'TAXI DEP' }, atisArr: { type: 'atis', title: 'ATIS ARR' }, clrArr: { type: 'star', title: 'Příletová clearance' }, atisDiv: { type: 'atis', title: 'ATIS DIVERT' }, taxiArr: { type: 'taxiA', title: 'TAXI ARR' } };
@@ -95,7 +94,7 @@ function empty(type, dest) {
   if (type === 'clr') return { route: '', alt: '', sq: '', freq: '' };
   if (type === 'taxi') return { rwy: '', hp: '', via: [] };
   if (type === 'taxiA') return { via: [], stand: '' };
-  return { route: '', alt: '', app: '', rwy: '' };
+  return { route: '', app: '', rwy: '' };   // arrival clearance: no altitude
 }
 
 // ---------- formatting (stored values stay as typed; the line is normalized) ----------
@@ -458,8 +457,8 @@ function digit(f, k, d) {
     case 'qnh': { const n = () => v.qnh[0] === '9' ? 3 : 4; if (v.qnh.length >= n()) v.qnh = ''; v.qnh += d; if (v.qnh.length === n()) adv(f); return }
     case 'trend': v.trend.push(d); return;
     case 'route': if (fresh || v.route === 'RWY HDG') v.route = '';
-      // no SID / STAR starts with a digit: digits at an empty route are the altitude (the plan stays offered)
-      if (!v.route) { const j = idxOf(f, 'alt'); if (j >= 0) { setSlot(f, j); digit(f, 'alt', d) } return }
+      // no SID / STAR starts with a digit: digits at an empty route are the altitude (departure) or the runway (arrival); the plan stays offered
+      if (!v.route) { const t = idxOf(f, 'alt') >= 0 ? 'alt' : 'rwy', j = idxOf(f, t); if (j >= 0) { setSlot(f, j); digit(f, t, d) } return }
       if (isStr(v.route)) {
         const o = strParse(v.route);
         if (o.h !== null) { if (o.h.length < 3) { o.h += d; v.route = strMake(o); if (o.h.length === 3) adv(f) } }
