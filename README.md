@@ -373,6 +373,15 @@ V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signál
   průběžné hodnoty uzavřených OFP (ponechat jen výsledný stav).
 - **Záloha** je ruční (JSON). Pro ostrý provoz placený tarif Supabase se zálohami, nebo pravidelný export.
 
+## W&B z APG (načtení performance)
+- Tlačítko **W&B z APG** v kroku Performance (a u Přistávacích dat): vyberte PDF z APG nebo snímek obrazovky reportu.
+- Report z APG je obrázek bez textu, proto se čte přímo v zařízení (OCR Tesseract, `vendor/ocr/`). Poprvé se stáhne asi 7 MB, pak funguje i bez signálu (vlastní mezipaměť, nestahuje se s každou novou verzí znovu).
+- Hodnoty se berou podle názvu řádku a sloupce (Weight × Departure, VREF × Arrival, VREF × Emerg Ret…), ne podle pozice.
+- Každá hodnota se čte několikrát; jistá je jen tehdy, když se čtení shodují. Nejisté se zobrazí žlutě a nejsou zaškrtnuté.
+- Nic se nevyplní bez potvrzení: kontrolní okno ukáže u každé hodnoty výřez z reportu, současnou hodnotu v OFP a upozornění (jiné letadlo, jiné letiště, V1 > VR, nad maximem).
+- Vyplní se zaškrtnuté: vzlet (TO weight, TO dist, Power, Flaps, V1, VR, V2, VFTO), emergency return (VREF, VAPP), přistání (LD weight, LD dist, VREF, VAPP, VFS, MA grad, REQD FL → LD × 1,67).
+- Departure / Arrival / Emergency return options a klapky na přistání se uloží jako řádek „APG“ pod příslušnými poli.
+
 ## Soubory
 | Soubor | Co obsahuje |
 |---|---|
@@ -384,6 +393,8 @@ V OFP tlačítko **PDF / tisk** – vytvoří PDF přímo v iPadu (i bez signál
 | `fonts/pdf/` | písma pro PDF s českou diakritikou (SIL OFL) |
 | `fonts/`, `fonts.css` | písma (lokálně kvůli offline) |
 | `ftl.js` | výpočet doby letu a služby (ORO.FTL / CS FTL.1) |
+| `apg.js` | čtení W&B reportu z APG (tabulky, OCR, kontrola hodnot) |
+| `vendor/ocr/` | čtečka textu Tesseract (tesseract.js 6, Apache 2.0) a anglická data; načítá se jen při importu APG |
 | `atis.js` | zápis ATIS, clearance, taxi a ATC instrukcí klávesnicí eTechLogu |
 | `i18n.js`, `lang-en.js` | angličtina: překladová vrstva a anglické texty |
 | `tools/i18n-check.js` | kontrola chybějících překladů (jen pro vývoj, aplikace ho nenačítá) |

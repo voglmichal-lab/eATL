@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.7.7"}
+:root{--etl-build:"0.7.8"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -644,3 +644,28 @@ table.ofplog .ofp-notebtn span{max-width:100%;white-space:normal;overflow-wrap:a
 /* ETO in the navigation log: tap = passed on time (ATO = ETO) */
 .eto-tap{font:inherit;color:inherit;background:var(--surface);border:1.5px dashed var(--line-strong);border-radius:7px;padding:6px 8px;min-height:40px;cursor:pointer}
 .eto-tap:hover,.eto-tap:focus-visible{border-color:var(--ok);border-style:solid}
+
+/* APG weight & balance import */
+.apg-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.apg-head .label{margin:0}
+.apg-btn{position:relative;cursor:pointer;white-space:nowrap}
+.apg-info{margin:4px 0 8px;font-size:.88rem;color:var(--muted);display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.apg-info .ann{font-size:.66rem;padding:1px 6px;border-width:1px}
+.apg-prog{display:flex;align-items:center;gap:12px;font-weight:600;padding:18px 4px}
+.apg-prog .spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:apgspin .8s linear infinite;flex:0 0 auto}
+@keyframes apgspin{to{transform:rotate(360deg)}}
+.apg-meta{font-size:1rem;font-weight:600;margin-bottom:8px}
+.apg-tab{width:100%;border-collapse:collapse;margin-bottom:6px}
+.apg-tab td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+.apg-tab td:first-child{width:34px}
+.apg-tab td:nth-child(2){width:9.5rem}
+.apg-tab tr.apg-check td{background:var(--caution-soft)}
+.apg-tab tr.apg-miss td{background:var(--warn-soft)}
+.apg-cut{width:170px}
+.apg-cut img{display:block;height:32px;max-width:170px;object-fit:contain;object-position:left center;background:#fff;border:1px solid var(--line);border-radius:3px}
+.apg-tab input.apg-v{width:7.5rem;max-width:100%;font-size:1.05rem}
+.apg-tab input[type=checkbox]{width:22px;height:22px}
+.apg-note{font-size:.85rem}
+.apg-note .ann{font-size:.66rem;padding:1px 6px;border-width:1px}
+.apg-opt{margin:4px 0;font-size:.9rem}
+@media (max-width:700px){.apg-tab td:nth-child(2){width:auto}.apg-cut{width:84px}.apg-cut img{max-width:84px;height:20px}.apg-note{display:none}}

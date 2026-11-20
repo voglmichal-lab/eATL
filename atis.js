@@ -765,7 +765,7 @@ function open(oid, key, i) {
 }
 function close() { const p = ACT; ACT = null; HINT = null; hideDock(); leave(p) }
 // the field the keypad leaves: an unfinished ATC instruction is written, the field shows its new state
-function leave(p) { if (!p) return; if (p.mode === 'num') { numMark(p, false); return } if (p.mode === 'atc') { atcCommit(p); atcRefresh(p) } else refreshField(p.oid, p.key) }
+function leave(p) { if (!p) return; if (p.mode === 'num') { numLeave(p); return } if (p.mode === 'atc') { atcCommit(p); atcRefresh(p) } else refreshField(p.oid, p.key) }
 function press(code) {
   if (!ACT) return; HINT = null;
   // × closes the keypad; what is typed stays, only an ATC instruction not yet added is dropped
@@ -861,6 +861,8 @@ function renderAtc() {
 // The iPad has no keyboard with digits only; these fields (inputmode="none", class npad) get the eTechLog keypad instead.
 // The value goes into the field itself (input event), so saving and the limit check stay as for typing.
 const numEl = p => { const c = document.querySelector(`[data-ofp="${CSS.escape(p.ofp)}"]`); return c && c.querySelector(`input.npad[data-of="${CSS.escape(p.of)}"]`) };
+// leaving a number field: the app finishes the value (a time typed as minutes only gets its hour)
+function numLeave(p) { numMark(p, false); const el = numEl(p); if (el && API && API.commit) API.commit(el) }
 function numMark(p, on) { const el = numEl(p), f = el && el.closest('.fld'); if (f) f.classList.toggle('npad-on', on) }
 function openNum(el) {
   if (el.readOnly || el.disabled) return; const c = el.closest('[data-ofp]'); if (!c || !el.dataset.of) return;
@@ -874,13 +876,13 @@ function numPress(code) {
   if (code === 'next') {
     // next field in page order, whichever keyboard it uses (Power, MA grad: iPad keyboard); a prefilled flaps field is jumped over
     const nx = API && API.nextField ? API.nextField(el) : null;
-    if (nx) { const p = ACT; ACT = null; numMark(p, false); nx.focus(); if (nx.matches('input.npad')) openNum(nx); else hideDock() } else { close(); try { el.blur() } catch (e) { } } return;
+    if (nx) { const p = ACT; ACT = null; numLeave(p); nx.focus(); if (nx.matches('input.npad')) openNum(nx); else hideDock() } else { close(); try { el.blur() } catch (e) { } } return;
   }
   if (code === 'bk') { numSet(el, ACT.fresh ? '' : el.value.slice(0, -1)); ACT.fresh = false }
   else if (code === 'n:ontime' || code === 'n:ok') {
     // ON TIME = the point's ETO as its ATO; OK = RVSM check in order – both move on like Další ›
     const v = code === 'n:ok' ? 'OK' : el.dataset.eto; if (!v) return; numSet(el, v); ACT.fresh = false;
-    const nx = API && API.nextField ? API.nextField(el) : null; if (nx) { const p = ACT; ACT = null; numMark(p, false); nx.focus(); if (nx.matches('input.npad')) openNum(nx); else hideDock() } else { close(); try { el.blur() } catch (e) { } } return }
+    const nx = API && API.nextField ? API.nextField(el) : null; if (nx) { const p = ACT; ACT = null; numLeave(p); nx.focus(); if (nx.matches('input.npad')) openNum(nx); else hideDock() } else { close(); try { el.blur() } catch (e) { } } return }
   else if (code.startsWith('n:')) { const d = code.slice(2), cur = ACT.fresh ? '' : el.value; if (d === '.' && (!el.dataset.dec || cur.includes('.'))) return;
     // + / − set the sign of the value (pressed before or after the digits)
     if (d === '+' || d === '-') { if (!el.dataset.sign) return; numSet(el, d + cur.replace(/^[+-]/, '')); ACT.fresh = false; renderNum(); return }

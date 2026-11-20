@@ -2,7 +2,7 @@
   "headers": [
     { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
     { "source": "/version.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
-    { "source": "/(index.html|app.js|atis.js|ftl.js|lang-en.js|i18n.js|app.css|fonts.css|config.js|manifest.webmanifest)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/(index.html|app.js|atis.js|apg.js|ftl.js|lang-en.js|i18n.js|app.css|fonts.css|config.js|manifest.webmanifest)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
     { "source": "/(.*)", "headers": [
       { "key": "X-Content-Type-Options", "value": "nosniff" },
       { "key": "Referrer-Policy", "value": "same-origin" }

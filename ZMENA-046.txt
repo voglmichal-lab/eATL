@@ -1,0 +1,45 @@
+eTechLog – změna Z-046
+Verze: 0.7.8 (navazuje na Z-045 / 0.7.7; obsahuje vše předchozí)
+Datum: 2026-11-20
+
+- W&B z APG: tlačítko v kroku Performance (a u Přistávacích dat). Vyberte PDF z APG nebo snímek obrazovky reportu.
+  Report z APG je obrázek bez textu – čte se přímo v zařízení (OCR Tesseract ve složce vendor/ocr).
+  Poprvé se stáhne asi 7 MB, pak funguje i bez signálu a s novou verzí aplikace se znovu nestahuje.
+- Hodnoty se hledají podle názvu řádku a sloupce (Weight × Departure, VREF × Arrival, VREF × Emerg Ret …).
+  Každá se čte několikrát; jistá je jen při shodě čtení. Nejistá je žlutě a není zaškrtnutá.
+- Nic se nevyplní bez potvrzení. Kontrolní okno ukazuje u každé hodnoty výřez z reportu, současnou hodnotu v OFP
+  a upozornění: jiné letadlo nebo letiště než v OFP, V1 > VR, VREF > VAPP, hmotnost nad maximem.
+- Vyplní se: TO weight, TO dist, Power, Flaps, V1, VR, V2, VFTO, EMR VREF/VAPP, LD weight, LD dist, VREF, VAPP, VFS,
+  MA grad, REQD FL (do pole LD × 1,67). Options z reportu a klapky na přistání se uloží jako řádek „APG“ pod poli.
+- Oprava: ATO zadané jen minutami (37 → 10:37) fungovalo jen s klávesnicí iPadu; teď i s klávesnicí eTechLogu
+  (Další ›, Hotovo, ON TIME i klepnutí jinam).
+
+Návrat
+- Na 0.7.7: eatl-Z-045-v0.7.7.zip. Složku vendor/ocr a soubor apg.js lze ponechat (starší verze je nenačítá).
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-046.txt) do kořene repozitáře eatl, včetně nové složky vendor/ocr. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  apg.js
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  tools/i18n-check.js
+  vendor/ocr/LICENSE-tesseract-core.txt
+  vendor/ocr/LICENSE-tesseract.js.txt
+  vendor/ocr/eng.traineddata.gz
+  vendor/ocr/tesseract-core-lstm.wasm.js
+  vendor/ocr/tesseract-core-simd-lstm.wasm.js
+  vendor/ocr/tesseract.min.js
+  vendor/ocr/worker.min.js
+  vercel.json
+  version.js

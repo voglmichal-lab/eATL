@@ -1240,6 +1240,60 @@ async function importOfp(file){
     if(UI.ofpAfter&&mode()==='office'){UI.ofpAfter=false;const ac=S.ac[UI.acId];const nx=ac&&plannedOfps(ac).sort((a,b)=>(a.date+a.std)<(b.date+b.std)?-1:1)[0];UI.tab='ofp';UI.ofpId=nx?nx.ofpId:null;render();window.scrollTo(0,0)}
   }});
 }
+/* --- APG weight & balance report → performance data (apg.js reads it, the crew confirms every value) --- */
+const APG_ROWS=[['Vzlet',[['to_w','TO weight'],['to_dist','TO dist'],['to_pwr','Power'],['to_flaps','Flaps'],['v1','V1'],['vr','VR'],['v2','V2'],['vfto','VFTO']]],
+  ['Emergency return',[['emr_vref','EMR VREF'],['emr_vapp','EMR VAPP']]],
+  ['Přistání',[['ld_w','LD weight'],['ld_dist','LD dist'],['vref','VREF'],['vapp','VAPP'],['vfs','VFS'],['magrad','MA grad'],['ld167','REQD FL (LD × 1,67)']]]];
+function apgBtn(o){if(o.closed||o.void)return '';return `<label class="btn sm apg-btn" title="Načíst hodnoty z W&B reportu APG (PDF nebo snímek obrazovky)">W&amp;B z APG<input type="file" class="apg-file" data-id="${esc(o.ofpId)}" accept="application/pdf,.pdf,image/*" hidden></label>`}
+function apgInfo(o,k){const t=ofpVal(o,k);return t?`<p class="apg-info"><span class="ann mute">APG</span> ${esc(t)}</p>`:''}
+let apgLib=null;
+function loadApg(){if(!apgLib)apgLib=(async()=>{if(!self.ETL_APG)await loadScript('apg.js');if(!self.ETL_APG)throw new Error('Čtečka APG se nenačetla.');return self.ETL_APG})().catch(e=>{apgLib=null;throw e});return apgLib}
+async function apgImport(oid,file){
+  const o=ofpOf(oid);if(!o)return;
+  openSheet('W&B z APG',`<p class="muted">${esc(file.name||'')}</p><div class="apg-prog"><span class="spin" aria-hidden="true"></span><span id="apg-st">Otevírám report…</span></div><p class="muted">Report z APG je obrázek – text se čte přímo v zařízení. Poprvé se stáhne čtečka (asi 7 MB), pak funguje i bez signálu.</p>`,{focus:false});
+  const ST={page:'Otevírám report…',tables:'Hledám tabulky…',load:'Připravuji čtečku textu…',ocr:'Čtu report…',check:'Ověřuji každou hodnotu…'};
+  const prog=(s,p)=>{const el=document.getElementById('apg-st');if(el)el.textContent=(ST[s]||ST.load)+(p>0&&p<1&&s!=='check'?' '+Math.round(p*100)+' %':'')};
+  let r;try{const [lib,pdfjs]=await Promise.all([loadApg(),/pdf/i.test(file.type)||/\.pdf$/i.test(file.name||'')?loadPdfJs():Promise.resolve(null)]);r=await lib.readReport(file,pdfjs,prog)}
+  catch(e){if(!document.getElementById('apg-st'))return;openSheet('W&B z APG se nepodařilo přečíst',`<div class="warnline warn">${esc(e&&e.message||'Soubor se nepodařilo přečíst.')}</div><p class="muted">Hodnoty můžete zadat ručně jako dosud.</p>`,{focus:false});return}
+  if(!document.getElementById('apg-st'))return;   // closed while reading
+  apgConfirm(oid,r,file.name||'');
+}
+function apgConfirm(oid,r,fname){
+  const o=ofpOf(oid);if(!o)return;const m=r.meta||{},F=r.fields||{};const warn=[];
+  const ac=S.ac[o.acId];const reg=regKey(ac?ac.reg:o.reg);
+  const lev=(a,b)=>{const d=Array.from({length:b.length+1},(_,j)=>j);for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]};
+  if(m.reg&&reg&&lev(m.reg,reg)>1)warn.push(`Report je pro ${esc(m.reg)}, OFP pro ${esc(ac?ac.reg:o.reg)}.`);
+  if(m.dep&&o.dep&&m.dep!==String(o.dep).toUpperCase())warn.push(`Odlet v reportu ${esc(m.dep)}, v OFP ${esc(o.dep)}.`);
+  const arr=String(ofpVal(o,'dv')?divTo(o):o.des||'').toUpperCase();if(m.arr&&arr&&m.arr!==arr)warn.push(`Přílet v reportu ${esc(m.arr)}, v OFP ${esc(arr)}.`);
+  for(const w of r.warn||[])warn.push(esc(w));
+  const unsure=Object.values(F).filter(f=>f.v!=null&&!f.sure).length,miss=Object.values(F).filter(f=>f.v==null).length;
+  const row=([k,lb])=>{const f=F[k]||{};const cur=ofpVal(o,k);const ok=f.v!=null&&f.sure;const mx=num(ofpMax(o,k));const over=mx!=null&&num(f.v)!=null&&num(f.v)>mx;
+    const note=[f.v==null?'<span class="ann warn">nepřečteno</span>':!f.sure?'<span class="ann caution">ověřte podle výřezu</span>':'',
+      cur&&f.v!=null&&String(cur)!==String(f.v)?`<span class="muted">nyní ${esc(cur)}</span>`:'',over?`<span class="ann warn">nad max ${fmtN(mx)}</span>`:'',
+      k==='ld167'&&num(f.v)&&num(F.ld_dist&&F.ld_dist.v)?`<span class="muted">= LD × ${(num(f.v)/num(F.ld_dist.v)).toFixed(2).replace('.',',')}</span>`:''].filter(Boolean).join(' ');
+    return `<tr class="${ok?'':f.v==null?'apg-miss':'apg-check'}"><td><input type="checkbox" id="apg-c-${k}" ${ok&&!over?'checked':''} aria-label="Vyplnit ${esc(lb)}"></td><td><b>${esc(lb)}</b></td>
+      <td class="apg-cut">${f.img?`<img src="${f.img}" alt="">`:''}</td><td><input type="text" class="apg-v mono" id="apg-v-${k}" data-k="${k}" value="${esc(f.v==null?'':f.v)}" inputmode="decimal" autocomplete="off"></td><td class="apg-note">${note}</td></tr>`};
+  const opt=(lb,t)=>t?`<p class="apg-opt"><b>${lb}</b> ${esc(t)}</p>`:'';
+  const head=`<div class="apg-meta mono">${esc(m.reg||'?')} · ${esc(m.dep||'?')}${m.rwyDep?' '+esc(m.rwyDep):''} → ${esc(m.arr||'?')}${m.rwyArr?' '+esc(m.rwyArr):''}${m.generated?` · <span class="muted">vytvořeno ${esc(m.generated)}</span>`:''}</div>`;
+  const body=`${head}${warn.map(w=>`<div class="warnline caution">${w}</div>`).join('')}
+    <p class="muted">${r.how==='ocr'?'Každá hodnota byla přečtena několikrát; vedle je výřez z reportu.':'Hodnoty přečtené z textu PDF; vedle je výřez z reportu.'} Vyplní se jen zaškrtnuté.${unsure?` <b>${unsure}× ověřte</b> – porovnejte s výřezem a zaškrtněte.`:''}${miss?` ${miss}× nepřečteno – doplňte ručně nebo nechte prázdné.`:''}</p>
+    ${APG_ROWS.map(([g,rows])=>`<p class="label">${esc(g)}</p><table class="apg-tab"><tbody>${rows.map(row).join('')}</tbody></table>`).join('')}
+    ${opt('Departure options',r.opts&&r.opts.dep)}${opt('Arrival options',r.opts&&r.opts.arr)}${opt('Emergency return options',r.opts&&r.opts.emr)}`;
+  openSheet('W&B z APG – kontrola',body,{focus:false,submit:'Vyplnit vybrané',live:()=>{},onSubmit:async()=>{
+    const out={};
+    for(const [,rows] of APG_ROWS)for(const [k,lb] of rows){if(!chk('apg-c-'+k))continue;const val=String(v('apg-v-'+k)||'').trim().replace(',','.');if(!val)continue;if(!/^\d+(\.\d+)?$/.test(val))fail(`${lb}: „${val}“ není číslo.`);out[k]=val}
+    if(!Object.keys(out).length)fail('Nevybrali jste žádnou hodnotu.');
+    const info=[m.reg,(m.dep||'?')+(m.rwyDep?' '+m.rwyDep:'')+' → '+(m.arr||'?')+(m.rwyArr?' '+m.rwyArr:''),m.generated].filter(Boolean).join(' · ');
+    const op=r.opts||{};
+    if(out.to_w||out.v1||out.v2||out.to_dist)out.apg_to=[op.dep,info].filter(Boolean).join(' · ');
+    if(out.emr_vref||out.emr_vapp)out.apg_emr=op.emr||'';
+    if(out.ld_w||out.vref||out.vapp||out.ld_dist)out.apg_ld=[m.flapArr?'Flap '+m.flapArr:'',op.arr].filter(Boolean).join(' · ');
+    for(const k of Object.keys(out))if(out[k]!=null)ofpSet(oid,k,out[k]);
+    ofpFlush();closeSheet();render();toast(`Vyplněno z APG: ${Object.keys(out).filter(k=>!/^apg_/.test(k)).length} hodnot`);
+  }});
+}
+// typing a value into the check sheet ticks it
+document.addEventListener('input',e=>{const t=e.target;if(t&&t.classList&&t.classList.contains('apg-v')){const c=document.getElementById('apg-c-'+t.dataset.k);if(c)c.checked=!!t.value.trim()}});
 function ofpOf(id){return S.ofps[id]||null}
 // departure ATO = takeoff, destination ATO = landing – typed in one place, shown in the other (a typed value always wins)
 /* --- nav log notes: quick entries for level, frequency, heading, or free text --- */
@@ -1549,9 +1603,10 @@ function viewOfp(o,u){
   <section class="panel ostep ${done.fuel?'done':''}" id="ofps-fuel">${stepH('fuel','Palivo a olej před odletem')}
     ${fuelStep}
   </section>
-  <section class="panel ostep ${done.perf?'done':''}" id="ofps-perf">${stepH('perf','Performance')}
+  <section class="panel ostep ${done.perf?'done':''}" id="ofps-perf">${stepH('perf','Performance','',apgBtn(o))}
+    ${apgInfo(o,'apg_to')}
     <div class="fgrid">${ofpIn(o,'to_w','TO weight',{num:true})}${ofpIn(o,'to_dist','TO dist',{num:true})}${ofpIn(o,'to_pwr','Power')}${ofpIn(o,'to_flaps','Flaps')}${ofpIn(o,'v1','V1',{num:true})}${ofpIn(o,'vr','VR',{num:true})}${ofpIn(o,'v2','V2',{num:true})}${ofpIn(o,'vfto','VFTO',{num:true})}</div>
-    <div class="emr"><p class="label">Emergency return</p><div class="fgrid">${ofpIn(o,'emr_vref','EMR VREF',{num:true})}${ofpIn(o,'emr_vapp','EMR VAPP',{num:true})}</div></div>
+    <div class="emr"><p class="label">Emergency return</p><div class="fgrid">${ofpIn(o,'emr_vref','EMR VREF',{num:true})}${ofpIn(o,'emr_vapp','EMR VAPP',{num:true})}</div>${apgInfo(o,'apg_emr')}</div>
   </section>
   ${!o.closed&&!o.void?`<div class="chips" style="justify-content:flex-end"><button type="button" class="btn primary" data-act="ofp-ph" data-id="${esc(o.ofpId)}|flight">Pokračovat: Let ›</button></div>`:''}`)}
   ${sec('flight',`${!l&&mode()==='crew'&&!o.closed&&!o.void?`<div class="warnline caution">Let ještě není zahájený – palivo a security search jsou v části <button type="button" class="linkbtn" style="display:inline;min-height:0;padding:0" data-act="ofp-goto" data-id="pre|fuel">Před letem</button>.</div>`:''}
@@ -1569,7 +1624,7 @@ function viewOfp(o,u){
   ${ofpDivertPanel(o,LK)}
   <section class="panel ostep ${done.arr?'done':''}" id="ofps-arr">${stepH('arr','Přílet a přistání'+(ofpVal(o,'dv')?' – DIVERT '+esc(divTo(o)):''))}
     ${self.ETL_ATIS?`<div class="atf-pair">${ETL_ATIS.field(o,'atisArr',LK)}${ofpVal(o,'dv')?ETL_ATIS.field(o,'atisDiv',LK):''}${ETL_ATIS.field(o,'clrArr',LK)}${ETL_ATIS.field(o,'taxiArr',LK)}</div>`:`<div class="fgrid wide">${ofpIn(o,'atisArr','ATIS ARR',{area:true})}</div>`}
-    <div><p class="label">Přistávací data</p><div class="fgrid">${ofpIn(o,'ld_w','LD weight',{num:true})}${ofpIn(o,'ld_dist','LD dist',{num:true})}${ofpIn(o,'vref','VREF',{num:true})}${ofpIn(o,'vapp','VAPP',{num:true})}${ofpIn(o,'vfs','VFS',{num:true})}${ofpIn(o,'magrad','MA grad')}${ofpIn(o,'ld167','LD × 1,67',{num:true})}</div></div>
+    <div><div class="apg-head"><p class="label">Přistávací data</p>${apgBtn(o)}</div>${apgInfo(o,'apg_ld')}<div class="fgrid">${ofpIn(o,'ld_w','LD weight',{num:true})}${ofpIn(o,'ld_dist','LD dist',{num:true})}${ofpIn(o,'vref','VREF',{num:true})}${ofpIn(o,'vapp','VAPP',{num:true})}${ofpIn(o,'vfs','VFS',{num:true})}${ofpIn(o,'magrad','MA grad')}${ofpIn(o,'ld167','LD × 1,67',{num:true})}</div></div>
     <div><p class="label">Přistání</p>${ofpLandingStep(o)}</div>
   </section>
   ${!o.closed&&!o.void?`<div class="chips" style="justify-content:flex-end"><button type="button" class="btn primary" data-act="ofp-ph" data-id="${esc(o.ofpId)}|close">Pokračovat: Shrnutí letu ›</button></div>`:''}`)}
@@ -3547,6 +3602,7 @@ document.addEventListener('change',e=>{
   else if(t.id==='audit-all'){UI.auditAll=t.checked;render()}
   else if(t.id==='q-all'){UI.qAll=t.checked;const r=document.getElementById('q-res');if(r)r.innerHTML=searchResults(S.ac[UI.acId])}
   else if(t.id==='ofp-file'&&t.files&&t.files[0]){importOfp(t.files[0]);t.value=''}
+  else if(t.classList&&t.classList.contains('apg-file')&&t.files&&t.files[0]){const f=t.files[0];t.value='';apgImport(t.dataset.id,f)}
   else if(t.id==='ofp-file-s'&&t.files&&t.files[0]){const f=t.files[0];closeSheet();UI.ofpAfter=true;importOfp(f)}
   else if(t.id==='import-file'&&t.files&&t.files[0]){importJson(t.files[0]);t.value=''}
   else if(t.type==='checkbox'&&t.dataset&&t.dataset.of==='nonRvsm'){const c=t.closest('[data-ofp]');if(c){ofpSet(c.dataset.ofp,'nonRvsm',t.checked?'1':'');c.querySelectorAll('.rvsm-only').forEach(x=>x.hidden=t.checked)}}
@@ -3592,13 +3648,18 @@ document.addEventListener('input',e=>{
   if(t.dataset&&t.dataset.k&&t.type!=='checkbox'&&t.type!=='radio'&&t.tagName!=='SELECT'){UI.draft[t.dataset.k]=t.value;saveDraft();const er=document.getElementById('c-err');if(er)er.hidden=true;crewLive()}
   if(sheetLive&&t.closest('#sf'))sheetLive();
 });
+// a time field is finished (left by focus, or by the eTechLog keypad – Další ›, ON TIME, Hotovo, another field):
+// "1040" / "10.40" → 10:40, minutes only "40" → hour from the point's ETO
+function t4Commit(t){
+  if(!(t&&t.classList&&t.classList.contains('t4')&&t.value))return;let n=normHM(t.value);
+  if(t.dataset.of&&/_ato$/.test(t.dataset.of)&&/^\d{1,2}$/.test(t.value.trim())){const c=t.closest('[data-ofp]');const full=c&&atoFromMin(ofpOf(c.dataset.ofp),t.dataset.of,+t.value,t);if(full)n=full}
+  if(n===t.value&&!t.classList.contains('bad')&&parseHM(n)!=null)return;
+  t.value=n;t.classList.toggle('bad',parseHM(n)==null);if(t.dataset.k){UI.draft[t.dataset.k]=n;saveDraft();crewLive()}else if(t.dataset.of){const c=t.closest('[data-ofp]');if(c)ofpSet(c.dataset.ofp,t.dataset.of,n)}else if(sheetLive)sheetLive()}
 document.addEventListener('focusout',e=>{
   const t=e.target;
   if(t.classList&&t.classList.contains('t-hm')&&t.value){t.value=normHM(t.value);t.classList.toggle('bad',parseHM(t.value)==null);if(sheetLive)sheetLive()}
   if(t.classList&&t.classList.contains('t-date')&&t.value){const d=parseDate(t.value);t.classList.toggle('bad',!d);if(d){t.value=fmtDate(d);if(t.dataset.k){UI.draft[t.dataset.k]=t.value;saveDraft()}}}
-  if(t.classList&&t.classList.contains('t4')&&t.value){let n=normHM(t.value);
-    if(t.dataset.of&&/_ato$/.test(t.dataset.of)&&/^\d{1,2}$/.test(t.value.trim())){const c=t.closest('[data-ofp]');const full=c&&atoFromMin(ofpOf(c.dataset.ofp),t.dataset.of,+t.value,t);if(full)n=full}
-    t.value=n;t.classList.toggle('bad',parseHM(n)==null);if(t.dataset.k){UI.draft[t.dataset.k]=n;saveDraft();crewLive()}else if(t.dataset.of){const c=t.closest('[data-ofp]');if(c)ofpSet(c.dataset.ofp,t.dataset.of,n)}else if(sheetLive)sheetLive()}
+  t4Commit(t);
   if(renderPending)setTimeout(()=>{if(renderPending)softRender()},60);
 });
 // Enter in an ordinary field goes to the next one (the iPad keyboard says "další"/next); after the last field of a form
@@ -3650,7 +3711,7 @@ document.addEventListener('submit',async e=>{
 });
 
 /* ---------- boot ---------- */
-if(self.ETL_ATIS)ETL_ATIS.bind({nextField,prefs:()=>{const u=me();return u&&u.prefs||null},ofpOf,ofpVal,ofpSet,ofps:()=>Object.values((S&&S.ofps)||{}),arrApt:o=>ofpVal(o,'dv')?divTo(o):o.des,noteBtn,atcDone,noteSheet:(oid,key,wpt)=>{openNoteEditor(oid,key,wpt);noteAction('note-tab','txt')}});
+if(self.ETL_ATIS)ETL_ATIS.bind({nextField,commit:t4Commit,prefs:()=>{const u=me();return u&&u.prefs||null},ofpOf,ofpVal,ofpSet,ofps:()=>Object.values((S&&S.ofps)||{}),arrApt:o=>ofpVal(o,'dv')?divTo(o):o.des,noteBtn,atcDone,noteSheet:(oid,key,wpt)=>{openNoteEditor(oid,key,wpt);noteAction('note-tab','txt')}});
 themeApply(themeGet());try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themeGet()==='auto')themeApply('auto')})}catch(e){}
 rebuild();render();initDb();
 checkOffline();if('serviceWorker' in navigator){navigator.serviceWorker.ready.then(()=>setTimeout(checkOffline,500)).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>setTimeout(checkOffline,500))}
