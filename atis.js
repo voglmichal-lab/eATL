@@ -29,7 +29,7 @@ const DEF = {
     time: { l: 'ČAS', ph: '1320', dig: 1, h: 'Čas vysílání (UTC), čtyři číslice.' },
     app: { l: 'APP', ph: 'ILS', h: 'Typ přiblížení, varianta Z / Y / X, CAT II. Může zaznít před dráhou i po ní. Když nezazní, pište dál – číslice skočí do dalšího pole.' },
     rwy: { l: 'RWY', ph: '24', dig: 1, h: 'Dráha, dvě číslice. L, C nebo R přidáte tlačítkem.' },
-    cond: { l: 'STAV RWY', ph: 'WET', dig: 1, skip: 1, h: 'Povrch ťukněte jednou, pro třetiny zvlášť jen když se liší. Číslice = RWYCC 0–6: 5 5 5 = 5/5/5.' },
+    cond: { l: 'STAV RWY', ph: 'WET', dig: 1, skip: 1, h: 'Jak zazní: číslice = RWYCC (5 5 5 = 5/5/5), pokrytí 25–100 %, mm a číslice = hloubka, povrch. Jednou pro celou dráhu, po třetinách jen když se liší.' },
     tl: { l: 'TL', ph: '70', dig: 1, h: 'Převodní hladina: 7 0 = FL70, 1 1 0 = FL110.' },
     wind: { l: 'VÍTR', ph: '25008', dig: 1, h: 'Směr a rychlost bez lomítka: 2 5 0 0 8. Gusting G, variable VRB, variable between V a šest číslic (2 4 0 3 2 0).' },
     vis: { l: 'VIS', ph: 'CAVOK', dig: 1, h: 'CAVOK nebo 9999 jedním ťuknutím. Kilometry (1 0) i metry (4 0 0 0). Nízká dohlednost: RVR.' },
@@ -52,7 +52,7 @@ const DEF = {
     rwy: { l: 'RWY', ph: '24', dig: 1, ghost: 'arrRwy', h: 'Dráha. Hodnotu z ATIS ARR potvrdíte ✓.' }
   },
   taxi: {
-    rwy: { l: 'RWY', ph: '24', dig: 1, ghost: 'depRwy', h: 'Dráha: z ATIS DEP potvrdíte ✓, jinak dvě číslice (L, C, R písmenem).' },
+    rwy: { l: 'RWY', ph: '24', dig: 1, ghost: 'depRwy', h: 'Dráha: z ATIS DEP potvrdíte ✓, jinak dvě číslice; strana L / C / R tlačítkem nahoře.' },
     hp: { l: 'HOLDING POINT', ph: 'A1', dig: 1, skip: 1, h: 'Holding point nebo intersection: HP, pak písmeno a číslo (A 1).' },
     via: { l: 'VIA', ph: 'B A1', dig: 1, w: 1, h: '' }
   },
@@ -88,7 +88,7 @@ function userCfg() { const p = API && API.prefs(); return p && p.atis ? sanitize
 // all fields in the pilot's order; switched-off ones behave like optional fields: shown and kept only when another pilot filled them
 const slotsOf = (type, cfg) => (cfg || userCfg())[type].map(c => Object.assign({ k: c.k }, DEF[type][c.k], c.on ? {} : { skip: 1, off: 1 }));
 
-const noCond = () => ({ cc: '', s: [], last: '' });
+const noCond = () => ({ cc: '', s: [], p: [], d: [], last: '' });
 function empty(type, dest) {
   if (type === 'atis') return { info: '', time: '', app: '', rwy: '', cond: noCond(), tl: '', wind: '', vis: '', rvr: '', wx: [], cld: [], tdp: '', qnh: '', trend: [] };
   if (type === 'clr') return { route: '', alt: '', sq: '', freq: '' };
@@ -117,7 +117,9 @@ function fmtCld(a, live) { return (a || []).map(c => c.t === 'NSC' ? 'NSC' : c.t
 function fmtVis(v, live) { if (!v || live || !/^\d{1,2}$/.test(v)) return v || ''; const n = parseInt(v, 10); return n >= 10 ? '9999' : pad(n * 1000, 4) }
 function fmtTdp(r, live) { if (!r) return ''; return r.split('/').map(p => { if (p === '') return ''; const neg = p.startsWith('-'); const n = p.replace('-', ''); return (neg ? '−' : '') + (live || !n ? n : pad(n, 2)) }).join('/') }
 const collapse = s => s.length > 1 && s.every(x => x === s[0]) ? [s[0]] : s;
-function fmtCond(c) { if (!c) return ''; return [c.cc && 'RWYCC ' + c.cc.split('').join('/'), collapse(c.s || []).join('/')].filter(Boolean).join(' ') }
+// order as in the runway condition report: RWYCC, coverage per third, depth of a loose contaminant, surface
+function fmtCond(c) { if (!c) return ''; const p = c.p || [], d = (c.d || []).filter(x => x !== '');
+  return [c.cc && 'RWYCC ' + c.cc.split('').join('/'), p.length ? collapse(p).join('/') + '%' : '', d.length ? collapse(d.map(x => String(+x))).join('/') + ' mm' : '', collapse(c.s || []).join('/')].filter(Boolean).join(' ') }
 function fmtRoute(r) {
   r = r || ''; if (/^HDG\d+$/.test(r)) return 'HDG ' + r.slice(3); if (isDct(r)) return r.trim(); if (!isStr(r)) return r;
   const o = strParse(r), a = [];
@@ -217,7 +219,7 @@ function load(o, key) {
   // the keyed values count only while the stored line is theirs; a line written elsewhere (an older version, by hand) wins and becomes the note
   if (!st || typeof st !== 'object' || !st.v || st.line !== text) return { v: e, note: text, saved: false, text, prev: [] };
   const v = Object.assign(e, st.v);
-  if (t === 'atis') { if (!v.cond || typeof v.cond !== 'object') v.cond = noCond(); for (const a of ['wx', 'cld', 'trend']) if (!Array.isArray(v[a])) v[a] = [] }
+  if (t === 'atis') { if (!v.cond || typeof v.cond !== 'object') v.cond = noCond(); if (!Array.isArray(v.cond.p)) v.cond.p = []; if (!Array.isArray(v.cond.d)) v.cond.d = []; for (const a of ['wx', 'cld', 'trend']) if (!Array.isArray(v[a])) v[a] = [] }
   if ((t === 'taxi' || t === 'taxiA') && !Array.isArray(v.via)) v.via = [];
   return { v, note: String(st.note || ''), saved: true, text, prev: Array.isArray(st.prev) ? st.prev.slice(-5) : [] };
 }
@@ -255,7 +257,7 @@ let ACT = null, HINT = null, VIS = null;
 const idxOf = (f, k) => f.L.findIndex(s => s.k === k);
 function hasVal(f, i) {
   const s = f.L[i]; if (!s) return false; const k = s.k, v = f.v[k];
-  if (k === 'cond') return !!(v && (v.cc || v.s.length)); if (k === 'cld') return v.length > 0 || f.v.vis === 'CAVOK';
+  if (k === 'cond') return !!(v && (v.cc || v.s.length || (v.p || []).length || (v.d || []).length)); if (k === 'cld') return v.length > 0 || f.v.vis === 'CAVOK';
   return Array.isArray(v) ? v.length > 0 : !!v;
 }
 const freshOf = (f, i) => hasVal(f, i) && !['cond', 'wx', 'trend', 'via'].includes(f.L[i].k);
@@ -289,8 +291,11 @@ function apply(f, code) {
     case 'd': digit(f, k, val); break;
     case 'tok': token(f, k, val); break;
     case 'rc': { const c = f.v.cond; if (c.s.length < 3) c.s.push(val); else HINT = 'Stav dráhy má nejvýš tři třetiny. Opravíte ho ⌫.'; c.last = 's'; ACT.fresh = false; break }
+    case 'rp': { const c = f.v.cond; if (c.p.length < 3) c.p.push(val); else HINT = 'Pokrytí má nejvýš tři třetiny. Opravíte ho ⌫.'; c.last = 'p'; ACT.fresh = false; break }
+    case 'rd': { const c = f.v.cond; if (c.d.length < 3) { c.d.push(''); c.last = 'd' } else HINT = 'Hloubka má nejvýš tři třetiny. Opravíte ji ⌫.'; ACT.fresh = false; break }
     case 'wx': { if (ACT.fresh && k === 'wx') f.v.wx = []; ACT.fresh = false; (k === 'trend' ? f.v.trend : f.v.wx).push(val); break }
     case 'tr': trendKey(f, val); break;
+    case 'side': { const r = taxiRwy(f, k); if (r) r.set(r.s === val ? '' : val); ACT.fresh = false; break }
     case 'chip': f.v[k] = val; ACT.fresh = false; adv(f); break;
     case 'chipj': try { const x = JSON.parse(val); if (Array.isArray(x)) f.v[k] = x } catch (e) { } ACT.fresh = false; break;
     case 'gh': { const g = ghostVal(f, k); if (g) { f.v[k] = g; ACT.fresh = false; adv(f) } break }
@@ -303,8 +308,9 @@ function backspace(f, k) {
   const v = f.v;
   if (k === 'cld') { const c = v.cld[v.cld.length - 1]; if (!c) { back1(f); return } if (c.x) c.x = ''; else if (c.h) c.h = c.h.slice(0, -1); else v.cld.pop(); return }
   if (k === 'cond') {
-    const c = v.cond, rm = w => { if (w === 'cc' && c.cc) { c.cc = c.cc.slice(0, -1); return true } if (w === 's' && c.s.length) { c.s.pop(); return true } return false };
-    const first = c.last === 'cc' ? 'cc' : 's'; if (!rm(first) && !rm(first === 'cc' ? 's' : 'cc')) back1(f); return;
+    const c = v.cond, rm = w => { if (w === 'cc' && c.cc) { c.cc = c.cc.slice(0, -1); return true } if ((w === 's' || w === 'p') && c[w].length) { c[w].pop(); return true }
+      if (w === 'd' && c.d.length) { const x = c.d[c.d.length - 1]; if (x.length) c.d[c.d.length - 1] = x.slice(0, -1); else { c.d.pop(); c.last = '' } return true } return false };
+    const order = [c.last || 's'].concat(['d', 'p', 's', 'cc'].filter(w => w !== c.last)); if (!order.some(rm)) back1(f); return;
   }
   if (k === 'wx' || k === 'trend') { if (v[k].length) v[k].pop(); else back1(f); return }
   if (k === 'via') { const a = v.via, last = a[a.length - 1]; if (!a.length) { back1(f); return } if (VKW[last] || last.length <= 1 || last === 'RWY') a.pop(); else a[a.length - 1] = last.slice(0, -1); return }
@@ -342,13 +348,10 @@ function letter(f, k, L) {
 const viaTail = /^[A-Z]{1,2}\d?$/;   // a taxiway that can still take a digit (A, TA, B1)
 function viaLetter(f, L) {
   const a = f.v.via, last = a[a.length - 1];
-  if (last && /^RWY\d{2}$/.test(last) && 'LCR'.includes(L)) { a[a.length - 1] = last + L; return }
-  a.push(L);
+  a.push(L);   // a letter always starts a taxiway – the runway side (24R) has its own keys
 }
 function taxiLetter(f, k, L, fresh) {
   const v = f.v;
-  // runway suffix: the cursor stays on the runway after its two digits for L / C / R
-  if (k === 'rwy' && /^\d{2}$/.test(v.rwy) && 'LCR'.includes(L) && !fresh) { v.rwy += L; return }
   if (k === 'hp' || k === 'stand') { if (fresh) v[k] = ''; if (/^[A-Z]?$/.test(v[k])) { v[k] += L; return } }
   if (k !== 'via') focusK(f, 'via');
   viaLetter(f, L);
@@ -362,6 +365,13 @@ function viaDigit(f, d) {
   if (last && /^\d$/.test(last)) { a[a.length - 1] = last + d; return true }   // exit 15
   if (last && viaTail.test(last)) { a[a.length - 1] = last + d; return true }
   return false;
+}
+// runway side in taxi: L / C / R keys shown above the keypad right after a runway number (RWY 24 → 24R), never a taxiway letter
+function taxiRwy(f, k) {
+  if (!isTaxi(f)) return null;
+  if (k === 'rwy') { const m = /^(\d{2})([LCR]?)$/.exec(f.v.rwy || ''); return m ? { b: m[1], s: m[2], set: s => { f.v.rwy = m[1] + s } } : null }
+  if (k === 'via') { const a = f.v.via || [], i = a.length - 1, m = /^RWY(\d{2})([LCR]?)$/.exec(a[i] || ''); return m ? { b: m[1], s: m[2], set: s => { a[i] = 'RWY' + m[1] + s } } : null }
+  return null;
 }
 function taxiToken(f, k, val) {
   const v = f.v, a = v.via, last = a[a.length - 1];
@@ -410,7 +420,7 @@ function okDigit(v, k, d, fresh) {
     case 'tl': { const t = val('tl'), full = t.length >= (t[0] === '1' ? 3 : 2); return (full || t === '') ? n >= 1 : true }
     case 'sq': return n <= 7;
     case 'freq': { const r = freqNorm(val('freq')).length >= 6 ? '' : val('freq'); return freqPre(freqNorm(r + d)) }
-    case 'cond': return n <= 6;
+    case 'cond': { const c = v.cond || {}; return c.last === 'd' && (c.d || []).length ? String(c.d[c.d.length - 1]).length < 3 : n <= 6 }
   }
   return true;
 }
@@ -429,7 +439,10 @@ function digit(f, k, d) {
     case 'via': if (!viaDigit(f, d)) { const t = f.type === 'taxi' ? 'rwy' : 'stand', j = idxOf(f, t); if (j < 0) return; setSlot(f, j); digit(f, t, d) } return;
     case 'hp': if (v.hp.length < 4) v.hp += d; return;
     case 'stand': if (v.stand.length < 5) v.stand += d; return;
-    case 'cond': { if (+d > 6) return; const c = v.cond; if (c.cc.length < 3) c.cc += d; c.last = 'cc'; return }
+    case 'cond': { const c = v.cond;
+      // after "mm" digits are the depth of that third, otherwise the runway condition code 0–6
+      if (c.last === 'd' && c.d.length) { const x = c.d[c.d.length - 1]; if (x.length < 3) c.d[c.d.length - 1] = x + d; return }
+      if (+d > 6) return; if (c.cc.length < 3) c.cc += d; c.last = 'cc'; return }
     case 'tl': { const n = () => v.tl[0] === '1' ? 3 : 2; if (v.tl.length >= n()) v.tl = ''; v.tl += d; if (v.tl.length === n()) adv(f); return }
     case 'wind': {
       const p = windParts(v.wind);
@@ -606,7 +619,12 @@ const TREND_TOK = [['VRB', 'variable'], ['G', 'gusting'], ['CAVOK', ''], ['9999'
   ['FEW', 'few'], ['SCT', 'scattered'], ['BKN', 'broken'], ['OVC', 'overcast'], ['CB', '']];
 const TURN_TOK = [['STRAIGHT', 'straight ahead', null, 1], ['PASSING', 'when passing', null, 1], ['LEFT', 'turn left'], ['RIGHT', 'turn right'], ['HDG', 'heading'], ['SID', 'zpět na písmena']];
 const COND_TOK = [['DRY', 'dry'], ['WET', 'wet'], ['FROST', 'frost'], ['SLUSH', 'slush'], ['ST WATER', 'standing water'], ['DRY SNOW', 'dry snow'], ['WET SNOW', 'wet snow'], ['COMP SNOW', 'compacted snow'], ['ICE', 'ice'], ['WET ICE', 'wet ice'], null, null];
-function keyBtn(code, label, cls, small, dis) { return `<button type="button" class="ak-key${cls ? ' ' + cls : ''}" data-ak="${esc(code)}"${dis ? ' disabled' : ''}>${label}${small ? `<small>${esc(small)}</small>` : ''}</button>` }
+const COV_TOK = ['25', '50', '75', '100'];
+// label and sub-label shrink to the key width (--n / --m = number of characters), so no text ever spills out of a key
+function keyBtn(code, label, cls, small, dis) {
+  const n = Math.max(1, String(label).replace(/<[^>]*>/g, '').length), m = small ? String(small).length : 0;
+  return `<button type="button" class="ak-key${cls ? ' ' + cls : ''}" data-ak="${esc(code)}" style="--n:${n}${m ? ';--m:' + m : ''}"${dis ? ' disabled' : ''}><span class="kl">${label}</span>${small ? `<small>${esc(small)}</small>` : ''}</button>`
+}
 // a lit key shows what is set now (G = the wind has gusts), not which keys belong to the field
 function grid(list, ON, prefix) { return list.map(x => x ? keyBtn((prefix || 'tok:') + x[0], esc(x[0]), 't' + (ON && ON.has(x[0]) ? ' on' : '') + (x[3] ? ' s2' : '') + (x[4] ? ' ' + x[4] : '') + (x[0].length > 5 ? ' sm' : ''), x[1]) : '<span></span>').join('') }
 function onSet(f, k, kind) {
@@ -656,6 +674,7 @@ function renderDock() {
   if (g && f.v[k] !== g) ch += `<button type="button" class="ak-chip ok" data-ak="gh:">✓ ${esc(fmtSlot(k, g, false))}<small>${GHOST_TAG[s.ghost][1]}</small></button>`;
   const fx = fixVal(f, k);
   if (fx && !isHdg(f.v[k]) && !isDct(f.v[k]) && !String(f.v[k] || '').startsWith(fx)) ch += `<button type="button" class="ak-chip pre" data-ak="pre:${esc(fx)}">${esc(fx)}…<small>bod z OFP</small></button>`;
+  { const r = taxiRwy(f, k); if (r) ch += ['L', 'C', 'R'].map(x => `<button type="button" class="ak-chip${r.s === x ? ' on' : ''}" data-ak="side:${x}">RWY ${r.b}${x}<small>${x === 'L' ? 'left' : x === 'C' ? 'centre' : 'right'}</small></button>`).join('') }
   if (kind === 'trend') ch += TREND_KW.map(x => `<button type="button" class="ak-chip${ON.has(x) ? ' on' : ''}" data-ak="tr:${x}">${x}</button>`).join('');
   if ((['rwy', 'tl', 'route', 'alt', 'freq', 'stand', 'hp'].includes(k) || (k === 'via' && !f.v.via.length)) && !(f.type === 'clr' && k === 'rwy')) {
     const hs = history(f, k).filter(x => x !== g);
@@ -677,7 +696,9 @@ function renderDock() {
       + keyBtn('tok:HS', 'HOLD SHORT', 't s3', 'hold short of');
   }
   else if (kind === 'rwy') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(RWY_TOK, ON) + (f.type === 'atis' ? keyBtn('tok:STAV RWY', 'STAV RWY', 't sm nav', 'kontaminace ›') : '<span></span>') }
-  else if (kind === 'cond') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(COND_TOK, ON, 'rc:') }
+  else if (kind === 'cond') { const c = (f.v && f.v.cond) || noCond(); ctx.className = 'ak-ctx c4 r4';
+    ctx.innerHTML = grid(COND_TOK.slice(0, 10), ON, 'rc:') + keyBtn('rd:', 'mm', 't' + (c.last === 'd' ? ' on' : ''), 'hloubka + číslice') + '<span></span>'
+      + COV_TOK.map(x => keyBtn('rp:' + x, x + ' %', 't' + ((c.p || []).includes(x) ? ' on' : ''), 'pokrytí')).join('') }
   else if (kind === 'turn') { ctx.className = 'ak-ctx c4'; ctx.innerHTML = grid(TURN_TOK, ON); if (!HINT) hint.textContent = 'Straight ahead: PASSING a výška, LEFT / RIGHT, HDG a tři číslice. Pak Další ›.' }
   else if (kind === 'met') { ctx.className = 'ak-ctx c5'; ctx.innerHTML = grid(MET_TOK, ON) }
   else if (kind === 'wx') { ctx.className = 'ak-ctx c5'; ctx.innerHTML = grid(WX_TOK, ON, 'wx:') + grid(CLD_ROW, ON) }
@@ -850,14 +871,17 @@ function numPress(code) {
     if (nx) { const p = ACT; ACT = null; numMark(p, false); nx.focus(); if (nx.matches('input.npad')) openNum(nx); else hideDock() } else { close(); try { el.blur() } catch (e) { } } return;
   }
   if (code === 'bk') { numSet(el, ACT.fresh ? '' : el.value.slice(0, -1)); ACT.fresh = false }
-  else if (code.startsWith('n:')) { const d = code.slice(2); numSet(el, (ACT.fresh ? '' : el.value) + d); ACT.fresh = false }
+  else if (code.startsWith('n:')) { const d = code.slice(2), cur = ACT.fresh ? '' : el.value; if (d === '.' && (!el.dataset.dec || cur.includes('.'))) return;
+    // + / − set the sign of the value (pressed before or after the digits)
+    if (d === '+' || d === '-') { if (!el.dataset.sign) return; numSet(el, d + cur.replace(/^[+-]/, '')); ACT.fresh = false; renderNum(); return }
+    numSet(el, cur === '' && d === '.' ? '0.' : cur + d); ACT.fresh = false }
   renderNum();
 }
 function renderNum() {
   const el = numEl(ACT); const sheetOpen = !!document.querySelector('#sheet:not([hidden])');
   if (!el || el.readOnly || el.disabled || sheetOpen) { if (!el || el.readOnly || el.disabled) { const p = ACT; ACT = null; leave(p) } hideDock(); return }
   numMark(ACT, true);
-  const d = dockEl(), f = el.closest('.fld'), lab = f ? (f.querySelector('span') || f).childNodes[0].textContent.trim() : ACT.of;
+  const d = dockEl(), f = el.closest('.fld'), lab = f ? (f.querySelector('span') || f).childNodes[0].textContent.trim() : (el.getAttribute('aria-label') || ACT.of);
   d.querySelector('#ak-title').textContent = lab;
   const mx = el.dataset.max ? +el.dataset.max : null, over = mx != null && el.value !== '' && +el.value > mx;
   const hint = d.querySelector('#ak-hint'); hint.classList.toggle('warn', over);
@@ -865,7 +889,7 @@ function renderNum() {
   d.querySelector('#ak-chips').innerHTML = '';
   const ctx = d.querySelector('#ak-ctx'); ctx.className = 'ak-ctx read';
   ctx.innerHTML = `<div class="ak-readout"><span class="sl">${esc(lab)}</span><span class="rv">${esc(el.value || '–')}</span></div>`;
-  d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('n:' + n, n)).join('') + '<span></span>' + keyBtn('n:0', '0') + '<span></span>';
+  d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('n:' + n, n)).join('') + (el.dataset.dec ? keyBtn('n:.', '.', '', 'tečka', /\./.test(ACT.fresh ? '' : el.value)) : el.dataset.sign ? keyBtn('n:+', '+', '', 'plus') : '<span></span>') + keyBtn('n:0', '0') + (el.dataset.sign ? keyBtn('n:-', '−', '', 'minus') : '<span></span>');
   d.querySelector('#ak-act').innerHTML = keyBtn('bk', '⌫', 'bk', 'smazat') + keyBtn('next', 'Další ›', 't nx') + keyBtn('done', 'Hotovo', 't okk');
   const was = d.hidden; d.hidden = false; const key = 'num' + ACT.of;
   requestAnimationFrame(() => { document.body.style.paddingBottom = (d.offsetHeight + 16) + 'px'; if (was || VIS !== key) { VIS = key; const r = el.getBoundingClientRect(), lim = innerHeight - d.offsetHeight - 12; if (r.bottom > lim || r.top < 130) window.scrollBy({ top: r.bottom > lim ? r.bottom - lim : r.top - 130, behavior: 'smooth' }) } });
@@ -919,7 +943,7 @@ function bind(api) {
     if (!ACT || e.metaKey || e.ctrlKey || e.altKey) return; if (e.target.closest && e.target.closest('input,textarea,select')) return;
     const d = document.getElementById('akdock'); if (!d || d.hidden) return;
     const key = e.key;
-    if (ACT.mode === 'num') { if (/^[0-9]$/.test(key)) press('n:' + key); else if (key === 'Backspace') press('bk'); else if (key === 'Enter' || key === 'Tab') press('next'); else if (key === 'Escape') press('done'); else return; e.preventDefault(); return }
+    if (ACT.mode === 'num') { if (/^[0-9.+-]$/.test(key)) press('n:' + key); else if (key === 'Backspace') press('bk'); else if (key === 'Enter' || key === 'Tab') press('next'); else if (key === 'Escape') press('done'); else return; e.preventDefault(); return }
     if (ACT.mode === 'atc') { if (/^[a-zA-Z0-9]$/.test(key)) press('at:' + key.toUpperCase()); else if (key === ' ' || key === '.' || key === '/') press('at:' + key); else if (key === 'Backspace') press('bk'); else if (key === 'Enter') press('add'); else if (key === 'Escape') press('done'); else return; e.preventDefault(); return }
     const f = ctxOf(ACT.oid, ACT.key); if (!f) return;
     if (ACT.mode === 'note') { if (key.length === 1 && /[A-Za-z0-9 \/,.\-]/.test(key)) press('nt:' + key.toUpperCase()); else if (key === 'Backspace') press('bk'); else if (key === 'Enter' || key === 'Escape') press('done'); else return; e.preventDefault(); return }

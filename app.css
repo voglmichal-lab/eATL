@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.7.2"}
+:root{--etl-build:"0.7.6"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -63,6 +63,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .brand small{color:var(--band-muted);font-size:.78rem}
 .pill{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--band-ink);cursor:pointer;min-height:36px;font-size:.88rem}
 .pill:hover{background:rgba(255,255,255,.12)}
+/* fixed width: a changing sync text ("Synchronizováno" ↔ "Jen v tomto zařízení · 3 čeká") must never re-wrap the bar and move the page */
+.top .pill{flex:0 0 14rem;width:14rem;min-width:0;overflow:hidden}
+.top .pill>span:last-child{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--band-muted);flex:none}
 .dot.ok{background:#4cc68a}.dot.caution{background:#f2b350}.dot.warn{background:#f2786a}
 .dot.busy{background:#78aef0;animation:pulse 1s infinite alternate}
@@ -548,6 +551,7 @@ table.ftl-duties td,table.ftl-tab td{vertical-align:top}
 .ak-key.kfreq{box-shadow:inset 0 0 0 2px #7cc7ff}
 .ak-chip.on{background:var(--key-on);color:var(--key-on-ink)}
 .ak-ctx.r5{grid-template-rows:repeat(5,minmax(0,1fr))}
+.ak-ctx.r4{grid-template-rows:repeat(4,minmax(0,1fr))}
 .ak-ctx.r5 .ak-key{min-height:46px}
 .ak-ent{display:inline-flex;align-items:center;gap:2px;min-height:38px;padding:0 2px 0 12px;border-radius:999px;background:var(--key-2);font-family:var(--f-mono);font-size:.95rem;font-weight:600}
 .ak-ent button{min-width:36px;min-height:36px;border:0;background:transparent;color:var(--key-muted);font-size:1.25rem;cursor:pointer;touch-action:manipulation}
@@ -580,3 +584,47 @@ table.ftl-duties td,table.ftl-tab td{vertical-align:top}
 .ak-crow .sp{flex:1 1 0}
 .ak-mv{min-width:40px;min-height:36px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);cursor:pointer;font-size:1rem;touch-action:manipulation}
 .ak-mv[disabled]{opacity:.3;cursor:default}
+
+/* ground inspection (maintenance) – phone first */
+.insp{display:flex;flex-direction:column;gap:14px;padding-bottom:90px}
+.insp .chips{align-items:center}
+.insp .seg{align-self:flex-start}
+.insp-kinds{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.insp-defs .row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.insp-defs .line-item{text-align:left;width:100%;font:inherit;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.insp-num{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+.insp-list{display:flex;flex-direction:column;gap:10px}
+.insp-item{border:1.5px solid var(--line-strong);border-radius:10px;background:var(--surface);padding:6px 10px 10px;display:flex;flex-direction:column;gap:8px}
+.insp-item.done{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 7%,var(--surface))}
+.insp-item.flag{border-color:var(--warn);background:var(--warn-soft)}
+.insp-main{display:flex;align-items:center;gap:12px;min-height:56px;border:0;background:none;padding:4px 0;text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%}
+.insp-box{flex:none;width:32px;height:32px;border:2px solid var(--line-strong);border-radius:7px;display:grid;place-items:center;background:var(--surface)}
+.insp-item.done .insp-box{background:var(--ok);border-color:var(--ok);color:#fff}
+.insp-box svg{width:20px;height:20px}
+.insp-t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.insp-t b{font-size:1.05rem}.insp-t small{color:var(--muted);font-size:.85rem}
+.insp-acts{display:flex;flex-wrap:wrap;gap:6px}
+.insp-acts .btn{min-height:40px}
+.insp-acts .warnbtn.on{border-color:var(--warn);color:var(--warn);background:var(--surface)}
+.insp-item textarea{width:100%;min-height:60px}
+.insp-bar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line-strong);box-shadow:0 -6px 20px rgba(0,0,0,.12)}
+.insp-bar .btn{min-height:50px;padding:0 22px}
+.warn-t{color:var(--warn)}
+.insp-flags .item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;margin-top:6px;border-top:1px solid color-mix(in srgb,var(--caution) 35%,transparent)}
+@media (max-width:560px){
+  /* on a phone the bar scrolls away – it would take a third of the screen */
+  .top{position:relative}
+  .phase-tabs{top:0}
+  .who{flex-wrap:wrap;gap:6px}
+  .who>span{max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .who .btn{padding:4px 9px}
+}
+
+/* keypad keys: text scales down to the key (iPadOS 16+), and is clipped rather than spilling out on older systems */
+.ak-key{min-width:0;overflow:hidden;container-type:inline-size}
+.ak-key .kl{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.ak-key.t .kl{font-size:min(1em,calc(100cqi / (var(--n,1) * .6)))}
+.ak-key small{display:block;text-overflow:ellipsis;font-size:min(.66rem,calc(100cqi / (var(--m,1) * .55)))}
+
+.dct-done{display:inline-flex;flex-direction:column;align-items:flex-start;gap:0}
+.dct-done .linkbtn{min-height:0;padding:2px 0;font-size:.78rem}

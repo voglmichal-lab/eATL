@@ -1,0 +1,25 @@
+Změna Z-044 – eTechLog 0.7.6
+
+- Poskakování stránky: stav synchronizace v liště má pevnou šířku (na iPadu na výšku se lišta přelamovala a posouvala stránku).
+- Výkonnost: Power a MA grad na klávesnici eTechLogu s tečkou; VFS (160) se při Další přeskočí jako klapky (VAPP → MA grad).
+- Kontrola výškoměrů on ground nahoře v kroku Před odletem (před ATIS); on ground i RVSM na klávesnici s + / −.
+- Taxi: písmena jsou vždy pojezdové dráhy; strana dráhy tlačítky RWY 24L / 24C / 24R nad klávesnicí.
+- Přeletěný DCT: „DCT přeletěno · zrušit“ – po potvrzení zruší direct i ATO cílového bodu.
+- Palivo: varování „pod minimem required“ hned při psaní i u paliva převzatého z předchozího přistání.
+
+Nahrajte všechny soubory ze zipu (config.js v zipu není a zůstává váš).
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

@@ -60,6 +60,7 @@ Nahrajte znovu všechny soubory ze zipu předchozí změny (např. `eatl-Z-026-v
 - Soubor `atis.js` může na serveru zůstat, 0.6.13 ho nenačítá.
 - Z 0.6.16 zpět na 0.6.15 nebo 0.6.13: TAXI DEP / TAXI ARR starší verze nezobrazí (v datech zůstanou), ATC instrukce
   za letu ukáže jako poznámky u bodů i s časem, ATIS s větrem v TEMPO je běžný text.
+- Z 0.7.3 zpět na 0.7.2: prohlídky údržby se ve starší verzi ukážou jen jako „SVC_PRE / SVC_POST“ u prohlídek dne, nedostatky a jejich vyřešení se nezobrazí (v datech zůstanou). Olej z prohlídky funguje dál.
 - Z 0.7.2 zpět na 0.7.1: aplikace je zase jen česky; volba jazyka zůstane v datech a 0.7.2 ji po návratu použije.
 - **Z 0.7 zpět na 0.6.x: jen se signálem.** 0.7 ukládá záznamy jinak (viz níže); 0.6 si po návratu stáhne deník ze
   serveru znovu a neodeslané záznamy z 0.7 odešle. Bez signálu by 0.6 ukázala prázdný deník, dokud se nepřipojí.
@@ -112,8 +113,10 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
      6 Přílet a přistání (ATIS ARR, příletová clearance, taxi, přistávací data, čas přistání, on-block, palivo po přistání, přiblížení, počet přistání).
    - **Shrnutí a uzavření**: 7 Shrnutí letu – časy odletu a příletu i palivo jdou opravit, block/flight, posádka, PF,
      olej, závady, chybějící položky OFP → *Potvrdit a zapsat do ATL* (podpis kapitána).
-   Navigační log: DCT, který je už přeletěný (cílový bod má ATO), nejde zrušit jedním klepnutím – pro opravu nejdřív
-   smažte ATO u cílového bodu. ATO letiště odletu = čas vzletu a ATO cílového letiště (při divertu letiště divertu)
+   Bod vynechaný directem má dál pole pro palivo (*abeam*) – palivo se často kontroluje i na úrovni bodu; ATO se u něj nezadává
+   a mezi chybějícími položkami se nepočítá.
+   Navigační log: DCT, který je už přeletěný (cílový bod má ATO), má u sebe „DCT přeletěno · zrušit“ – zrušení se nejdřív zeptá,
+   protože smaže i ATO cílového bodu. ATO letiště odletu = čas vzletu a ATO cílového letiště (při divertu letiště divertu)
    = čas přistání – vyplní se samy, ručně zapsaná hodnota má přednost.
    Poznámka k bodu: klepnutím na „+ pozn.“ se otevře rychlé zadání – **FL / ALT** (výška ve stopách, tlačítkem FL
    hladina; CLB ↑ / DESC ↓), **FREQ** (stačí 133355 → 133,355), **HDG** (0–360, ← vlevo / → vpravo) a **Text**.
@@ -233,7 +236,10 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
   Přiblížení může zaznít před dráhou i po ní. Když pole v ATIS nezazní, číslice skočí do dalšího.
 - **Zápis jako na papír, výsledek jednotný:** FEW 2 0 i FEW 2 0 0 0 → FEW020, viditelnost 1 0 → 9999, 2 5 0 0 8 → 250/08,
   1 2 5 → 12/05, QNH 9 8 9 i 1 0 1 3. Pomlčka u jevů = slabý (light): − SH RA = −SHRA, plus = silný (heavy).
-- **ILS** s variantou Z / Y / X a **CAT II**, stav dráhy (DRY, WET, SLUSH… + RWYCC 5/5/5), RVR, vítr s nárazy (gusting) a variable between (240V320).
+- **Stav dráhy** jak zazní (pořadí jako v runway condition report): číslice = RWYCC (5 5 5 = 5/5/5), **pokrytí** 25 / 50 / 75 / 100 %,
+  **mm** a číslice = hloubka volné kontaminace (voda, slush, sníh), povrch (DRY, WET, ST WATER…). Jednou pro celou dráhu, po třetinách
+  jen když se liší: `RWYCC 5/5/5 100% WET`, `RWYCC 5/3/5 25/100/50% WET/ST WATER/WET`, `RWYCC 2/2/2 100% 6 mm ST WATER`.
+- **ILS** s variantou Z / Y / X a **CAT II**, RVR, vítr s nárazy (gusting) a variable between (240V320).
 - **Trend:** TEMPO / BECMG nahoře, pak stejně jako v ATIS – vítr 2 5 0 1 7 G 2 7 = 250/17G27, dohlednost, jevy, oblačnost
   (`TEMPO 250/17G27 4000 −SHRA BKN015CB`). NOSIG jedním ťuknutím.
 - **Rozsvícená klávesa** ukazuje, co je zapsané: G = vítr má nárazy, VRB, V, CAVOK / 9999, druh poslední vrstvy oblačnosti,
@@ -265,7 +271,7 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
 **TAXI DEP** (Před odletem) a **TAXI ARR** (Přílet; při divertu pro letiště divertu) – stejná klávesnice s písmeny:
 - Pojezdové dráhy, jak zazní: B A 2 = `B, A2`. Každé písmeno začne další dráhu, číslice patří k té předchozí.
   Dvoupísmenná dráha: T A a **SPOJIT** = `TA` (SPOJIT a RWY jsou ve spodní řadě číslic vedle 0).
-- **RWY** – dráha (TAXI DEP ji nabídne z ATIS DEP ✓; L / C / R písmenem hned za číslem), **HP** – holding point / intersection (A 1),
+- **RWY** – dráha (TAXI DEP ji nabídne z ATIS DEP ✓; strana L / C / R tlačítky *RWY 24L / 24C / 24R* nad klávesnicí – písmena jsou vždy pojezdové dráhy), **HP** – holding point / intersection (A 1),
   **STAND** – stání (1 2). Číslice bez dráhy, ke které by patřily, jdou na odletu do RWY, na příletu do STAND.
 - **HOLD SHORT**, **CROSS**, **BKTRK** a dráha nebo pojezdová dráha: HOLD SHORT 3 3 = `HOLD SHORT RWY 33`.
 - **EXIT** a číslo (nebo označení): M EXIT 1 5 B D = `M, EXIT 15, B, D`.
@@ -276,9 +282,13 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
 - **ATO jen minutami.** U bodů trati stačí napsat minuty jako na papíře: „40“ → 10:40. Hodinu doplní aplikace podle
   ETO bodu – vezme čas s těmi minutami nejbližší k ETO (ETO 11:01, napsáno 59 → 10:59; ETO 12:58, napsáno 01 → 13:01).
   Bez ETO vezme první takový čas po předchozím ATO. Celý čas (1040) jde psát dál.
-- **Výkonnost (TO / LD weight, distance, flaps, V-rychlosti, VFTO, VREF…)** se píše na klávesnici eTechLogu jen s číslicemi
-  (klávesnice iPadu se neotevře); *Další ›* skočí na další pole v pořadí stránky – i na Power (klávesnice iPadu) a z něj Enterem dál. Předvyplněné klapky se přeskočí
-  (TO dist → Power → V1); prázdné klapky ne. Power a MA grad zůstávají na klávesnici iPadu.
+- **Klávesnice eTechLogu:** text na klávese se zmenší podle šířky klávesy (STRAIGHT, November…), nikdy nepřeteče ven.
+- **Výkonnost (TO / LD weight, distance, Power, flaps, V-rychlosti, VFTO, VREF, VAPP, MA grad…)** se píše na klávesnici eTechLogu
+  jen s číslicemi (Power a MA grad i s tečkou); klávesnice iPadu se neotevře. *Další ›* skočí na další pole; předvyplněné klapky
+  a VFS se přeskočí (TO dist → Power → V1, VAPP → MA grad), prázdné ne.
+- **Kontrola výškoměrů**: on ground je v kroku Před odletem nahoře (před ATIS), RVSM dole a v navigačním logu; obojí na klávesnici
+  eTechLogu s číslicemi a + / − (+10, −20).
+- **HOLD SHORT 2 4 a R, L, C** = pojezdové dráhy R, L, C; dráha 24R se zadá tlačítkem *RWY 24R* nad klávesnicí.
 - **Dlouhé hodnoty** (oblačnost, trend, stav dráhy): pole je tak široké, jak je třeba; když se nevejde, přejde na další řádek.
 - **Enter = další pole.** V běžných polích (palivo, takeoff data, časy, formuláře) přeskočí Enter na další pole – klávesa
   na klávesnici iPadu má nápis *další*. Za posledním polem fáze klávesnice zmizí, ve formuláři poslední Enter odešle.
@@ -297,6 +307,23 @@ u kteréhokoli bodu otevře stejnou klávesnici, volný text s diakritikou přes
 - **DCT** nabídne body tratě dál po trase; `DCT MOROK` z klávesnice zkrátí trať stejně jako tlačítko DCT v řádku
   (od bodu, u kterého je instrukce zapsaná).
 - U vynechaného bodu (direct) je přeškrtnutý jen název – instrukce zapsané u něj zůstávají čitelné.
+
+## Prohlídka údržby před letem / po letu (beta)
+Pro mechaniky na bázi, udělaná pro **telefon** (funguje i na iPadu a bez signálu). Položky jsou zatím obecné – po dodání
+papírového checklistu se upraví.
+- **Přihlášení**: Kancelář → jméno a PIN mechanika (na iPadu letadla odkaz *Mechanik na bázi – prohlídka a olej*).
+  Nahoře je výběr letadla a tlačítko **Provést prohlídku** → *Před letem* / *Po letu* (nebo *Jen doplnění oleje*, *Denní / jiná prohlídka*).
+- **Obsah**: datum, otevřené a odložené závady letadla (klepnutím detail s odložením / odstraněním), **olej doplněný L/P**
+  (předvyplní se další posádce jako dřív), **měření** – pneu příďová / hlavní L / P a brzdy L / P v mm, kyslík v psi, a checklist:
+  čištění exteriéru (okna, křídla, klapky), vnější kontrola stavu vč. světel, kontrola a úklid interiéru (kokpit, kabina),
+  toilet service, doplnění potřeb (propisky, bloky, vesty, olej v cargu, nářadí), krytky a zátky (před letem sejmuty / po letu
+  nasazeny), okolí letadla (FOD, podložky), dokumenty a vybavení na palubě (jen před letem).
+- Ke každé položce **Poznámka**, **⚠ Nedostatek** (upozornění pro CAMO, musí mít popis) a **Závada do ATL** – otevře zápis
+  závady předvyplněný názvem položky; prohlídka zůstane rozdělaná. Rozdělaná prohlídka přežije zavření aplikace.
+- Lze ji udělat kdykoli, i když let v ATL ještě není uzavřený. Neprovedené položky se jen zaznamenají.
+- **Podepsat prohlídku** (PIN). **CAMO** pak hned vidí u letadla *Nedostatky z prohlídek* a označí je *Vyřešeno* (s poznámkou,
+  podpis PINem). Všechny prohlídky jsou v záložce **Uvolnění → Prohlídky údržby** (klepnutím detail) a na stránce ATL dne.
+- Záznam je `daily.sign` (druh `SVC_PRE` / `SVC_POST`), vyřešení `svc.resolve`. Není to předletová prohlídka posádky.
 
 ## Jazyk – čeština / angličtina
 - Každý uživatel si volí jazyk v **Můj účet → Jazyk aplikace / Language**. Volba se synchronizuje (platí na všech iPadech) a
