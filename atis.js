@@ -26,7 +26,7 @@ const REM_DEF = ['BIRDS', 'GNSS RFI', 'WORKS', 'TWY _ CLSD', 'LVP'];
 const DEF = {
   atis: {
     info: { l: 'INFO', ph: 'D', h: 'Písmeno informace – „Delta“ je D.' },
-    time: { l: 'ČAS', ph: '1320', dig: 1, h: 'Čas vysílání (UTC), čtyři číslice.' },
+    time: { l: 'ČAS', ph: '1320', dig: 1, d: 'čas vysílání ATIS („at time 1230“) – nad písmenem', h: 'Čas vysílání (UTC), čtyři číslice – „at time 1230“.' },
     app: { l: 'APP', ph: 'ILS', h: 'Typ přiblížení, varianta Z / Y / X, CAT II. Může zaznít před dráhou i po ní. Když nezazní, pište dál – číslice skočí do dalšího pole.' },
     rwy: { l: 'RWY', ph: '24', dig: 1, h: 'Dráha, dvě číslice. L, C nebo R přidáte tlačítkem.' },
     cond: { l: 'STAV RWY', ph: 'WET', dig: 1, skip: 1, h: 'Jak zazní: číslice = RWYCC (5 5 5 = 5/5/5), pokrytí 25–100 %, mm a číslice = hloubka, povrch. Jednou pro celou dráhu, po třetinách jen když se liší.' },
@@ -565,7 +565,13 @@ function slotHTML(f, i, s) {
   if (same) inner = `<span><span class="sv${wrap}">${esc(val)}</span><span class="gtag">= ${esc(last.info)}</span></span>`;
   return `<button type="button" class="ak-slot${s.w ? ' wide' : ''}${g ? ' ghost' : ''}${same ? ' carry' : ''}${on ? ' on' : ''}${on && ACT.fresh ? ' fresh' : ''}" data-ak-slot="${i}" data-ak-f="${f.key}" data-ak-o="${esc(f.o.ofpId)}" aria-pressed="${on}"><span class="sl">${esc(s.l)}</span>${inner}</button>`;
 }
-function slotsHTML(f) { return f.L.map((s, i) => (!s.skip || hasVal(f, i) || (ACT && ACT.oid === f.o.ofpId && ACT.key === f.key && ACT.s === i)) ? slotHTML(f, i, s) : '').join('') }
+function slotsHTML(f) {
+  const show = (s, i) => !s.skip || hasVal(f, i) || (ACT && ACT.oid === f.o.ofpId && ACT.key === f.key && ACT.s === i);
+  const out = f.L.map((s, i) => show(s, i) ? slotHTML(f, i, s) : '');
+  // ATIS: the broadcast time sits in a small box above the letter ("ATIS L at time 1230")
+  if (f.type === 'atis') { const i = f.L.findIndex(s => s.k === 'info'); if (i >= 0 && f.L[i + 1] && f.L[i + 1].k === 'time' && out[i + 1]) { out[i] = `<span class="ak-stack">${out[i + 1].replace('class="ak-slot', 'class="ak-slot mini')}${out[i]}</span>`; out[i + 1] = '' } }
+  return out.join('');
+}
 function outHTML(f) {
   const line = f.st.text;
   return `<span class="label">Do OFP</span><span class="mono">${line ? esc(line) : '<span class="muted">–</span>'}</span>`;
@@ -871,9 +877,14 @@ function numPress(code) {
     if (nx) { const p = ACT; ACT = null; numMark(p, false); nx.focus(); if (nx.matches('input.npad')) openNum(nx); else hideDock() } else { close(); try { el.blur() } catch (e) { } } return;
   }
   if (code === 'bk') { numSet(el, ACT.fresh ? '' : el.value.slice(0, -1)); ACT.fresh = false }
+  else if (code === 'n:ontime' || code === 'n:ok') {
+    // ON TIME = the point's ETO as its ATO; OK = RVSM check in order – both move on like Další ›
+    const v = code === 'n:ok' ? 'OK' : el.dataset.eto; if (!v) return; numSet(el, v); ACT.fresh = false;
+    const nx = API && API.nextField ? API.nextField(el) : null; if (nx) { const p = ACT; ACT = null; numMark(p, false); nx.focus(); if (nx.matches('input.npad')) openNum(nx); else hideDock() } else { close(); try { el.blur() } catch (e) { } } return }
   else if (code.startsWith('n:')) { const d = code.slice(2), cur = ACT.fresh ? '' : el.value; if (d === '.' && (!el.dataset.dec || cur.includes('.'))) return;
     // + / − set the sign of the value (pressed before or after the digits)
     if (d === '+' || d === '-') { if (!el.dataset.sign) return; numSet(el, d + cur.replace(/^[+-]/, '')); ACT.fresh = false; renderNum(); return }
+    if (el.classList.contains('t4') && cur.replace(/\D/g, '').length >= 4) return;   // a time has four digits at most
     numSet(el, cur === '' && d === '.' ? '0.' : cur + d); ACT.fresh = false }
   renderNum();
 }
@@ -888,7 +899,9 @@ function renderNum() {
   hint.textContent = over ? `Víc než maximum ${mx}.` : (ACT.fresh && el.value ? 'První číslice nahradí hodnotu. ' : '') + 'Další › = další pole, Hotovo zavře.' + (mx != null ? ` Max ${mx}.` : '');
   d.querySelector('#ak-chips').innerHTML = '';
   const ctx = d.querySelector('#ak-ctx'); ctx.className = 'ak-ctx read';
-  ctx.innerHTML = `<div class="ak-readout"><span class="sl">${esc(lab)}</span><span class="rv">${esc(el.value || '–')}</span></div>`;
+  // ON TIME (ATO = ETO) and OK (RVSM check) – one big key next to the value, easy to hit
+  const big = el.dataset.eto ? keyBtn('n:ontime', 'ON TIME', 't wide-act', 'ATO = ETO ' + el.dataset.eto) : el.dataset.ok ? keyBtn('n:ok', 'OK', 't wide-act', 'kontrola v pořádku') : '';
+  ctx.innerHTML = `<div class="ak-readout"><span class="sl">${esc(lab)}</span><span class="rv">${esc(el.value || '–')}</span></div>${big}`;
   d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('n:' + n, n)).join('') + (el.dataset.dec ? keyBtn('n:.', '.', '', 'tečka', /\./.test(ACT.fresh ? '' : el.value)) : el.dataset.sign ? keyBtn('n:+', '+', '', 'plus') : '<span></span>') + keyBtn('n:0', '0') + (el.dataset.sign ? keyBtn('n:-', '−', '', 'minus') : '<span></span>');
   d.querySelector('#ak-act').innerHTML = keyBtn('bk', '⌫', 'bk', 'smazat') + keyBtn('next', 'Další ›', 't nx') + keyBtn('done', 'Hotovo', 't okk');
   const was = d.hidden; d.hidden = false; const key = 'num' + ACT.of;
@@ -902,7 +915,7 @@ function cfgInner() {
   return `<div class="ak-presets"><span class="label">Předvolby</span><button type="button" class="btn sm" data-ak-preset="icao">ICAO / Evropa</button><button type="button" class="btn sm" data-ak-preset="us">USA – počasí před dráhou</button></div>
     <div class="ak-cfg">${Object.keys(DEF).map(t => `<div><p class="label">${TYPE_NAME[t]}</p><ol>${c[t].map((x, i) => {
       const d = DEF[t][x.k];
-      return `<li class="ak-crow${x.on ? '' : ' off'}"><label><input type="checkbox" data-ak-cfg="${t}|${x.k}"${x.on ? ' checked' : ''}>${esc(d.l)}</label><span class="muted">${d.skip ? 'přes tlačítko' : ''}</span><span class="sp"></span><button type="button" class="ak-mv" data-ak-mv="${t}|${x.k}|-1" aria-label="${esc(d.l)} výš"${i === 0 ? ' disabled' : ''}>↑</button><button type="button" class="ak-mv" data-ak-mv="${t}|${x.k}|1" aria-label="${esc(d.l)} níž"${i === c[t].length - 1 ? ' disabled' : ''}>↓</button></li>`;
+      return `<li class="ak-crow${x.on ? '' : ' off'}"><label><input type="checkbox" data-ak-cfg="${t}|${x.k}"${x.on ? ' checked' : ''}>${esc(d.l)}</label><span class="muted">${d.d ? esc(d.d) : d.skip ? 'přes tlačítko' : ''}</span><span class="sp"></span><button type="button" class="ak-mv" data-ak-mv="${t}|${x.k}|-1" aria-label="${esc(d.l)} výš"${i === 0 ? ' disabled' : ''}>↑</button><button type="button" class="ak-mv" data-ak-mv="${t}|${x.k}|1" aria-label="${esc(d.l)} níž"${i === c[t].length - 1 ? ' disabled' : ''}>↓</button></li>`;
     }).join('')}</ol></div>`).join('')}</div>
     <label class="fld"><span>Rychlé poznámky k ATIS (oddělte čárkou; _ = doplníte na klávesnici, např. TWY _ CLSD)</span><input type="text" id="ak-rem" value="${esc(c.rem.join(', '))}" autocomplete="off" spellcheck="false" autocapitalize="characters"></label>`;
 }

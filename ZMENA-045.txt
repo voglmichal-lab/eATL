@@ -1,0 +1,24 @@
+Změna Z-045 – eTechLog 0.7.7
+
+- Čas vysílání ATIS: zapne se v Můj účet → ATIS → ČAS. Po písmenu skočí kurzor na čas, zobrazí se v malém poli nad písmenem.
+- Navigační log: ATO a palivo u bodů na klávesnici eTechLogu (jen číslice).
+  ON TIME na klávesnici = ATO podle ETO; bez klávesnice stačí klepnout na ETO bodu.
+- Řádek RVSM v navigačním logu: klávesa OK.
+- Instrukce u bodu jsou pod sebou – tabulka se do šířky neroztahuje.
+
+Nahrajte všechny soubory ze zipu (config.js v zipu není a zůstává váš).
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

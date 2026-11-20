@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.7.6"}
+:root{--etl-build:"0.7.7"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -313,7 +313,7 @@ table.ofplog .wdiff{display:block;font-size:.8rem;min-height:1em;margin-top:2px;
 /* one-line labels, so the three selects stay on one line even when a label is long */
 .crewgrid .fld>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 table.ofplog input.ofp-note{width:140px;text-align:left;font-family:var(--f-body)}
-table.ofplog .ofp-notebtn{min-width:140px;min-height:44px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;text-align:left;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);padding:4px 8px;font:600 .86rem var(--f-mono);cursor:pointer}
+table.ofplog .ofp-notebtn{min-width:140px;min-height:44px;display:flex;flex-direction:column;align-items:flex-start!important;flex-wrap:nowrap;gap:4px;align-items:center;text-align:left;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);padding:4px 8px;font:600 .86rem var(--f-mono);cursor:pointer}
 table.ofplog .ofp-notebtn.empty{color:var(--muted);font-family:var(--f-body);font-weight:500;border-style:dashed}
 table.ofplog .ofp-notebtn span{background:var(--surface-2);border-radius:4px;padding:2px 6px;white-space:nowrap}
 table.ofplog .ofp-notebtn:disabled{cursor:default;border-style:solid;opacity:.85}
@@ -628,3 +628,19 @@ table.ftl-duties td,table.ftl-tab td{vertical-align:top}
 
 .dct-done{display:inline-flex;flex-direction:column;align-items:flex-start;gap:0}
 .dct-done .linkbtn{min-height:0;padding:2px 0;font-size:.78rem}
+
+/* ATIS broadcast time: a small box above the ATIS letter */
+.ak-stack{display:flex;flex-direction:column;gap:4px;flex:0 0 auto}
+.ak-slot.mini{min-height:0;min-width:80px;padding:3px 10px;gap:0;border-radius:8px}
+.ak-slot.mini .sl{font-size:.6rem}
+.ak-slot.mini .sv,.ak-slot.mini .pl,.ak-slot.mini .gh{font-size:.9rem}
+
+/* nav log notes: one instruction per line, so the table does not grow sideways */
+table.ofplog .ofp-notebtn span{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+/* wide action keys under the digits: ON-TIME (ATO = ETO), OK (RVSM check) */
+.ak-key.wide-act{grid-column:1/-1;min-height:64px;font-size:1.15rem;letter-spacing:.06em;border:2px solid var(--ok);background:color-mix(in srgb,var(--ok) 16%,var(--surface-2));color:var(--ink)}
+.ak-key.wide-act small{color:var(--muted)}
+
+/* ETO in the navigation log: tap = passed on time (ATO = ETO) */
+.eto-tap{font:inherit;color:inherit;background:var(--surface);border:1.5px dashed var(--line-strong);border-radius:7px;padding:6px 8px;min-height:40px;cursor:pointer}
+.eto-tap:hover,.eto-tap:focus-visible{border-color:var(--ok);border-style:solid}

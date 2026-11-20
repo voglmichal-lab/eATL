@@ -115,6 +115,9 @@ Data se jen doplní, nic se nepřepíše ani nezdvojí. Převzaté záznamy ode�
      olej, závady, chybějící položky OFP → *Potvrdit a zapsat do ATL* (podpis kapitána).
    Bod vynechaný directem má dál pole pro palivo (*abeam*) – palivo se často kontroluje i na úrovni bodu; ATO se u něj nezadává
    a mezi chybějícími položkami se nepočítá.
+   Navigační log: ATO a palivo u bodů se píšou na klávesnici eTechLogu (ATO stačí minutami: 40 → 10:40). Klávesa **ON TIME**
+   zapíše ETO bodu jako ATO a skočí na palivo; bez klávesnice stačí **klepnout na ETO** (u bodu bez ATO). Řádek RVSM má klávesu **OK**.
+   Instrukce u bodu jsou pod sebou, tabulka se do šířky neroztahuje.
    Navigační log: DCT, který je už přeletěný (cílový bod má ATO), má u sebe „DCT přeletěno · zrušit“ – zrušení se nejdřív zeptá,
    protože smaže i ATO cílového bodu. ATO letiště odletu = čas vzletu a ATO cílového letiště (při divertu letiště divertu)
    = čas přistání – vyplní se samy, ručně zapsaná hodnota má přednost.
@@ -286,6 +289,8 @@ na vlastní klávesnici eTechLogu místo klávesnice iPadu. Ťuknutím na polí�
 - **Výkonnost (TO / LD weight, distance, Power, flaps, V-rychlosti, VFTO, VREF, VAPP, MA grad…)** se píše na klávesnici eTechLogu
   jen s číslicemi (Power a MA grad i s tečkou); klávesnice iPadu se neotevře. *Další ›* skočí na další pole; předvyplněné klapky
   a VFS se přeskočí (TO dist → Power → V1, VAPP → MA grad), prázdné ne.
+- **Čas vysílání ATIS** („Ruzyně ATIS L, at time 1230“): zapne se v *Můj účet → ATIS → ČAS*. Pak po písmenu skočí kurzor
+  na čas (4 číslice) a ten je v malém poli nad písmenem; do OFP jako `INFO L · 1230Z · …`.
 - **Kontrola výškoměrů**: on ground je v kroku Před odletem nahoře (před ATIS), RVSM dole a v navigačním logu; obojí na klávesnici
   eTechLogu s číslicemi a + / − (+10, −20).
 - **HOLD SHORT 2 4 a R, L, C** = pojezdové dráhy R, L, C; dráha 24R se zadá tlačítkem *RWY 24R* nad klávesnicí.
