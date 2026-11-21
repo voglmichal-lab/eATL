@@ -1,0 +1,35 @@
+eTechLog – změna Z-047
+Verze: 0.7.9 (navazuje na Z-046 / 0.7.8)
+Datum: 2026-11-20
+
+- Import W&B z APG je odebrán: tlačítka v Performance a u Přistávacích dat, apg.js i čtečka textu ve vendor/ocr.
+  Zařízení, která čtečku už stáhla, si její mezipaměť (asi 7 MB) samy smažou.
+  Hodnoty, které se z APG už vyplnily, v OFP zůstávají jako běžně zadané.
+- Zůstává oprava ze Z-046: ATO zadané jen minutami (37 → 10:37) funguje i na klávesnici eTechLogu.
+
+V repozitáři smažte (zip soubory mazat neumí):
+- soubor apg.js
+- složku vendor/ocr
+Když v repozitáři zůstanou, nic se nestane – aplikace je už nenačítá.
+
+Návrat
+- Na 0.7.8 s importem APG: eatl-Z-046-v0.7.8.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-047.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  tools/i18n-check.js
+  vercel.json
+  version.js

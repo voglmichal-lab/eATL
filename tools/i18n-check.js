@@ -6,7 +6,7 @@
 // key = normalized text; dynamic parts become {0},{1}…
 const fs=require('fs'),acorn=require('acorn'),walk=require('acorn-walk');
 const SRC=require('path').join(__dirname,'..');
-const files=['app.js','atis.js','ftl.js','apg.js'];
+const files=['app.js','atis.js','ftl.js'];
 const M='\u0001';
 const ent=s=>s.replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&#8209;/g,'‑');
 const norm=s=>ent(s).replace(/\s+/g,' ').trim();

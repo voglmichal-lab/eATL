@@ -4,7 +4,7 @@
    Requests to Supabase (other origin) are never touched – sync is handled in the app. */
 importScripts('version.js');
 const CACHE = 'etl-' + (self.ETL_VERSION || 'dev');
-const SHELL = ['./', 'index.html', 'app.css', 'fonts.css', 'app.js', 'ftl.js', 'atis.js', 'apg.js', 'lang-en.js', 'i18n.js', 'config.js', 'version.js', 'manifest.webmanifest',
+const SHELL = ['./', 'index.html', 'app.css', 'fonts.css', 'app.js', 'ftl.js', 'atis.js', 'lang-en.js', 'i18n.js', 'config.js', 'version.js', 'manifest.webmanifest',
   'vendor/supabase.js', 'vendor/591.supabase.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js', 'vendor/qrcode.min.js', 'vendor/jsqr.min.js',
   'vendor/pdf-lib.min.js', 'vendor/fontkit.min.js', 'fonts/pdf/barlow-400.ttf', 'fonts/pdf/barlow-600.ttf', 'fonts/pdf/plexmono-400.ttf', 'fonts/pdf/plexmono-600.ttf',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
@@ -27,15 +27,11 @@ self.addEventListener('install', e => {
     .then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => (k.startsWith('etl-') && k !== CACHE) || (k.startsWith('ocr-') && k !== OCR_CACHE)).map(k => caches.delete(k))))
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => (k.startsWith('etl-') && k !== CACHE) || k.startsWith('ocr-')).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
 const immutable = p => /\/(vendor|fonts|icons)\//.test(p);
-// the text reader for APG reports (about 7 MB) is kept in its own cache: downloaded once on first use,
-// not again with every new app version (the files never change under the same name)
-const OCR_CACHE = 'ocr-6.0.1';
-const isOcr = p => /\/vendor\/ocr\//.test(p);
 function timeout(ms) { return new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms)); }
 
 self.addEventListener('fetch', e => {
@@ -43,10 +39,6 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (isOcr(url.pathname)) {
-    e.respondWith(caches.open(OCR_CACHE).then(c => c.match(req).then(hit => hit || fetch(req).then(res => { if (res.ok) c.put(req, res.clone()); return res; }))));
-    return;
-  }
   if (immutable(url.pathname)) {
     e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => {
       if (res.ok) { const cp = res.clone(); caches.open(CACHE).then(c => c.put(req, cp)); }
