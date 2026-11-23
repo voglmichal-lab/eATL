@@ -1,0 +1,27 @@
+eTechLog – změna Z-060
+Verze: 0.7.22 (navazuje na Z-059 / 0.7.21)
+Datum: 2026-11-24
+
+- Kancelářský režim: uživatel jen s rolí Mechanik nevidí záložku OFP.
+  Kdo má vedle mechanika i jinou roli (Posádka, CAMO, Správce…), OFP vidí dál.
+
+Návrat
+- Na 0.7.21: eatl-Z-059-v0.7.21.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-060.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

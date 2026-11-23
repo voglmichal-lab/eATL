@@ -625,6 +625,8 @@ function renderApp(){
 
   const nOpen=ac.open.length,nDef=ac.deferred.length;
   const tabs=[['log','Technický deník'],['ofp','OFP'],['defects','Závady',nOpen+nDef,nOpen?'warn':nDef?'caution':''],['crs','Uvolnění'],['reports','Výkazy'],['search','Hledat'],['audit','Audit']];
+  // a mechanic (no other role) has nothing to do with the OFP
+  if(u&&u.roles&&!u.roles.some(r=>r!=='mech'))tabs.splice(tabs.findIndex(t=>t[0]==='ofp'),1);
   if(can.admin(u)){if(!setupState().done)tabs.unshift(['setup','Úvodní nastavení']);tabs.push(['admin','Správa'])}
   if(S.cfg.ftlBy!=='none'&&(can.ftlAll(u)||has(u,'crew')))tabs.splice(tabs.findIndex(t=>t[0]==='reports')+1,0,['ftl',can.ftlAll(u)?'Doba služby':'Moje služba']);
   if(canDel(u))tabs.push(['testdel','Mazání (test)','!','warn']);

@@ -64,3 +64,4 @@ Zip změny obsahuje jen změněné soubory ve správných složkách a popis `ZM
 | Z-057 | 0.7.19 | 2026-11-23 | Doplnění oleje: přiřadí se k letu, jehož off-block následuje po čase doplnění – i k letu už podepsanému (doplní se do jeho záznamu s historií). Formulář ukazuje, ke kterému letu se olej zapíše; při datu v minulosti se čas vymaže, aby nezůstal aktuální. |
 | Z-058 | 0.7.20 | 2026-11-23 | Odstranění závady a CRS: popisek výběru letu jen „Přiřadit k letu“. |
 | Z-059 | 0.7.21 | 2026-11-23 | ATL – štítky závad u letu: odstraněná závada jako „CRS WO …“ (číslo WO / workpacku z odstranění), bez čísla závady a bez „na zemi odstraněná“; otevřená / odložená bez „na zemi“. Formulář odstranění závady: pole „Číslo WO / workpacku“. |
+| Z-060 | 0.7.22 | 2026-11-24 | Mechanik (bez jiné role) nevidí záložku OFP. |
