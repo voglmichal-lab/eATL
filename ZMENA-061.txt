@@ -1,0 +1,40 @@
+eTechLog – změna Z-061
+Verze: 0.7.23 (navazuje na Z-060 / 0.7.22)
+Datum: 2026-11-24
+
+Nová záložka „Prohlídky“ (vidí CAMO, mechanik, správce, kancelář – ne čistě posádka):
+- Prohlídky před a po letu: tabulka nejnovější nahoře – datum a čas, druh, technik, cykly letadla v době prohlídky,
+  provedeno x/y, nedostatky (s počtem ještě otevřených), doplněný olej L/P a všechna měření
+  (pneu příďová / L / P, brzda L / P v mm, kyslík v psi). Období 30 / 90 dní / rok / vše. Klepnutím na řádek celý záznam.
+  Export CSV (včetně textů nedostatků).
+- Opotřebení: grafy vývoje měření z prohlídek – pneumatiky (hloubka dezénu), brzdy (indikátor), kyslík (tlak).
+  Pod grafem poslední hodnota a změna od začátku období (výměna pneu je vidět jako skok nahoru).
+- Spotřeba oleje (přesunuto sem z Výkazů, nový pohled):
+  - graf = součet doplněného oleje podle letových hodin za posledních 100 FH, L plnou a P čárkovanou čarou;
+    strmější čára = vyšší spotřeba,
+  - tabulka spotřeby za posledních 25 / 50 / 100 / 200 FH a za celé období v l/FH a „1 litr za X FH“,
+  - seznam doplnění (datum, TTAF, L, P, kdo, ke kterému letu) – i olej doplněný po posledním letu,
+    který ještě čeká na další let, je vidět hned.
+  - Opraveno: olej zapsaný při prohlídce se dřív započítal dvakrát.
+- Záložka Uvolnění už prohlídky neukazuje (jen CRS, odstranění závad a uzemnění).
+
+Návrat
+- Na 0.7.22: eatl-Z-060-v0.7.22.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-061.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

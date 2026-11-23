@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.7.22"}
+:root{--etl-build:"0.7.23"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -14,7 +14,7 @@ html,body{overscroll-behavior-y:none}
   --ok:#17784a; --ok-soft:#dbeee3; --caution:#9a5b06; --caution-soft:#f7e8cc; --warn:#b02a20; --warn-soft:#f6dcd8;
   --band:#13202c; --band-ink:#e9eff5; --band-muted:#9fb1c2;
   --shadow:0 1px 2px rgba(20,33,45,.06),0 6px 24px rgba(20,33,45,.08);
-  --s1:#2a78d6; --s2:#eb6834;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1d9b6c;
   --dock:#1b2834; --key:#2c3b49; --key-2:#23313d; --key-ink:#eef3f8; --key-muted:#a9b9c8; --key-hi:#3f73b4; --key-ok:#1f7a4d; --key-on:#f2f6fa; --key-on-ink:#10202e;
   --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
   --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -26,7 +26,7 @@ html,body{overscroll-behavior-y:none}
   --ok:#4cc68a; --ok-soft:#123326; --caution:#f2b350; --caution-soft:#3a2a10; --warn:#f2786a; --warn-soft:#3d1814;
   --band:#0a0f14; --band-ink:#e4ebf2; --band-muted:#8a9bab;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 28px rgba(0,0,0,.35);
-  --s1:#3987e5; --s2:#d95926;
+  --s1:#3987e5; --s2:#d95926; --s3:#2fb582;
   --dock:#0b1117; --key:#1f2b37; --key-2:#18222c; --key-ink:#e4ebf2; --key-muted:#93a4b5; --key-hi:#2f5f9c; --key-ok:#1c6b45; --key-on:#dfe8f1; --key-on-ink:#0b1622;
   color-scheme:dark}}
 :root[data-theme="dark"]{
@@ -35,7 +35,7 @@ html,body{overscroll-behavior-y:none}
   --ok:#4cc68a; --ok-soft:#123326; --caution:#f2b350; --caution-soft:#3a2a10; --warn:#f2786a; --warn-soft:#3d1814;
   --band:#0a0f14; --band-ink:#e4ebf2; --band-muted:#8a9bab;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 28px rgba(0,0,0,.35);
-  --s1:#3987e5; --s2:#d95926;
+  --s1:#3987e5; --s2:#d95926; --s3:#2fb582;
   --dock:#0b1117; --key:#1f2b37; --key-2:#18222c; --key-ink:#e4ebf2; --key-muted:#93a4b5; --key-hi:#2f5f9c; --key-ok:#1c6b45; --key-on:#dfe8f1; --key-on-ink:#0b1622;
   color-scheme:dark}
 *{box-sizing:border-box}
@@ -725,3 +725,13 @@ table.ofplog .ofp-notebtn span{max-width:100%;white-space:normal;overflow-wrap:a
 .fg-arrow{font-size:1.4rem;color:var(--muted);padding:0 2px 12px;line-height:1}
 @media (max-width:560px){.fgrid.fg3{grid-template-columns:1fr 1fr}.fgrid.fg3>.fld:first-child{grid-column:1/-1}.fgrid.fg-route{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}.fgrid.fg-route>.fld:last-child{grid-column:1/-1}}
 .oil-target{margin:8px 0 0;padding:8px 12px;border-radius:6px;background:var(--accent-soft);font-size:.9rem}
+
+/* inspections overview (CAMO) */
+.insp-tab td,.insp-tab th{white-space:nowrap}
+.insp-tab tr.tap{cursor:pointer}
+.insp-tab tr.tap:hover td{background:var(--surface-2,rgba(0,0,0,.03))}
+.wear-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.wear-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.wear-card h3{margin:0 0 4px;font-size:1rem}
+.wear-card .legend{margin:2px 0 4px}
+.wear-sum{font-size:.84rem;color:var(--muted);margin:4px 0 0}

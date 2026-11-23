@@ -625,6 +625,8 @@ function renderApp(){
 
   const nOpen=ac.open.length,nDef=ac.deferred.length;
   const tabs=[['log','Technický deník'],['ofp','OFP'],['defects','Závady',nOpen+nDef,nOpen?'warn':nDef?'caution':''],['crs','Uvolnění'],['reports','Výkazy'],['search','Hledat'],['audit','Audit']];
+  // inspections before / after flight: their own overview (not under releases) – for CAMO, maintenance and the office
+  if(u&&u.roles&&u.roles.some(r=>r!=='crew'&&r!=='cabin'))tabs.splice(tabs.findIndex(t=>t[0]==='reports'),0,['insp','Prohlídky']);
   // a mechanic (no other role) has nothing to do with the OFP
   if(u&&u.roles&&!u.roles.some(r=>r!=='mech'))tabs.splice(tabs.findIndex(t=>t[0]==='ofp'),1);
   if(can.admin(u)){if(!setupState().done)tabs.unshift(['setup','Úvodní nastavení']);tabs.push(['admin','Správa'])}
@@ -639,6 +641,7 @@ function renderApp(){
     case 'defects':view=viewDefects(ac,u);break;
     case 'crs':view=viewCrs(ac,u);break;
     case 'reports':view=viewReports(ac);break;
+    case 'insp':view=viewInspections(ac);break;
     case 'search':view=viewSearch(ac);break;
     case 'ofp':{const o=UI.ofpId&&ofpOf(UI.ofpId);view=o&&o.acId===ac.acId?`<div class="chips"><button class="btn" data-act="ofp-back">‹ Seznam OFP</button></div>${viewOfp(o,u)}`:viewOfpList(ac);break}
     case 'audit':view=viewAudit(ac);break;
@@ -817,7 +820,7 @@ function viewCrs(ac,u){
     if(it.kind==='ground')return `<div class="defect open tap" data-act="crs-detail" data-id="ground|${esc(it.c.ev)}" role="button" tabindex="0"><div class="stripe"></div><div class="body"><div class="top-row">${delLink('ev:'+it.c.ev,'Smazat',true)}<span class="ann warn">Uzemněno</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.reason)}</p><p class="meta">${esc(it.c.name)}${it.c.wo?' · WO '+esc(it.c.wo):''}</p></div></div>`;
     return `<div class="defect closed tap" data-act="crs-detail" data-id="rect|${esc(it.c.defId)}" role="button" tabindex="0"><div class="stripe"></div><div class="body"><div class="top-row">${delLink('ev:'+it.c.rect.ev,'Smazat odstranění',true)}<span class="ann ok">CRS k závadě</span><span class="mono">${esc(it.c.no)}</span><span class="muted mono">${fmtTs(it.at)}</span></div><p class="txt">${esc(it.c.text)}</p><p class="meta">${esc(it.c.rect.action)} · ${esc(it.c.rect.name)} (${esc(it.c.rect.licence||'–')})</p>${(()=>{const L=it.c.rect.atLeg&&S.legs[it.c.rect.atLeg];return L?`<p class="meta">Po letu ${esc(L.page)}/${L.idx} · ${fmtDate(L.date)} · ${esc(L.from)} → ${esc(L.to)}</p>`:'<p class="meta">Nepřiřazeno k letu</p>'})()}</div></div>`;
   };
-  return prepPanel(ac,u)+svcPanel(ac)+`<div class="panel"><div class="panel-head"><div><p class="label">Aktuální stav</p><h2>${esc(ac.reg)} · <span class="ann ${ac.status}">${STATUS_LABEL[ac.status]}</span></h2></div>${can.prepCrs(u)?`<button class="btn primary" data-act="crs-form">${ICON.check}${can.crs(u)?'Vydat CRS':'Připravit CRS'}</button>`:''}</div>
+  return prepPanel(ac,u)+`<div class="panel"><div class="panel-head"><div><p class="label">Aktuální stav</p><h2>${esc(ac.reg)} · <span class="ann ${ac.status}">${STATUS_LABEL[ac.status]}</span></h2></div>${can.prepCrs(u)?`<button class="btn primary" data-act="crs-form">${ICON.check}${can.crs(u)?'Vydat CRS':'Připravit CRS'}</button>`:''}</div>
   <p class="muted">${ac.lastCrs?`Poslední samostatné CRS ${fmtTs(ac.lastCrs.at)} – ${esc(ac.lastCrs.name)}, WO ${esc(ac.lastCrs.wo||'–')}.`:'Zatím žádné samostatné CRS.'} Otevřené závady se uzavírají přes „Odstranit a uvolnit“ v záložce Závady, uzemnění ruší vydání CRS.</p></div>
   ${items.length?`<div class="grid-list">${items.map(row).join('')}</div>`:`<div class="empty"><p>Zatím žádná uvolnění ani uzemnění.</p></div>`}`;
 }
@@ -832,7 +835,7 @@ function viewReports(ac){
   const rows=monthly(ac);
   return `<div class="panel"><div class="panel-head"><div><p class="label">Měsíční výkaz hodin a cyklů</p><h2>${esc(ac.reg)}</h2></div><div class="chips"><button class="btn sm" data-act="export-month">Export CSV výkazu</button><button class="btn sm" data-act="export-legs">Export CSV letů</button></div></div>
   ${rows.length?`<div class="scroll-x"><table class="plain"><thead><tr><th>Měsíc</th><th class="r">Lety</th><th class="r">Let (drak)</th><th class="r">Blok</th><th class="r">Přistání</th><th class="r">TTAF na konci</th><th class="r">Cykly na konci</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="mono">${r.k.slice(5)}/${r.k.slice(0,4)}</td><td class="r mono">${r.legs}</td><td class="r mono">${hm(r.air)}</td><td class="r mono">${hm(r.block)}</td><td class="r mono">${r.ldg}</td><td class="r mono">${hm(r.ttaf)}</td><td class="r mono">${r.tcyc}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Zatím žádné lety.</p>'}
-  <p class="muted">Tohle je podklad, který dnes CAMO ručně přepisuje z papírových stránek. Zneplatněné lety se nepočítají.</p></div>${viewOil(ac)}`;
+  <p class="muted">Tohle je podklad, který dnes CAMO ručně přepisuje z papírových stránek. Zneplatněné lety se nepočítají. Spotřeba oleje a opotřebení jsou v záložce Prohlídky.</p></div>`;
 }
 
 
@@ -1133,35 +1136,101 @@ function oilPendingNote(acId){const pd=oilPending(acId,null);if(!pd)return '';
 
 /* --- oil consumption per engine --- */
 function parseOil(x){const n=String(x||'').replace(/,/g,'.').match(/\d+(?:\.\d+)?/g);if(!n||n.length<2)return null;const l=+n[0],r=+n[1];return (l||r)?{l,r}:null}
-function oilData(ac){
-  const m={};const add=(date,o,src)=>{if(!o)return;const k=date.slice(0,7);const r=m[k]=m[k]||{k,l:0,r:0,air:0,n:0};r.l+=o.l;r.r+=o.r;r.n++};
-  for(const l of ac.legs){if(l.void||l.state==='open')continue;const k=l.date.slice(0,7);const r=m[k]=m[k]||{k,l:0,r:0,air:0,n:0};r.air+=l.air;add(l.date,parseOil(l.oil))}
-  for(const key in S.daily){if(!key.startsWith(ac.acId+'|'))continue;for(const d of S.daily[key])add(d.date,parseOil(d.oil))}
-  return Object.values(m).sort((a,b)=>a.k<b.k?-1:1).map(r=>Object.assign(r,{fh:r.air/60,ql:r.air?r.l/(r.air/60):null,qr:r.air?r.r/(r.air/60):null}));
+// every oil top-up of the aircraft, placed at the flight hours (TTAF) when it was added:
+// written with a flight = TTAF before that flight; added on the ground and still waiting for the next flight = TTAF now.
+// (an inspection's oil is also an oil.add, attached to a flight – counted once)
+function oilEvents(ac){
+  const ev=[];
+  for(const l of ac.legs){if(l.void||l.state==='open')continue;const o=parseOil(l.oil);if(!o)continue;
+    const ids=(l.oilSvc||[]).filter(x=>S.oilAdds[x]);const who=ids.length?[...new Set(ids.map(x=>S.oilAdds[x].who.name))].join(', '):((S.users[l.pic]||{}).name||'posádka');
+    ev.push({date:l.date,fh:(l.ttaf-l.air)/60,l:o.l,r:o.r,who,src:ids.length?'ground':'crew',leg:`${l.from}–${l.to}`})}
+  const pd=oilPending(ac.acId,null);if(pd)for(const x of pd.list)ev.push({date:x.date,time:x.time,fh:ac.air/60,l:+x.l||0,r:+x.r||0,who:x.who.name,src:'ground',pending:true});
+  return ev.sort((a,b)=>a.fh-b.fh||(a.date<b.date?-1:1));
 }
-function niceMax(v){const steps=[0.02,0.05,0.1,0.2,0.25,0.5,1,2,5,10];return steps.find(s=>s>=v)||Math.ceil(v)}
-function oilChart(rows){
-  const W=680,H=230,pl=44,pr=8,pt=14,pb=30,iw=W-pl-pr,ih=H-pt-pb;
-  const mx=niceMax(Math.max(0.01,...rows.flatMap(r=>[r.ql||0,r.qr||0])));
-  const y=v=>pt+ih-(v/mx)*ih;const bw=iw/rows.length;const w=Math.max(6,Math.min(18,(bw-12)/2));
-  const bar=(x,v,cls,lab)=>{if(v==null)return '';const h=Math.max(1,(v/mx)*ih),y0=pt+ih-h,rr=Math.min(4,w/2,h);
-    return `<path class="bar" fill="var(${cls})" d="M${x},${pt+ih}V${y0+rr}Q${x},${y0} ${x+rr},${y0}H${x+w-rr}Q${x+w},${y0} ${x+w},${y0+rr}V${pt+ih}Z"><title>${lab}: ${v.toFixed(3)} l/FH</title></path>`};
-  const ticks=[0,mx/2,mx];
-  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Spotřeba oleje v litrech na letovou hodinu po měsících, levý a pravý motor">
-    ${ticks.map(t=>`<line x1="${pl}" x2="${W-pr}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-6}" y="${y(t)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${t.toFixed(t<0.1&&t>0?3:2)}</text>`).join('')}
-    ${rows.map((r,i)=>{const cx=pl+i*bw+bw/2;return bar(cx-w-1,r.ql,'--s1',`${r.k.slice(5)}/${r.k.slice(0,4)} levý`)+bar(cx+1,r.qr,'--s2',`${r.k.slice(5)}/${r.k.slice(0,4)} pravý`)+`<text x="${cx}" y="${H-10}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${r.k.slice(5)}/${r.k.slice(2,4)}</text>`}).join('')}
+function niceMax(v){const steps=[0.02,0.05,0.1,0.2,0.25,0.5,1,2,5,10,20,50];return steps.find(s=>s>=v)||Math.ceil(v)}
+const r3=x=>x==null?'–':x.toFixed(3);
+// litres added per engine over the last N flight hours → l/FH and "1 l per X FH"
+function oilRates(ac,ev){
+  const end=ac.air/60;let first=null;for(const l of ac.legs){if(l.void||l.state==='open')continue;const st=(l.ttaf-l.air)/60;if(first==null||st<first)first=st}
+  if(first==null)return [];const hist=end-first;
+  const win=[25,50,100,200].filter(n=>n<hist).concat([hist]).filter((n,i,a)=>n>0&&a.indexOf(n)===i);
+  return win.map(n=>{const st=end-n;const ins=ev.filter(e=>e.fh>st-1e-9);const L=ins.reduce((a,e)=>a+e.l,0),R=ins.reduce((a,e)=>a+e.r,0);return {n,all:n===hist,L,R,ql:L/n,qr:R/n,cnt:ins.length}});
+}
+function oilChart(ev,from,to){
+  const W=680,H=250,pl=46,pr=14,pt=24,pb=32,iw=W-pl-pr,ih=H-pt-pb;
+  const inw=ev.filter(e=>e.fh>=from-1e-9);
+  let cl=0,cr=0;const pts=inw.map(e=>({fh:e.fh,cl:(cl+=e.l),cr:(cr+=e.r),e}));
+  const mx=niceMax(Math.max(0.1,cl,cr));const span=Math.max(1,to-from);
+  const X=fh=>pl+(fh-from)/span*iw,Y=v=>pt+ih-(v/mx)*ih;
+  const step=(key)=>{let d=`M${X(from).toFixed(1)},${Y(0).toFixed(1)}`;let prev=0;for(const p of pts){d+=`H${X(p.fh).toFixed(1)}V${Y(p[key]).toFixed(1)}`;prev=p[key]}d+=`H${X(to).toFixed(1)}`;return d};
+  const yt=[0,mx/2,mx];const xs=[from,from+span/2,to];
+  const dot=(p,key,c,side)=>`<circle cx="${X(p.fh).toFixed(1)}" cy="${Y(p[key]).toFixed(1)}" r="3.5" fill="${c}"><title>${fmtDate(p.e.date)} · TTAF ${p.fh.toFixed(1)} FH · ${side} +${side==='L'?p.e.l:p.e.r} l · ${esc(p.e.who)}${p.e.pending?' (čeká na další let)':''}</title></circle>`;
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Doplněný olej v litrech, součet od začátku období, podle letových hodin – levý a pravý motor">
+    ${yt.map(t=>`<line x1="${pl}" x2="${W-pr}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-6}" y="${Y(t)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${t%1?t.toFixed(1):t}</text>`).join('')}<text x="2" y="${pt-12}" text-anchor="start" font-size="10.5" fill="var(--muted)">litry</text>
+    ${xs.map((t,i)=>`<text x="${X(t)}" y="${H-10}" text-anchor="${i===0?'start':i===2?'end':'middle'}" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${Math.round(t)} FH</text>`).join('')}
+    <path d="${step('cl')}" fill="none" stroke="var(--s1)" stroke-width="2.2"/><path d="${step('cr')}" fill="none" stroke="var(--s2)" stroke-width="2.2" stroke-dasharray="6 3"/>
+    ${pts.map(p=>(p.e.l?dot(p,'cl','var(--s1)','L'):'')+(p.e.r?dot(p,'cr','var(--s2)','P'):'')).join('')}
   </svg></div>`;
 }
 function viewOil(ac){
-  const rows=oilData(ac);const withOil=rows.filter(r=>r.n);
-  const head=`<div class="panel-head"><div><p class="label">Spotřeba oleje</p><h2>${esc(ac.reg)} · l na letovou hodinu</h2></div></div>`;
-  if(!withOil.length)return `<div class="panel">${head}<p class="muted">Zatím žádné doplnění oleje. Zapisuje se při uzavření letu („Olej doplněn L/P“) nebo při denní prohlídce, ve tvaru „0.5 / 0“.</p></div>`;
-  const last=rows.slice(-12);const tl=withOil.reduce((a,r)=>a+r.l,0),tr=withOil.reduce((a,r)=>a+r.r,0),fh=rows.reduce((a,r)=>a+r.fh,0);
+  const ev=oilEvents(ac);
+  const head=`<div class="panel-head"><div><p class="label">Spotřeba oleje</p><h2>${esc(ac.reg)} · doplněný olej podle letových hodin</h2></div></div>`;
+  if(!ev.length)return `<div class="panel">${head}<p class="muted">Zatím žádné doplnění oleje. Zapisuje se při uzavření letu, při prohlídce nebo tlačítkem Doplnění oleje.</p></div>`;
+  const rates=oilRates(ac,ev);const end=ac.air/60;
+  const per=x=>x>0?`1 litr za ${Math.round(1/x)} FH`:'–';
+  const sel=rates.find(r=>r.n===100)||rates[rates.length-1]||{n:end,all:true};const from=Math.max(0,end-sel.n);
+  const rt=rates.length?`<div class="scroll-x"><table class="plain"><thead><tr><th>Období</th><th class="r">Doplněno L / P (l)</th><th class="r">L l/FH</th><th class="r">P l/FH</th><th>Odpovídá</th></tr></thead><tbody>${rates.map(r=>`<tr><td>${r.all?`vše v e-deníku (${r.n.toFixed(1)} FH)`:`posledních ${r.n} FH`}</td><td class="r mono">${Math.round(r.L*10)/10} / ${Math.round(r.R*10)/10}</td><td class="r mono">${r3(r.ql)}</td><td class="r mono">${r3(r.qr)}</td><td>L: ${per(r.ql)} · P: ${per(r.qr)}</td></tr>`).join('')}</tbody></table></div>`:'';
+  const list=[...ev].reverse().slice(0,15);
   return `<div class="panel">${head}
-    <div class="legend"><span><i style="background:var(--s1)"></i>Levý motor · celkem ${fh?(tl/fh).toFixed(3):'–'} l/FH</span><span><i style="background:var(--s2)"></i>Pravý motor · celkem ${fh?(tr/fh).toFixed(3):'–'} l/FH</span></div>
-    ${oilChart(last)}
-    <div class="scroll-x"><table class="plain"><thead><tr><th>Měsíc</th><th class="r">Let (FH)</th><th class="r">Olej L (l)</th><th class="r">Olej P (l)</th><th class="r">L l/FH</th><th class="r">P l/FH</th></tr></thead><tbody>${[...rows].reverse().map(r=>`<tr><td class="mono">${r.k.slice(5)}/${r.k.slice(0,4)}</td><td class="r mono">${r.fh.toFixed(1)}</td><td class="r mono">${r.l||'–'}</td><td class="r mono">${r.r||'–'}</td><td class="r mono">${r.ql!=null&&r.n?r.ql.toFixed(3):'–'}</td><td class="r mono">${r.qr!=null&&r.n?r.qr.toFixed(3):'–'}</td></tr>`).join('')}</tbody></table></div>
-    <p class="muted">Rostoucí spotřeba na jednom motoru bývá časný signál problému. Limity spotřeby jsou v EMM motoru.</p></div>`;
+    <div class="legend"><span><i style="background:var(--s1)"></i>Levý motor</span><span><i style="background:var(--s2)"></i>Pravý motor (čárkovaně)</span><span class="muted">součet doplněného oleje za ${sel.all?'celé období':'posledních '+sel.n+' FH'} · strmější čára = vyšší spotřeba</span></div>
+    ${oilChart(ev,from,end)}
+    ${rt}
+    <p class="label" style="margin-top:12px">Doplnění${ev.length>15?` – posledních 15 z ${ev.length}`:''}</p>
+    <div class="scroll-x"><table class="plain"><thead><tr><th>Datum</th><th class="r">TTAF (FH)</th><th class="r">L (l)</th><th class="r">P (l)</th><th>Kdo</th><th>Let</th></tr></thead><tbody>${list.map(e=>`<tr><td class="mono">${fmtDate(e.date)}${e.time?' '+esc(e.time)+'Z':''}</td><td class="r mono">${e.fh.toFixed(1)}</td><td class="r mono">${e.l||'–'}</td><td class="r mono">${e.r||'–'}</td><td>${esc(e.who)}</td><td>${e.pending?'<span class="ann info">čeká na další let</span>':esc(e.leg||'')}</td></tr>`).join('')}</tbody></table></div>
+    <p class="muted">Spotřeba = doplněný olej ÷ nalétané hodiny v období. Rostoucí spotřeba na jednom motoru bývá časný signál problému; limity jsou v EMM motoru.</p></div>`;
+}
+
+/* --- inspections before / after flight: overview for CAMO (list, wear trends, oil) --- */
+// cycles of the aircraft at a moment: after the last signed flight that ended before it
+function cycAt(ac,iso){let c=null;for(const l of ac.legs){if(l.void||l.state==='open')continue;const t=legStartISO(l);if(t&&t<=iso)c=l.tcyc}return c}
+function inspList(ac){return Object.values(S.svc).filter(r=>r.acId===ac.acId).sort((a,b)=>(a.date+(a.time||''))<(b.date+(b.time||''))?1:-1)}
+// one chart per group: tyres (nose, L, R), brakes (L, R), oxygen – value by date, one line per measurement
+function wearChart(list,keys,title,unit){
+  const pts=keys.map(([k,lb],i)=>({k,lb,c:`var(--s${i+1})`,p:list.filter(r=>r.meas&&r.meas[k]!=null&&r.meas[k]!=='').map(r=>({d:r.date,t:Date.parse(r.date+'T'+(r.time||'12:00')+':00Z'),v:+r.meas[k]})).filter(x=>!isNaN(x.v)).sort((a,b)=>a.t-b.t)}));
+  const all=pts.flatMap(s=>s.p);if(!all.length)return '';
+  const W=640,H=190,pl=42,pr=10,pt=12,pb=26,iw=W-pl-pr,ih=H-pt-pb;
+  const t0=Math.min(...all.map(x=>x.t)),t1=Math.max(...all.map(x=>x.t)),span=Math.max(1,t1-t0);
+  let lo=Math.min(...all.map(x=>x.v)),hi=Math.max(...all.map(x=>x.v));if(hi-lo<1){lo-=0.5;hi+=0.5}const pad=(hi-lo)*0.1;lo=Math.max(0,lo-pad);hi+=pad;
+  const X=t=>pl+(all.length===1?iw/2:(t-t0)/span*iw),Y=v=>pt+ih-(v-lo)/(hi-lo)*ih;
+  const ticks=[lo,(lo+hi)/2,hi];const days=[...new Set(all.map(x=>x.d))].sort();const lab=[days[0],days[days.length-1]].filter((x,i,a)=>a.indexOf(x)===i);
+  const sum=pts.filter(s=>s.p.length).map(s=>{const a=s.p[0],b=s.p[s.p.length-1];const dv=b.v-a.v;return `${esc(s.lb)} <b class="mono">${b.v}</b> ${unit}${s.p.length>1?` <span class="mono">(${dv>0?'+':''}${Math.round(dv*10)/10} od ${fmtDate(a.d)})</span>`:''}`}).join(' · ');
+  return `<div class="wear-card"><h3>${esc(title)}</h3><div class="legend">${pts.filter(s=>s.p.length).map(s=>`<span><i style="background:${s.c}"></i>${esc(s.lb)}</span>`).join('')}</div>
+    <div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)} – vývoj podle data prohlídky">
+    ${ticks.map(t=>`<line x1="${pl}" x2="${W-pr}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-6}" y="${Y(t)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${Math.round(t*10)/10}</text>`).join('')}
+    ${lab.map((d,i)=>`<text x="${X(Date.parse(d+'T12:00:00Z'))}" y="${H-8}" text-anchor="${lab.length===1?'middle':i?'end':'start'}" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${fmtDate(d).slice(0,5)}</text>`).join('')}
+    ${pts.map(s=>s.p.length?`<polyline fill="none" stroke="${s.c}" stroke-width="2" points="${s.p.map(x=>X(x.t).toFixed(1)+','+Y(x.v).toFixed(1)).join(' ')}"/>${s.p.map(x=>`<circle cx="${X(x.t).toFixed(1)}" cy="${Y(x.v).toFixed(1)}" r="3.2" fill="${s.c}"><title>${esc(s.lb)} ${fmtDate(x.d)}: ${x.v} ${unit}</title></circle>`).join('')}`:'').join('')}
+    </svg></div><p class="wear-sum">${sum}</p></div>`;
+}
+function viewInspections(ac){
+  const all=inspList(ac);const per=UI.inspPer||'90';const cut=per==='all'?'':addDays(todayISO(),-(+per));
+  const list=all.filter(r=>!cut||r.date>=cut);
+  const segs=[['30','30 dní'],['90','90 dní'],['365','Rok'],['all','Vše']].map(([k,t])=>`<button type="button" class="${per===k?'on':''}" data-act="insp-per" data-id="${k}">${t}</button>`).join('');
+  const mcell=(r,k)=>{const v=r.meas&&r.meas[k];return v==null||v===''?'<span class="muted">–</span>':esc(v)};
+  const rows=list.map(r=>{const it=Object.values(r.items||{});const nf=svcOpenFlags(r).length;const fl=it.filter(x=>x.flag).length;const cyc=cycAt(ac,r.date+'T'+(r.time||'23:59'));
+    return `<tr class="tap" data-act="svc-detail" data-id="${esc(r.insId)}"><td class="mono">${fmtDate(r.date)} ${esc(r.time||'')}</td><td><span class="ann ${nf?'caution':'ok'}">${r.kind==='SVC_PRE'?'Před letem':'Po letu'}</span></td><td>${esc(r.name)}</td><td class="r mono">${cyc??'–'}</td><td class="r mono">${it.filter(x=>x.done).length}/${it.length}</td><td class="r mono">${fl?`${fl}${nf?` <span class="ann caution">${nf} otevř.</span>`:''}`:'–'}</td><td class="r mono">${r.oil?esc(r.oil):'–'}</td>${SVC_MEAS.map(m=>`<td class="r mono">${mcell(r,m[0])}</td>`).join('')}</tr>`}).join('');
+  const head=`<div class="panel-head"><div><p class="label">Prohlídky před a po letu</p><h2>${esc(ac.reg)} · ${list.length} ${list.length===1?'prohlídka':list.length<5&&list.length?'prohlídky':'prohlídek'}</h2></div><div class="chips"><div class="seg">${segs}</div><button class="btn sm" data-act="export-insp">Export CSV</button></div></div>`;
+  const table=list.length?`<div class="scroll-x"><table class="plain insp-tab"><thead><tr><th>Datum / UTC</th><th>Druh</th><th>Technik</th><th class="r">Cykly</th><th class="r">Provedeno</th><th class="r">Nedostatky</th><th class="r">Olej L / P (l)</th>${SVC_MEAS.map(m=>`<th class="r">${esc(m[1])}<br><small>${m[2]}</small></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div><p class="muted">Klepnutím na řádek se otevře celý záznam prohlídky. Cykly = stav letadla v době prohlídky.</p>`:`<div class="empty"><p>V tomto období žádná prohlídka.</p></div>`;
+  const m=k=>SVC_MEAS.find(x=>x[0]===k);
+  const charts=[wearChart(list,[['tn',m('tn')[1]],['tl',m('tl')[1]],['tr',m('tr')[1]]],'Pneumatiky – hloubka dezénu','mm'),wearChart(list,[['bl',m('bl')[1]],['br',m('br')[1]]],'Brzdy – indikátor opotřebení','mm'),wearChart(list,[['o2',m('o2')[1]]],'Kyslík – tlak láhve','psi')].filter(Boolean).join('');
+  return `<div class="panel">${head}${table}</div>
+    <div class="panel"><div class="panel-head"><div><p class="label">Opotřebení</p><h2>${esc(ac.reg)} · vývoj měření z prohlídek</h2></div></div>
+    ${charts?`<div class="wear-grid">${charts}</div><p class="muted">Hodnoty zapsané technikem při prohlídce. Limity jsou v AMM.</p>`:'<p class="muted">Zatím žádná měření – zapisují se při prohlídce (pneumatiky, brzdy, kyslík).</p>'}</div>
+    ${viewOil(ac)}`;
+}
+function exportInsp(){
+  const ac=S.ac[UI.acId];if(!ac)return;const rows=[['datum','cas_utc','druh','technik','cykly','provedeno','celkem_bodu','nedostatky','olej_L_P'].concat(SVC_MEAS.map(m=>m[0]+'_'+m[2])).concat(['poznamka'])];
+  for(const r of inspList(ac)){const it=Object.values(r.items||{});rows.push([r.date,r.time||'',r.kind==='SVC_PRE'?'pred_letem':'po_letu',r.name,cycAt(ac,r.date+'T'+(r.time||'23:59'))??'',it.filter(x=>x.done).length,it.length,Object.entries(r.items||{}).filter(([,x])=>x.flag).map(([k,x])=>svcItemTitle(k,r.kind)+(x.note?': '+x.note:'')).join('; '),r.oil||''].concat(SVC_MEAS.map(m=>r.meas&&r.meas[m[0]]!=null?r.meas[m[0]]:'')).concat([r.notes||'']))}
+  saveFile(`ATL_${ac.reg}_prohlidky_${todayISO()}.csv`,'﻿'+csv(rows));
 }
 
 /* --- search across the log --- */
@@ -3709,6 +3778,8 @@ document.addEventListener('click',e=>{
     case 'export-json':exportJson();break;
     case 'export-legs':exportLegs();break;
     case 'export-month':exportMonth();break;
+    case 'export-insp':exportInsp();break;
+    case 'insp-per':UI.inspPer=id;render();break;
     case 'today':{const el=document.getElementById(id);if(el){el.value=fmtDate(todayISO());el.dispatchEvent(new Event('input',{bubbles:true}))}break}
     case 'add-defrow':{const box=document.getElementById('def-rows');box.insertAdjacentHTML('beforeend',defRowHtml());const n=document.getElementById('nil-note');if(n)n.hidden=true;const ta=box.lastElementChild.querySelector('textarea');if(ta)ta.focus();break}
     case 'del-defrow':{t.closest('.def-row').remove();const n=document.getElementById('nil-note');if(n)n.hidden=!!document.querySelector('.def-row');break}
