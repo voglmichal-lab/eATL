@@ -169,7 +169,7 @@ function rebuild(){
       case 'leg.sign':{const ex=s.legs[p.legId];s.legs[p.legId]=Object.assign({},ex||{},p,{state:'closed',signed:who,history:ex?ex.history:[],ev:e.id,openEv:ex?ex.openEv:null,opened:ex?ex.opened:null});break}
       case 'leg.amend':{const l=s.legs[p.legId];if(!l)break;const prev={};for(const k in p.changes)prev[k]=l[k];Object.assign(l,p.changes);l.history.push(Object.assign({},who,{reason:p.reason,changes:p.changes,prev}));break}
       case 'leg.void':{const l=s.legs[p.legId];if(l)l.void=Object.assign({},who,{reason:p.reason});break}
-      case 'leg.split':{const l=s.legs[p.legId];if(!l)break;const nm=x=>x?(x.acc==='basic'?'ano – jiné ubytování':'ano – vhodné ubytování'):'ne';l.history.push(Object.assign({},who,{reason:'Split duty'+(p.reason?' – '+p.reason:''),changes:{split:nm(p.split)},prev:{split:nm(l.split)}}));l.split=p.split||null;break}
+      case 'leg.split':{const l=s.legs[p.legId];if(!l)break;const nm=x=>x?(x.acc==='basic'?'ano – jiné ubytování':'ano'):'ne';l.history.push(Object.assign({},who,{reason:'Split duty'+(p.reason?' – '+p.reason:''),changes:{split:nm(p.split)},prev:{split:nm(l.split)}}));l.split=p.split||null;break}
       case 'oil.add':s.oilAdds[p.svcId]=Object.assign({},p,{who,at:e.at});break;
       case 'daily.sign':{const k=p.acId+'|'+p.date;const r=Object.assign({},p,who);(s.daily[k]=s.daily[k]||[]).push(r);if(p.insId)s.svc[p.insId]=r;break}
       case 'svc.resolve':s.svcRes[p.insId+'|'+p.key]=Object.assign({note:p.note||''},who);break;
@@ -848,7 +848,7 @@ function viewFtl(u){
     const since=last?Math.max(0,Math.round((now-last.endMs)/6e4)):null;
     return `<tr class="tap" data-act="ftl-user" data-id="${esc(x.userId)}" role="button" tabindex="0"><td><b>${esc(x.name)}</b><br><span class="muted" style="font-size:.84rem">${x.roles.filter(r=>r==='crew'||r==='cabin').map(r=>ROLE[r]).join(', ')}</span></td>
       <td>${last?`${fmtDate(last.dateLocal)} · <span class="mono">${esc(last.route)}</span><br><span class="mono" style="font-size:.86rem">FDP ${hm(last.fdp)} / ${hm(last.maxFdp)}</span>`:'<span class="muted">zatím bez letů</span>'}</td>
-      <td class="mono">${since!=null?hm(since):'–'}</td>
+      <td class="mono">${since==null?'–':since>24*60?`<span title="${hm(since)}">&gt;24h</span>`:hm(since)}</td>
       ${Object.keys(LIMH).map(k=>`<td class="r mono"><span class="ftl-v ${limCls(r.now[k],LIMH[k])}">${hm(r.now[k])}</span></td>`).join('')}
       <td>${nf?`<span class="ann warn">${nf}× nález</span>`:r.duties.length?'<span class="ann ok">v limitu</span>':''}</td></tr>`}).join('');
   return `<div class="panel"><div class="panel-head"><div><p class="label">Doba letu a služby · ${esc(FTL_RULES[S.cfg.ftlRules]||'')}</p><h2>Posádky</h2></div><button class="btn sm" data-act="ftl-export">Export CSV (pro Fl3xx)</button></div>
@@ -863,7 +863,7 @@ function viewFtlPerson(id,u){
   const tiles=FTL_LIM.map(([k,l])=>{const lim=LIMH[k],v=r.now[k],pk=r.peak[k];const pct=Math.min(100,Math.round(v/(lim*60)*100));
     return `<div class="ftl-tile ${limCls(v,lim)}"><span class="label">${l}</span><b class="mono">${hm(v)}</b><span class="muted" style="font-size:.84rem">limit ${lim} h</span><div class="bar"><i style="width:${pct}%"></i></div>${pk&&pk.t&&pk.v>v?`<span class="muted" style="font-size:.78rem">nejvíc ${hm(pk.v)} · ${fmtTs(new Date(pk.t).toISOString())}</span>`:''}</div>`}).join('');
   const row=d=>{const fc=d.flags.includes('fdp')?'warn':d.fdp>=d.maxFdp*0.95?'caution':'';
-    const chips=[...d.tags.map(t=>`<span class="ann info">${FTL_TAG[t]}</span>`),...d.flags.map(f=>`<span class="ann warn">${FTL_FLAG[f]}</span>`),d.split&&d.split.valid?`<span class="ann ok">split ${hm(d.split.brk)} · ${SPLIT_ACC[d.split.acc]||''}</span>`:'',d.accl&&d.accl!=='A'?`<span class="ann caution">aklimatizace ${d.accl}</span>`:''].filter(Boolean).join(' ');
+    const chips=[...d.tags.map(t=>`<span class="ann info">${FTL_TAG[t]}</span>`),...d.flags.map(f=>`<span class="ann warn">${FTL_FLAG[f]}</span>`),d.split&&d.split.valid?`<span class="ann ok">split ${hm(d.split.brk)}${SPLIT_ACC[d.split.acc]?' · '+SPLIT_ACC[d.split.acc]:''}</span>`:'',d.accl&&d.accl!=='A'?`<span class="ann caution">aklimatizace ${d.accl}</span>`:''].filter(Boolean).join(' ');
     return `<tr class="${d.flags.length?'bad':''}"><td class="mono">${fmtDate(d.dateLocal)}</td><td class="mono">${d.reportLocal} <span class="muted">/ ${hmUtc(d.reportMs)}Z</span></td><td>${d.sectors} · <span class="mono">${esc(d.route)}</span></td>
       <td class="r mono"><span class="ftl-v ${fc}">${hm(d.fdp)}</span> / ${hm(d.maxFdp)}${d.ext?`<br><small class="muted">vč. split +${hm(d.ext)}</small>`:''}</td><td class="r mono">${hm(d.duty)}</td><td class="r mono">${hm(d.block)}</td>
       <td class="r mono">${d.restBefore?`${hm(d.restBefore.min)} / ${hm(d.restBefore.req)}`:'–'}</td><td class="r mono">${d.wocl?hm(d.wocl):'–'}</td>
@@ -2100,7 +2100,7 @@ function evText(e){
     case 'leg.amend':return `${reg}Oprava letu – ${esc(Object.keys(p.changes||{}).join(', '))}. Důvod: ${esc(p.reason)}`;
     case 'leg.void':return `${reg}Let zneplatněn. Důvod: ${esc(p.reason)}`;
     case 'crew.login':return `${reg}Přihlášení na iPadu letadla`;
-    case 'leg.split':return `${reg}Split duty po letu ${esc((S.legs[p.legId]||{}).from||'')}–${esc((S.legs[p.legId]||{}).to||'')}: ${p.split?(p.split.acc==='basic'?'ano, jiné ubytování':'ano, vhodné ubytování'):'zrušena'}${p.reason?' – '+esc(p.reason):''}`;
+    case 'leg.split':return `${reg}Split duty po letu ${esc((S.legs[p.legId]||{}).from||'')}–${esc((S.legs[p.legId]||{}).to||'')}: ${p.split?(p.split.acc==='basic'?'ano, jiné ubytování':'ano'):'zrušena'}${p.reason?' – '+esc(p.reason):''}`;
     case 'crs.prep':return `${reg}Připraveno k uvolnění (čeká na podpis osvědčujícího personálu): ${p.kind==='rect'?'odstranění závady '+esc((S.defects[p.defId]||{}).no||'')+' – '+esc(p.action):esc(p.scope||'WO '+(p.wo||''))}`;
     case 'crs.prep.drop':return `${reg}Příprava uvolnění zrušena${p.reason?' – '+esc(p.reason):''}`;
     case 'oil.add':return `${reg}Doplněn olej L ${esc(p.l)} l · P ${esc(p.r)} l${p.note?' – '+esc(p.note):''}`;
@@ -2468,15 +2468,14 @@ function oilJoin(L,R){const q=x=>{const t=String(x==null?'':x).replace(',','.').
   const a=q(L),b=q(R);if(a>10||b>10)fail('Tolik oleje se nedoplňuje – zkontrolujte hodnotu (zadává se v litrech).');return a||b?`${a} / ${b}`:''}
 // split duty is declared on the flight after which the break starts; it ends with the next flight of that crew
 function splitOf(get){if(!S.cfg.splitDuty)return null;const sp=get('split');return sp===true||sp==='1'||sp==='on'?{acc:get('splitAcc')==='basic'?'basic':'suitable'}:null}
-const SPLIT_ACC={suitable:'vhodné ubytování',basic:'jiné ubytování'};
+const SPLIT_ACC={suitable:'',basic:'jiné ubytování'};
 function splitBox(kind,on,acc,LK,force){if(!S.cfg.splitDuty&&!on&&!force)return '';
   const a=kind==='of'?(k=>`data-of="x_${k}"`):kind==='k'?(k=>`data-k="${k}"`):(k=>`id="f-${k.toLowerCase()}"`);
   return `<div class="split-box"><label class="check"><input type="checkbox" ${a('split')} ${on?'checked':''} ${LK?'disabled':''}><span><b>Po tomto letu následuje přerušení služby (split duty)</b></span></label>
-    <label class="fld split-acc" ${on?'':'hidden'}><span>Ubytování během přerušení</span><select ${a('splitAcc')} ${LK?'disabled':''}><option value="suitable" ${acc!=='basic'?'selected':''}>Vhodné ubytování (hotel, pokoj s lůžkem)</option><option value="basic" ${acc==='basic'?'selected':''}>Jiné ubytování (místnost k odpočinku)</option></select></label>
     <p class="muted" style="font-size:.84rem;margin:0">Přerušení začne on-blockem tohoto letu a skončí nástupem na další let posádky. Aby se FDP prodloužila, musí trvat aspoň 3 h po odečtení ${esc(S.cfg.splitPrePost??30)} min na povinnosti (CS FTL.1.220).</p></div>`}
 // the aircraft's last flight opened a split duty that the next flight closes
 function splitNote(ac){const l=ac&&ac.lastLeg;if(!l||!l.split)return '';const t=ETL_FTL.legTimes(l);if(!t||Date.now()-t.inMs>18*3600e3)return '';
-  return `<div class="warnline info" style="margin:0"><b>Pokračuje služba po přerušení (split duty)</b> – přerušení od on-block ${esc(l.in)}Z (${SPLIT_ACC[l.split.acc]||''}). Skončí nástupem na tento let.</div>`}
+  return `<div class="warnline info" style="margin:0"><b>Pokračuje služba po přerušení (split duty)</b> – přerušení od on-block ${esc(l.in)}Z${SPLIT_ACC[l.split.acc]?' ('+SPLIT_ACC[l.split.acc]+')':''}. Skončí nástupem na tento let.</div>`}
 function openSplitForm(legId){const l=S.legs[legId];const u=me();if(!l||!can.splitEdit(u,l))return;
   openSheet('Split duty – '+l.from+' → '+l.to+' · '+fmtDate(l.date),`${S.cfg.splitDuty?'':'<div class="warnline caution">Provozní příručka split duty nepovoluje (Nastavení) – ve výpočtu se nepoužije.</div>'}${splitBox('id',!!l.split,l.split&&l.split.acc,false)}${F.text('f-reason','Důvod změny (nepovinné)','')}`,{submit:'Uložit',sign:true,
     live:()=>{const c=document.getElementById('f-split');const a=document.querySelector('#sheet .split-acc');if(c&&a)a.hidden=!c.checked},
@@ -2873,7 +2872,7 @@ function openLegDetail(id){
     ${l.opened?`<dt>Před odletem</dt><dd>${esc(l.opened.name)} · ${fmtTs(l.opened.at)} · <span class="mono">${esc(l.opened.dev)}</span></dd>`:''}
     ${l.signed?`<dt>Let podepsal</dt><dd>${esc(l.signed.name)} · ${fmtTs(l.signed.at)} · <span class="mono">${esc(l.signed.dev)}</span></dd>`:''}
     ${l.paper?`<dt>Zdroj</dt><dd>Přepis z papírové stránky ${esc(l.paper.page)}</dd>`:''}
-    ${!isOpen&&(S.cfg.splitDuty||l.split)?`<dt>Split duty</dt><dd>${l.split?'po tomto letu přerušení služby – '+esc(SPLIT_ACC[l.split.acc]||''):'ne'}${can.splitEdit(u,l)?` <button type="button" class="linkbtn" style="display:inline;min-height:0;padding:0 0 0 6px" data-act="split-form" data-id="${esc(l.legId)}">upravit</button>`:''}</dd>`:''}
+    ${!isOpen&&(S.cfg.splitDuty||l.split)?`<dt>Split duty</dt><dd>${l.split?'po tomto letu přerušení služby'+(SPLIT_ACC[l.split.acc]?' – '+esc(SPLIT_ACC[l.split.acc]):''):'ne'}${can.splitEdit(u,l)?` <button type="button" class="linkbtn" style="display:inline;min-height:0;padding:0 0 0 6px" data-act="split-form" data-id="${esc(l.legId)}">upravit</button>`:''}</dd>`:''}
     ${l.void?`<dt>Zneplatněno</dt><dd>${esc(l.void.name)} · ${fmtTs(l.void.at)} – ${esc(l.void.reason)}</dd>`:''}
   </dl>${hist?`<div><p class="label">Historie oprav</p><ul>${hist}</ul></div>`:''}
   ${lc.length?`<div><p class="label">Uvolnění do provozu po tomto letu</p><ul>${lc.map(c=>`<li><b>${esc(c.t)}</b>${c.wo?' · WO '+esc(c.wo):''} – ${esc(c.name)} (${esc(c.licence||'–')}), ${fmtTs(c.at)}</li>`).join('')}</ul></div>`:''}

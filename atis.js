@@ -988,7 +988,7 @@ function renderNum() {
 let DRAFT = null;
 function cfgInner() {
   const c = DRAFT;
-  return `<div class="ak-presets"><span class="label">Předvolby</span><button type="button" class="btn sm" data-ak-preset="icao">ICAO / Evropa</button><button type="button" class="btn sm" data-ak-preset="us">USA – počasí před dráhou</button></div>
+  return `<div class="ak-presets"><button type="button" class="linkbtn" data-ak-preset="icao">Obnovit výchozí pořadí</button></div>
     <div class="ak-cfg">${Object.keys(DEF).map(t => `<div><p class="label">${TYPE_NAME[t]}</p><ol>${c[t].map((x, i) => {
       const d = DEF[t][x.k];
       return `<li class="ak-crow${x.on ? '' : ' off'}"><label><input type="checkbox" data-ak-cfg="${t}|${x.k}"${x.on ? ' checked' : ''}>${esc(d.l)}</label><span class="muted">${d.d ? esc(d.d) : d.skip ? 'přes tlačítko' : ''}</span><span class="sp"></span><button type="button" class="ak-mv" data-ak-mv="${t}|${x.k}|-1" aria-label="${esc(d.l)} výš"${i === 0 ? ' disabled' : ''}>↑</button><button type="button" class="ak-mv" data-ak-mv="${t}|${x.k}|1" aria-label="${esc(d.l)} níž"${i === c[t].length - 1 ? ' disabled' : ''}>↓</button></li>`;

@@ -1,0 +1,28 @@
+eTechLog – změna Z-056
+Verze: 0.7.18 (navazuje na Z-055 / 0.7.17)
+Datum: 2026-11-23
+
+- Můj účet → Zápis ATIS a clearance: odebrány předvolby „ICAO / Evropa“ a „USA – počasí před dráhou“.
+  Místo nich je jen odkaz „Obnovit výchozí pořadí“ (vrátí pořadí a výběr polí do výchozího stavu).
+  Kdo si dřív zvolil USA, má své pořadí dál, dokud ho neobnoví nebo nezmění.
+
+Návrat
+- Na 0.7.17: eatl-Z-055-v0.7.17.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-056.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js
