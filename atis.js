@@ -720,6 +720,8 @@ function renderDock() {
   requestAnimationFrame(() => { document.body.style.paddingBottom = (d.offsetHeight + 16) + 'px'; if (was || VIS !== f.key + f.o.ofpId) { VIS = f.key + f.o.ofpId; ensureVisible(domId(f.o, f.key)) } });
 }
 // the note on the eTechLog keypad: letters, digits and a space (TWY _ CLSD puts the cursor where the taxiway goes)
+// the frequency being typed right after FREQ in a note ("…, FREQ 133.3" → "133.3"), else null
+const noteFreq = before => { const m = /(^|[ ,])FREQ ([\d.]*)$/.exec(before); return m ? m[2] : null };
 function renderNote(f) {
   const d = dockEl(), note = f.st.note, pos = Math.max(0, Math.min(ACT.pos == null ? note.length : ACT.pos, note.length));
   d.querySelector('#ak-title').textContent = FIELDS[f.key].title + ' · POZNÁMKA';
@@ -730,6 +732,12 @@ function renderNote(f) {
   ctx.innerHTML = Object.keys(PHON).map(x => keyBtn('nt:' + x, x, 't', PHON[x])).join('') + keyBtn('nt:/', '/', 't') + keyBtn('nt:,', ',', 't');
   d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('nt:' + n, n)).join('') + keyBtn('nt:-', '−') + keyBtn('nt:0', '0') + keyBtn('nt:.', '.');
   d.querySelector('#ak-act').innerHTML = keyBtn('bk', '⌫', 'bk', 'smazat') + keyBtn('nt: ', 'Mezera', 't nx') + keyBtn('done', 'Hotovo', 't okk');
+  // right after FREQ: the frequency – digits lit, letters dimmed (still usable), the dot comes by itself after three digits
+  if (noteFreq(note.slice(0, pos)) != null) {
+    d.querySelectorAll('#ak-ctx [data-ak]').forEach(b => b.classList.add('dim'));
+    d.querySelectorAll('#ak-dig [data-ak]').forEach(b => b.classList.add(/^nt:[\d.]$/.test(b.dataset.ak) ? 'go' : 'dim'));
+    if (!HINT) hint.insertAdjacentHTML('beforeend', ' <small class="ak-fq">frekvence – tečka se doplní sama</small>');
+  }
   const was = d.hidden; d.hidden = false;
   requestAnimationFrame(() => { document.body.style.paddingBottom = (d.offsetHeight + 16) + 'px'; if (was || VIS !== 'n' + f.key + f.o.ofpId) { VIS = 'n' + f.key + f.o.ofpId; ensureVisible(domId(f.o, f.key)) } });
 }
@@ -747,7 +755,12 @@ function notePress(f, code) {
   let note = f.st.note, pos = Math.max(0, Math.min(ACT.pos == null ? note.length : ACT.pos, note.length));
   if (code === 'done') { note = note.replace(/ {2,}/g, ' ').replace(/ ,/g, ',').trim(); save(f.o, f.key, { v: f.v, note, prev: f.prev }); close(); return }
   if (code === 'bk') { if (pos > 0) { note = note.slice(0, pos - 1) + note.slice(pos); pos-- } }
-  else if (code.startsWith('nt:')) { const ch = code.slice(3); note = note.slice(0, pos) + ch + note.slice(pos); pos += ch.length }
+  else if (code.startsWith('nt:')) {
+    const ch = code.slice(3), fq = noteFreq(note.slice(0, pos));
+    // frequency after FREQ: 1 3 3 3 5 5 → 133.355 (a typed dot is not doubled, at most 3 + 3 digits)
+    if (fq != null && /^[\d.]$/.test(ch)) { const dg = fq.replace(/\D/g, ''); if (ch === '.' ? fq.includes('.') || dg.length !== 3 : dg.length >= 6) { renderDock(); return }
+      const add = ch !== '.' && dg.length === 3 && !fq.includes('.') ? '.' + ch : ch; note = note.slice(0, pos) + add + note.slice(pos); pos += add.length }
+    else { note = note.slice(0, pos) + ch + note.slice(pos); pos += ch.length } }
   ACT.pos = pos; save(f.o, f.key, { v: f.v, note, prev: f.prev }); refreshField(f.o.ofpId, f.key); renderDock();
 }
 function ensureVisible(id) {
@@ -796,6 +809,8 @@ const spc = s => s && !s.endsWith(' ') ? s + ' ' : s;
 function atcType(s, c) {
   const lw = s.slice(s.lastIndexOf(' ') + 1), word = ATC_W.includes(lw) || / ?OWN NAV$/.test(s);
   if (c === ' ') return spc(s);
+  // CLB right after DES (or DES after CLB) with nothing between = a slip corrected: the new word replaces the old one
+  if (c === 'CLB' || c === 'DES') { const m = /(^| )(CLB|DES) ?$/.exec(s); if (m) return s.slice(0, m.index) + m[1] + c }
   if (c === 'FL' || c === 'M.' || ATC_W.includes(c)) return spc(s) + c;
   if (/^\d$/.test(c)) {
     const fm = /(^| )FREQ ?([\d.]*)$/.exec(s);
@@ -835,6 +850,31 @@ function atcPress(code) {
   else if (code.startsWith('at:')) { const c = code.slice(3), was = ACT.cur; ACT.cur = atcType(ACT.cur, c); if (c === 'DCT') ACT.abc = true; if (ACT.cur === was && /^\d$/.test(c)) HINT = DIG_HINT.freq }
   atcRefresh(ACT); renderDock();
 }
+// ---- guidance: after a word, the keys that usually follow it are lit and the rest dimmed (still usable) ----
+// CLB / DES → FL or an altitude · HDG → LEFT / RIGHT and the heading · SPD → M. or knots · FREQ, QNH, SQ → digits ·
+// HOLD → the point (ABC) · EXPECT, MAINT → what is expected / kept. A value with all its digits = instruction complete → Přidat ›.
+const ATC_NEXT = { CLB: { t: ['FL'], d: 1 }, DES: { t: ['FL'], d: 1 }, HDG: { t: ['LEFT', 'RIGHT'], d: 1 }, LEFT: { t: ['HDG'], d: 1 }, RIGHT: { t: ['HDG'], d: 1 },
+  SPD: { t: ['M.'], d: 1 }, FREQ: { t: [], d: 1, dot: 1 }, QNH: { t: [], d: 1 }, SQ: { t: [], d: 1 }, HOLD: { t: [], d: 0, abc: 1 },
+  EXPECT: { t: ['CLB', 'DES', 'FL', 'DCT', 'HDG', 'SPD'], d: 1, abc: 1 }, MAINT: { t: ['FL', 'SPD', 'M.', 'HDG'], d: 1 } };
+// digits a value needs before the instruction is complete
+const ATC_MIN = { FL: 3, HDG: 3, LEFT: 3, RIGHT: 3, SPD: 3, FREQ: 6, QNH: 3, SQ: 4, CLB: 3, DES: 3, MAINT: 3, EXPECT: 3 };
+function atcGuide(s) {
+  const t = String(s || '').trim(); if (!t) return null;
+  if (/(^| )OWN NAV$/.test(t)) return { done: true };
+  const w = t.split(' '), last = w[w.length - 1], prev = w[w.length - 2];
+  if (last === 'FL') return { t: [], d: 1 };
+  let m = /^FL(\d+)$/.exec(last); if (m) return m[1].length < 3 ? { t: [], d: 1 } : { done: true };
+  m = /^M\.(\d*)$/.exec(last); if (m) return m[1].length < 2 ? { t: [], d: 1 } : { done: true };
+  if (ATC_NEXT[last]) return ATC_NEXT[last];
+  if (/^[\d.]+$/.test(last) && prev && ATC_MIN[prev] && last.replace(/\D/g, '').length < ATC_MIN[prev]) return { t: [], d: 1, dot: prev === 'FREQ' };
+  return { done: true };
+}
+function atcLight(d, cur) {
+  const g = atcGuide(cur); if (!g) return;
+  if (g.done) { const a = d.querySelector('#ak-act [data-ak="add"]'); if (a) a.classList.add('go'); return }
+  d.querySelectorAll('#ak-ctx [data-ak]').forEach(b => { const c = b.dataset.ak; const on = c === 'abc:' ? !!g.abc : c.startsWith('at:') && g.t.includes(c.slice(3)); b.classList.add(on ? 'go' : 'dim') });
+  d.querySelectorAll('#ak-dig [data-ak]').forEach(b => { const c = b.dataset.ak.slice(3); const on = /^\d$/.test(c) ? !!g.d : c === '.' && !!g.dot; b.classList.add(on ? 'go' : 'dim') });
+}
 function renderAtc() {
   const o = API.ofpOf(ACT.oid), id = nbId(ACT.oid, ACT.key), el = document.getElementById(id);
   const sheetOpen = !!document.querySelector('#sheet:not([hidden])');
@@ -853,6 +893,7 @@ function renderAtc() {
   else { ctx.className = 'ak-ctx c5'; ctx.innerHTML = grid(ATC_TOK, null, 'at:') + keyBtn('abc:', 'ABC', 't s2', 'písmena: bod, text') + keyBtn('at: ', 'MEZERA', 't sm s2') + keyBtn('at:OWN NAV', 'OWN NAV', 't sm', 'resume own') }
   d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('at:' + n, n)).join('') + keyBtn('at:.', '.') + keyBtn('at:0', '0') + keyBtn('at:/', '/');
   d.querySelector('#ak-act').innerHTML = keyBtn('bk', '⌫', 'bk', 'smazat') + keyBtn('add', 'Přidat ›', 't nx', 's časem UTC') + keyBtn('done', 'Hotovo', 't okk');
+  if (!ACT.abc) atcLight(d, cur);
   const was = d.hidden; d.hidden = false;
   requestAnimationFrame(() => { document.body.style.paddingBottom = (d.offsetHeight + 16) + 'px'; if (was || VIS !== id) { VIS = id; ensureVisible(id) } });
 }
@@ -879,6 +920,9 @@ function numPress(code) {
     if (nx) { const p = ACT; ACT = null; numLeave(p); nx.focus(); if (nx.matches('input.npad')) openNum(nx); else hideDock() } else { close(); try { el.blur() } catch (e) { } } return;
   }
   if (code === 'bk') { numSet(el, ACT.fresh ? '' : el.value.slice(0, -1)); ACT.fresh = false }
+  else if (code === 'n:now') {
+    // NOW = the current time in UTC; the event (off-block, take-off…) happens now, nothing else to type: the keypad closes
+    numSet(el, utcNow()); ACT.fresh = false; close(); try { el.blur() } catch (e) { } return }
   else if (code === 'n:ontime' || code === 'n:ok') {
     // ON TIME = the point's ETO as its ATO; OK = RVSM check in order – both move on like Další ›
     const v = code === 'n:ok' ? 'OK' : el.dataset.eto; if (!v) return; numSet(el, v); ACT.fresh = false;
@@ -890,6 +934,10 @@ function numPress(code) {
     numSet(el, cur === '' && d === '.' ? '0.' : cur + d); ACT.fresh = false }
   renderNum();
 }
+const utcNow = () => { const d = new Date(); return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0') };
+// the time shown under NOW follows the clock while the keypad is open
+let NOW_T = null;
+function nowTick() { if (NOW_T) return; NOW_T = setInterval(() => { const k = document.querySelector('#akdock:not([hidden]) .now-key small'); if (k) { const t = utcNow() + ' UTC'; if (k.textContent !== t) k.textContent = t } }, 5000) }
 function renderNum() {
   const el = numEl(ACT); const sheetOpen = !!document.querySelector('#sheet:not([hidden])');
   if (!el || el.readOnly || el.disabled || sheetOpen) { if (!el || el.readOnly || el.disabled) { const p = ACT; ACT = null; leave(p) } hideDock(); return }
@@ -902,7 +950,8 @@ function renderNum() {
   d.querySelector('#ak-chips').innerHTML = '';
   const ctx = d.querySelector('#ak-ctx'); ctx.className = 'ak-ctx read';
   // ON TIME (ATO = ETO) and OK (RVSM check) – one big key next to the value, easy to hit
-  const big = el.dataset.eto ? keyBtn('n:ontime', 'ON TIME', 't wide-act', 'ATO = ETO ' + el.dataset.eto) : el.dataset.ok ? keyBtn('n:ok', 'OK', 't wide-act', 'kontrola v pořádku') : '';
+  const big = el.dataset.eto ? keyBtn('n:ontime', 'ON TIME', 't wide-act', 'ATO = ETO ' + el.dataset.eto) : el.dataset.ok ? keyBtn('n:ok', 'OK', 't wide-act', 'kontrola v pořádku') : el.dataset.now ? keyBtn('n:now', 'NOW', 't wide-act now-key', utcNow() + ' UTC') : '';
+  if (el.dataset.now) nowTick();
   ctx.innerHTML = `<div class="ak-readout"><span class="sl">${esc(lab)}</span><span class="rv">${esc(el.value || '–')}</span></div>${big}`;
   d.querySelector('#ak-dig').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(n => keyBtn('n:' + n, n)).join('') + (el.dataset.dec ? keyBtn('n:.', '.', '', 'tečka', /\./.test(ACT.fresh ? '' : el.value)) : el.dataset.sign ? keyBtn('n:+', '+', '', 'plus') : '<span></span>') + keyBtn('n:0', '0') + (el.dataset.sign ? keyBtn('n:-', '−', '', 'minus') : '<span></span>');
   d.querySelector('#ak-act').innerHTML = keyBtn('bk', '⌫', 'bk', 'smazat') + keyBtn('next', 'Další ›', 't nx') + keyBtn('done', 'Hotovo', 't okk');
@@ -934,7 +983,8 @@ function bind(api) {
     if (b.dataset.ak != null) { press(b.dataset.ak); return }
     if (b.dataset.akSlot != null) { open(b.dataset.akO, b.dataset.akF, +b.dataset.akSlot); return }
     if (b.dataset.akRem != null) {
-      if (b.dataset.akRem.includes('_')) { openNote(b.dataset.akO, b.dataset.akF, b.dataset.akRem); return }
+      // a quick note ending in FREQ (or with _) opens the keypad at the place for the value: FREQ → the frequency digits
+      const rm = b.dataset.akRem; if (rm.includes('_') || /(^| )FREQ$/.test(rm.trim())) { openNote(b.dataset.akO, b.dataset.akF, rm.includes('_') ? rm : rm.trim() + ' _'); return }
       const f = ctxOf(b.dataset.akO, b.dataset.akF); if (!f) return;
       const note = (f.st.note.trim() ? f.st.note.trim() + ', ' : '') + b.dataset.akRem; save(f.o, f.key, { v: f.v, note, prev: f.prev });
       refreshField(f.o.ofpId, f.key); return;
@@ -975,6 +1025,6 @@ function after() { if (ACT) renderDock(); else hideDock() }
 return {
   bind, field, after, cfgEditor, cfgResult, lineOf, plan, FIELDS, openAtc, nbId, openNum,
   // for tests
-  _: { DEF, PRESETS, presetCfg, sanitize, empty, slotsOf, fmtSlot, outSlot, atomsStr, apply, setSlot, firstEmpty, nextIdx, fmtRoute, okDigit, fmtTrend, fmtVia, atcType, atcBack, atcCommit, fmtFreq, get ACT() { return ACT }, set ACT(x) { ACT = x }, get HINT() { return HINT } }
+  _: { DEF, PRESETS, presetCfg, sanitize, empty, slotsOf, fmtSlot, outSlot, atomsStr, apply, setSlot, firstEmpty, nextIdx, fmtRoute, okDigit, fmtTrend, fmtVia, atcType, atcBack, atcCommit, atcGuide, noteFreq, fmtFreq, get ACT() { return ACT }, set ACT(x) { ACT = x }, get HINT() { return HINT } }
 };
 })();

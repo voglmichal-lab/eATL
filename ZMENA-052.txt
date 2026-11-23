@@ -1,0 +1,33 @@
+eTechLog – změna Z-052
+Verze: 0.7.14 (navazuje na Z-051 / 0.7.13)
+Datum: 2026-11-23
+
+Mechanik a CRS – vedení přes závady:
+- V technickém deníku už u jednotlivých letů není tlačítko CRS. CRS se vydává z Detailu letu
+  (nebo jako dosud v záložce Uvolnění).
+- Detail letu, na kterém je zapsaná otevřená závada, nabídne jako první tlačítko
+  „Odstranit závadu UFF-001“ (CRS k závadě), teprve pod ním „Vydat CRS po tomto letu“.
+- Formulář obecného CRS vypíše všechny otevřené závady letadla, u každé tlačítko Odstranit závadu.
+  Obecné CRS se dá podepsat, jen když mechanik zaškrtne „Toto CRS se otevřených závad netýká (jiná údržba) –
+  závady zůstanou otevřené“. Tím se nestane, že CRS vyjde a závada dál svítí, aniž by o tom věděl.
+
+Návrat
+- Na 0.7.13: eatl-Z-051-v0.7.13.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-052.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

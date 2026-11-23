@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.7.9"}
+:root{--etl-build:"0.7.14"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -348,7 +348,7 @@ table.ofplog tr.rvsmrow input{width:80px}
 .big-static .linkbtn{font-family:var(--f-body);font-size:.9rem}
 details summary{list-style:none;display:inline-block}
 details summary::-webkit-details-marker{display:none}
-.pager{flex-wrap:nowrap}.pager select{flex:1 1 200px;min-width:0}
+.pager{flex-wrap:nowrap}.pg-word{display:none}
 
 /* OFP: limits and emergency return */
 .fld .lim{font-weight:500;color:var(--muted);font-size:.78em}
@@ -644,3 +644,76 @@ table.ofplog .ofp-notebtn span{max-width:100%;white-space:normal;overflow-wrap:a
 /* ETO in the navigation log: tap = passed on time (ATO = ETO) */
 .eto-tap{font:inherit;color:inherit;background:var(--surface);border:1.5px dashed var(--line-strong);border-radius:7px;padding:6px 8px;min-height:40px;cursor:pointer}
 .eto-tap:hover,.eto-tap:focus-visible{border-color:var(--ok);border-style:solid}
+
+/* ATL page picker */
+.pager .pg-step{min-height:52px;font-size:1.05rem}
+.pg-cur{display:flex;align-items:center;gap:12px;min-height:52px;padding:6px 14px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer;text-align:left;flex:0 1 auto;min-width:0}
+.pg-cur:hover{border-color:var(--accent)}
+.pg-cur .pg-ic svg{width:22px;height:22px;display:block;color:var(--accent)}
+.pg-cur .pg-txt{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.pg-cur .pg-txt b{font-size:1.1rem}
+.pg-cur .pg-txt b small{font-weight:400;font-size:.75rem;color:var(--muted)}
+.pg-cur .pg-txt>span{font-size:.86rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-cur .pg-pos{font-size:.8rem;margin-left:4px;white-space:nowrap}
+.pcal-nav{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.pcal-nav select{flex:1 1 auto;min-height:40px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);padding:4px 10px;font-weight:600;font-size:1rem;text-align:center}
+.pcal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.pcal-dow{text-align:center;font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;padding:2px 0 4px}
+.pcal-d{min-height:50px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.95rem;line-height:1.1}
+.pcal-d.none{color:var(--muted);opacity:.55}
+.pcal-d.has{border:1px solid var(--accent);background:var(--accent-soft);color:var(--ink);cursor:pointer;font:inherit}
+.pcal-d.has small{font-size:.7rem;color:var(--accent);font-weight:600}
+.pcal-d.sel{background:var(--accent);color:var(--accent-ink)}
+.pcal-d.sel small{color:var(--accent-ink)}
+.pcal-d.today{box-shadow:inset 0 0 0 2px var(--ink)}
+.pcal-hint{font-size:.82rem;margin:8px 0}
+.pcal-list{display:flex;flex-direction:column;gap:4px}
+.pcal-row{display:grid;grid-template-columns:minmax(9.5rem,auto) 8.5rem 4.5rem 1fr auto;align-items:center;gap:10px;padding:8px 12px;min-height:44px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);cursor:pointer;text-align:left;font:inherit}
+.pcal-row:hover{border-color:var(--accent)}
+.pcal-row.sel{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.pcal-row.hl{background:var(--accent-soft)}
+.pcal-row small{font-weight:400;color:var(--muted)}
+.pcal-rt{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:700px){.pcal-row{grid-template-columns:auto 1fr auto;row-gap:2px}.pcal-rt{grid-column:1/-1}.pg-cur{flex:1 1 auto}.pg-cur .pg-pos{display:none}}
+
+/* OFP step 1: basic data from the OFP, framed, the key numbers as tiles */
+.ofp-basics{border:1.5px solid var(--line-strong);border-left:4px solid var(--accent);border-radius:10px;padding:12px 14px 14px;margin:12px 0;background:var(--surface)}
+.ofp-basics>.label{margin:0 0 8px}
+.ob-tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:12px}
+@media (max-width:1000px){.ob-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:480px){.ob-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.ob-t b{font-size:1.2rem}}
+.ob-t{border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.ob-t span{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.ob-t b{font-size:1.35rem;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ob-t b small{font-size:.75rem;font-weight:400;color:var(--muted)}
+.ob-t em{font-style:normal;font-size:.85rem;color:var(--muted)}
+.ob-t.key{border-color:var(--accent);background:var(--accent-soft)}
+.ofp-basics .two{margin-top:0}
+
+/* ATC keypad guidance: keys that usually follow are lit, the rest dimmed (still usable) */
+.ak-key.dim{opacity:.3}
+.ak-key.go{background:var(--key-hi);box-shadow:inset 0 0 0 2px var(--key-on)}
+.ak-key.nx.go{box-shadow:inset 0 0 0 3px var(--key-on),0 0 0 3px var(--key-hi)}
+
+/* OFP step 1: alternates */
+.ob-altn{margin-bottom:12px}
+.ob-altn>.label{margin:0 0 6px}
+.altn-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:8px}
+.altn-card{border:1px solid var(--line-strong);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.altn-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.altn-h .ann{font-size:.7rem;padding:1px 6px;align-self:center}
+.altn-icao{font-size:1.35rem}
+.altn-name{font-weight:600}
+.altn-f{display:flex;flex-wrap:wrap;gap:4px 16px}
+.altn-f span{display:flex;flex-direction:column;line-height:1.15}
+.altn-f small{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.altn-f b{font-size:1.05rem}
+.altn-r{margin:0;font-size:.86rem;overflow-wrap:anywhere}
+.altn-r small,.altn-s small{color:var(--muted)}
+.altn-r small{font-weight:600;text-transform:uppercase;font-size:.7rem;letter-spacing:.04em}
+.altn-s{margin:0;font-size:.84rem}
+@media (max-width:480px){.altn-cards{grid-template-columns:1fr}}
+
+.ak-fq{color:var(--key-muted);font-size:.75rem;margin-left:8px}
+
+.crs-defs{margin:6px 0 10px}.crs-defs .line-item{display:flex;align-items:center;gap:10px}.crs-defs .crs-dt{flex:1;min-width:0}
