@@ -1,0 +1,38 @@
+eTechLog – změna Z-054
+Verze: 0.7.16 (navazuje na Z-053 / 0.7.15)
+Datum: 2026-11-23
+
+- ATC instrukce a poznámky – jednotný tvar bez ohledu na pořadí kláves:
+  LEFT HDG 180, HDG 180 LEFT i RIGHT 180 HDG → HDG LEFT/RIGHT 180;
+  FL360 CLB, FL CLB 360 → CLB FL360 (DES stejně). „DES FL100 CLB“ (dvě instrukce) se nepřehazuje.
+  Po stisku FL se zvýrazní CLB a DES (a číslice). Oprava překliknutí: DES FL → CLB = CLB FL, HDG RIGHT → LEFT = HDG LEFT.
+- Ruční zápis letu (a oprava zápisu): pole jsou v řádcích
+  Datum · Druh letu · Číslo letu / Odkud → Kam · Přistání (počet) / Typ přiblížení · Jiné přiblížení.
+  „Jiné přiblížení“ se ukáže, jen když je zvoleno Jiné.
+- Ruční zápis letu: palivo po přistání a spáleno se dopočítají z paliva na odlet zadaného ve stejném formuláři
+  (dřív jen, když bylo palivo na odlet známé předem). Změna paliva na odlet přepočítá spáleno.
+- Oprava zápisu letu: oddíl Split duty – zaškrtnutí „Po tomto letu následuje přerušení služby“ a ubytování.
+  Uloží se s opravou (stejný důvod a podpis). Jde to i jako dosud v Detailu letu → Split duty → upravit,
+  tam je odkaz ale jen tehdy, když je split duty povolená v Nastavení (provozní příručka).
+  Když povolená není, oprava to uloží, ale FTL ji nepočítá – formulář na to upozorní.
+
+Návrat
+- Na 0.7.15: eatl-Z-053-v0.7.15.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-054.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

@@ -2343,6 +2343,8 @@ self.ETL_EN={
 "kojenci":"infants",
 "celkem":"total",
 "PAX M/F/C/I · POB":"PAX M/F/C/I · POB",
+"např. NDB 24":"e.g. NDB 24",
+"Provozní příručka split duty nepovoluje (Nastavení → Provoz) – označení se uloží, ale ve výpočtu FTL se nepoužije.":"The operations manual does not allow split duty (Settings → Operations) – the mark is saved but not used in the FTL calculation.",
 "CRS {0} ({1}) · {2} · TTAF {3} / {4} cyklů":"CRS {0} ({1}) · {2} · TTAF {3} / {4} cycles",
 "Na {0} probíhá jiný let {1} → {2} – nejdřív ho uzavřete.":"Another flight {1} → {2} is in progress on {0} – close it first.",
 "Plán: ramp EST {0} · used CALC {1} lbs":"Plan: ramp EST {0} · used CALC {1} lbs",

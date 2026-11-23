@@ -2469,7 +2469,7 @@ function oilJoin(L,R){const q=x=>{const t=String(x==null?'':x).replace(',','.').
 // split duty is declared on the flight after which the break starts; it ends with the next flight of that crew
 function splitOf(get){if(!S.cfg.splitDuty)return null;const sp=get('split');return sp===true||sp==='1'||sp==='on'?{acc:get('splitAcc')==='basic'?'basic':'suitable'}:null}
 const SPLIT_ACC={suitable:'vhodné ubytování',basic:'jiné ubytování'};
-function splitBox(kind,on,acc,LK){if(!S.cfg.splitDuty&&!on)return '';
+function splitBox(kind,on,acc,LK,force){if(!S.cfg.splitDuty&&!on&&!force)return '';
   const a=kind==='of'?(k=>`data-of="x_${k}"`):kind==='k'?(k=>`data-k="${k}"`):(k=>`id="f-${k.toLowerCase()}"`);
   return `<div class="split-box"><label class="check"><input type="checkbox" ${a('split')} ${on?'checked':''} ${LK?'disabled':''}><span><b>Po tomto letu následuje přerušení služby (split duty)</b></span></label>
     <label class="fld split-acc" ${on?'':'hidden'}><span>Ubytování během přerušení</span><select ${a('splitAcc')} ${LK?'disabled':''}><option value="suitable" ${acc!=='basic'?'selected':''}>Vhodné ubytování (hotel, pokoj s lůžkem)</option><option value="basic" ${acc==='basic'?'selected':''}>Jiné ubytování (místnost k odpočinku)</option></select></label>
@@ -2672,15 +2672,23 @@ function sicSync(ofpC,t,form){
 function crewOpts(blank){const o=Object.values(S.users).filter(x=>x.active!==false&&has(x,'crew')).sort((a,b)=>a.name.localeCompare(b.name)).map(x=>[x.userId,x.name]);return blank?[['','–']].concat(o):o}
 function legFields(l,ac){
   const u=me();
-  return `<fieldset><legend class="label">Let</legend><div class="fgrid">
+  const appOther=!!(l.app&&!APPS.includes(l.app));
+  // three rows: what flight · where from → to (+ landings) · approach (the "other" field only when Jiné is chosen)
+  return `<fieldset><legend class="label">Let</legend>
+    <div class="fgrid fg3">
     ${F.date('f-date','Datum (UTC)',l.date)}
     ${F.sel('f-kind','Druh letu',Object.entries(KIND),l.kind||'CAT')}
     ${F.text('f-fno','Číslo letu / volací znak',l.fno,{attrs:'autocapitalize="characters" data-caps="1"'})}
-    ${F.icao('f-from','Odkud',l.from)}${F.icao('f-to','Kam',l.to)}
+    </div>
+    <div class="fgrid fg-route">
+    ${F.icao('f-from','Odkud',l.from)}<span class="fg-arrow" aria-hidden="true">→</span>${F.icao('f-to','Kam',l.to)}
     ${F.text('f-ldg','Přistání (počet)',l.ldg==null?'1':l.ldg,{attrs:'inputmode="numeric"'})}
-    ${F.sel('f-app','Typ přiblížení',[['','– vyberte –']].concat(APPS.map(a=>[a,a])).concat([['OTHER','Jiné…']]),l.app&&!APPS.includes(l.app)?'OTHER':(l.app||''))}
-    ${F.text('f-appother','Jiné přiblížení',l.app&&!APPS.includes(l.app)?l.app:'',{attrs:'autocapitalize="characters" placeholder="jen u Jiné"'})}
-  </div></fieldset>
+    </div>
+    <div class="fgrid fg3">
+    ${F.sel('f-app','Typ přiblížení',[['','– vyberte –']].concat(APPS.map(a=>[a,a])).concat([['OTHER','Jiné…']]),appOther?'OTHER':(l.app||''))}
+    <label class="fld" id="f-appother-l" ${appOther?'':'hidden'}><span>Jiné přiblížení</span><input type="text" id="f-appother" value="${esc(appOther?l.app:'')}" autocapitalize="characters" data-caps="1" placeholder="např. NDB 24"></label>
+    </div>
+  </fieldset>
   <fieldset><legend class="label">Časy UTC</legend><div class="fgrid">
     ${F.time('f-out','Off-block',l.out)}${F.time('f-off','Vzlet',l.off)}${F.time('f-on','Přistání',l.on)}${F.time('f-in','On-block',l.in)}
   </div><div class="calc" id="calc"></div></fieldset>
@@ -2875,11 +2883,14 @@ function openLegDetail(id){
 function openAmend(id){
   const l=S.legs[id];const ac=S.ac[l.acId];
   const pic=S.users[l.pic];
-  openSheet('Oprava zápisu letu',`<div class="warnline info">Opravu smí podepsat jen PIC tohoto letu${pic?' ('+esc(pic.name)+')':''} nebo CAMO. Původní hodnoty zůstanou v historii, oprava musí mít důvod. Změna časů nebo přistání se promítne do TTAF a cyklů na všech dalších stránkách.</div>${legFields(l,ac)}${F.area('f-reason','Důvod opravy','', 'např. překlep v čase přistání podle záznamu FMS')}`,{submit:'Podepsat opravu',sign:true,live:legLive(ac,id),onSubmit:async()=>{
+  openSheet('Oprava zápisu letu',`<div class="warnline info">Opravu smí podepsat jen PIC tohoto letu${pic?' ('+esc(pic.name)+')':''} nebo CAMO. Původní hodnoty zůstanou v historii, oprava musí mít důvod. Změna časů nebo přistání se promítne do TTAF a cyklů na všech dalších stránkách.</div>${legFields(l,ac)}${can.splitEdit(me(),l)?`<p class="label">Split duty</p>${S.cfg.splitDuty?'':'<div class="warnline caution">Provozní příručka split duty nepovoluje (Nastavení → Provoz) – označení se uloží, ale ve výpočtu FTL se nepoužije.</div>'}${splitBox('id',!!l.split,l.split&&l.split.acc,false,true)}`:''}${F.area('f-reason','Důvod opravy','', 'např. překlep v čase přistání podle záznamu FMS')}`,{submit:'Podepsat opravu',sign:true,live:(()=>{const lv=legLive(ac,id);return()=>{if(lv)lv();const c=document.getElementById('f-split');const a=document.querySelector('#sheet .split-acc');if(c&&a)a.hidden=!c.checked}})(),onSubmit:async()=>{
     const n=readLeg(true);checkTimes(l.acId,id,Object.assign({crew:[n.pic,n.sic,l.ca]},n),false);const reason=v('f-reason');if(!can.amend(me(),l))fail('Opravu smí podepsat jen PIC tohoto letu nebo CAMO.');if(reason.length<5)fail('Napište důvod opravy.');
     const changes={};for(const k in n){if(String(n[k]??'')!==String(l[k]??''))changes[k]=n[k]}
-    if(!Object.keys(changes).length)fail('Nic se nezměnilo.');
-    await checkPin();emit([['leg.amend',{legId:id,changes,reason}]]);closeSheet();toast('Oprava podepsána');
+    // split duty after this flight, set or cleared afterwards
+    let sp=null;const sc=document.getElementById('f-split');
+    if(sc&&can.splitEdit(me(),l)){const want=sc.checked?{acc:v('f-splitacc')==='basic'?'basic':'suitable'}:null;if(JSON.stringify(want)!==JSON.stringify(l.split||null))sp=['leg.split',{legId:id,acId:l.acId,split:want,reason}]}
+    if(!Object.keys(changes).length&&!sp)fail('Nic se nezměnilo.');
+    await checkPin();emit([...(Object.keys(changes).length?[['leg.amend',{legId:id,changes,reason}]]:[]),...(sp?[sp]:[])]);closeSheet();toast('Oprava podepsána');
   }});
 }
 function openVoid(id){
@@ -3686,6 +3697,7 @@ function selectPre(pre){if(!pre)return;const r=document.createRange();r.selectNo
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='pcal-msel'){openPageCal(t.dataset.id,t.value)}
+  if(t.id==='f-app'){const o2=document.getElementById('f-appother-l');if(o2){o2.hidden=t.value!=='OTHER';if(t.value==='OTHER'){const i2=document.getElementById('f-appother');if(i2)i2.focus()}}}
   else if(t.id==='simoff'){SIMOFF=t.checked;store.set('etl.simoff',SIMOFF);if(!SIMOFF){pull();flush()}render();const sb=document.getElementById('syncbody');if(sb)sb.innerHTML=syncDetails()}
   else if(t.id==='audit-all'){UI.auditAll=t.checked;render()}
   else if(t.id==='q-all'){UI.qAll=t.checked;const r=document.getElementById('q-res');if(r)r.innerHTML=searchResults(S.ac[UI.acId])}
@@ -3734,7 +3746,11 @@ document.addEventListener('input',e=>{
       if(ok){const pre=t.id.slice(0,2);const order=['out','off','on','in'].map(k=>pre+k);const nx=document.getElementById(order[order.indexOf(t.id)+1]);if(t.dataset.k){UI.draft[t.dataset.k]=t.value;saveDraft();crewLive()}if(sheetLive&&t.closest('#sf'))sheetLive();if(nx)nx.focus();else t.blur();return}}
     else t.classList.remove('bad');
   }
-  if(t.dataset&&t.dataset.pair){const o=document.getElementById(t.dataset.pair);const dep=num(t.dataset.dep),val=num(t.value);
+  // manual entry: departure fuel is typed in the same form – the live value counts, not the one known when the form opened
+  const depIn=t.closest&&t.closest('#sf')?document.querySelector('#sf #f-fuelblk'):null;
+  if(depIn&&t===depIn){const rem=document.getElementById('f-frem'),brn=document.getElementById('f-fburn'),dv=num(depIn.value);
+    if(rem&&brn&&dv!=null){if(num(rem.value)!=null){brn.value=String(dv-num(rem.value));brn.classList.toggle('bad',dv-num(rem.value)<0)}else if(num(brn.value)!=null)rem.value=String(dv-num(brn.value))}}
+  if(t.dataset&&t.dataset.pair){const o=document.getElementById(t.dataset.pair);const dep=num(depIn&&depIn.value!==''?depIn.value:t.dataset.dep),val=num(t.value);
     if(o&&dep!=null){o.value=val==null?'':String(dep-val);o.classList.toggle('bad',val!=null&&dep-val<0);if(o.dataset.k){UI.draft[o.dataset.k]=o.value}}}
   if(t.dataset&&t.dataset.k&&t.type!=='checkbox'&&t.type!=='radio'&&t.tagName!=='SELECT'){UI.draft[t.dataset.k]=t.value;saveDraft();const er=document.getElementById('c-err');if(er)er.hidden=true;crewLive()}
   if(sheetLive&&t.closest('#sf'))sheetLive();

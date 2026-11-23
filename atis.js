@@ -809,11 +809,28 @@ const atcParts = t => String(t || '').split(NOTE_SEP).map(x => x.trim()).filter(
 const utcHM = () => new Date().toISOString().slice(11, 16);
 const spc = s => s && !s.endsWith(' ') ? s + ' ' : s;
 // spacing as written on paper: CLB FL360, HDG 250, DCT WW673, FREQ 133.355 (dot after three digits), M.78
-function atcType(s, c) {
+// one written form whatever the order of the keys: HDG LEFT 180 (also from LEFT HDG 180, HDG 180 LEFT), CLB FL360 (also from FL360 CLB)
+const VERB_FL = ['CLB', 'DES', 'MAINT', 'EXPECT'];
+function atcOrder(s) {
+  const trail = / $/.test(s), w = s.trim().split(' ').filter(Boolean), LR = x => x === 'LEFT' || x === 'RIGHT', D = x => /^\d+$/.test(x || '');
+  for (let k = 0; k < 4; k++) { let ch = false;
+    for (let i = 0; i < w.length; i++) {
+      if (LR(w[i]) && w[i + 1] === 'HDG') { w.splice(i, 2, 'HDG', w[i]); ch = true }
+      else if (LR(w[i]) && D(w[i + 1]) && w[i + 2] === 'HDG') { w.splice(i, 3, 'HDG', w[i], w[i + 1]); ch = true }
+      else if (w[i] === 'HDG' && D(w[i + 1]) && LR(w[i + 2])) { w.splice(i, 3, 'HDG', w[i + 2], w[i + 1]); ch = true }
+      else if (/^FL\d*$/.test(w[i]) && (w[i + 1] === 'CLB' || w[i + 1] === 'DES') && !VERB_FL.includes(w[i - 1])) { w.splice(i, 2, w[i + 1], w[i]); ch = true }
+    }
+    if (!ch) break }
+  return w.join(' ') + (trail && w.length ? ' ' : '');
+}
+function atcType(s, c) { const r = atcType0(s, c); return r === s ? r : atcOrder(r) }
+function atcType0(s, c) {
   const lw = s.slice(s.lastIndexOf(' ') + 1), word = ATC_W.includes(lw) || / ?OWN NAV$/.test(s);
   if (c === ' ') return spc(s);
   // CLB right after DES (or DES after CLB) with nothing between = a slip corrected: the new word replaces the old one
-  if (c === 'CLB' || c === 'DES') { const m = /(^| )(CLB|DES) ?$/.exec(s); if (m) return s.slice(0, m.index) + m[1] + c }
+  if (c === 'CLB' || c === 'DES') { const m = /(^| )(CLB|DES)( FL)? ?$/.exec(s); if (m) return s.slice(0, m.index) + m[1] + c + (m[3] || '') }
+  // the same for the turn: HDG RIGHT → LEFT = HDG LEFT
+  if (c === 'LEFT' || c === 'RIGHT') { const m = /(^| )(LEFT|RIGHT) ?$/.exec(s); if (m) return s.slice(0, m.index) + m[1] + c }
   if (c === 'FL' || c === 'M.' || ATC_W.includes(c)) return spc(s) + c;
   if (/^\d$/.test(c)) {
     const fm = /(^| )FREQ ?([\d.]*)$/.exec(s);
@@ -828,7 +845,7 @@ function atcType(s, c) {
 }
 function atcBack(s) { const m = /(^| )(OWN NAV|CLB|DES|HDG|DCT|LEFT|RIGHT|SPD|FREQ|QNH|SQ|HOLD|EXPECT|MAINT|FL|M\.)$/.exec(s); return m ? s.slice(0, m.index) : s.slice(0, -1) }
 function atcCommit(p) {
-  const t = String(p.cur || '').replace(/·/g, ' ').replace(/\s+/g, ' ').trim().replace(/(^| )FREQ (\d{3})(?:\.(\d*))?(?= |$)/g, (x, a, m, dec) => a + 'FREQ ' + m + '.' + (dec || '').padEnd(2, '0')); if (!t) return false;
+  const t = atcOrder(String(p.cur || '').replace(/·/g, ' ').replace(/\s+/g, ' ').trim()).replace(/(^| )FREQ (\d{3})(?:\.(\d*))?(?= |$)/g, (x, a, m, dec) => a + 'FREQ ' + m + '.' + (dec || '').padEnd(2, '0')); if (!t) return false;
   const o = API.ofpOf(p.oid); if (!o || o.closed || o.void) return false;
   const parts = atcParts(API.ofpVal(o, p.key)); parts.push(utcHM() + ' ' + t);
   API.ofpSet(p.oid, p.key, parts.join(NOTE_SEP)); p.cur = ''; p.abc = false;
@@ -865,8 +882,13 @@ function atcGuide(s) {
   const t = String(s || '').trim(); if (!t) return null;
   if (/(^| )OWN NAV$/.test(t)) return { done: true };
   const w = t.split(' '), last = w[w.length - 1], prev = w[w.length - 2];
-  if (last === 'FL') return { t: [], d: 1 };
-  let m = /^FL(\d+)$/.exec(last); if (m) return m[1].length < 3 ? { t: [], d: 1 } : { done: true };
+  const verb = VERB_FL.includes(prev);
+  // FL first: CLB / DES are lit too (FL360 CLB is written CLB FL360)
+  if (last === 'FL') return { t: verb ? [] : ['CLB', 'DES'], d: 1 };
+  let m = /^FL(\d+)$/.exec(last); if (m) return m[1].length < 3 ? { t: verb ? [] : ['CLB', 'DES'], d: 1 } : verb ? { done: true } : { done: true, t: ['CLB', 'DES'] };
+  // HDG LEFT → the heading; HDG 180 → done, LEFT / RIGHT still lit (written HDG LEFT 180)
+  if ((last === 'LEFT' || last === 'RIGHT') && prev === 'HDG') return { t: [], d: 1 };
+  if (/^\d+$/.test(last) && prev === 'HDG' && last.length >= 3) return { done: true, t: ['LEFT', 'RIGHT'] };
   m = /^M\.(\d*)$/.exec(last); if (m) return m[1].length < 2 ? { t: [], d: 1 } : { done: true };
   if (ATC_NEXT[last]) return ATC_NEXT[last];
   if (/^[\d.]+$/.test(last) && prev && ATC_MIN[prev] && last.replace(/\D/g, '').length < ATC_MIN[prev]) return { t: [], d: 1, dot: prev === 'FREQ' };
@@ -874,7 +896,7 @@ function atcGuide(s) {
 }
 function atcLight(d, cur) {
   const g = atcGuide(cur); if (!g) return;
-  if (g.done) { const a = d.querySelector('#ak-act [data-ak="add"]'); if (a) a.classList.add('go'); return }
+  if (g.done) { const a = d.querySelector('#ak-act [data-ak="add"]'); if (a) a.classList.add('go'); (g.t || []).forEach(c => { const b = d.querySelector(`#ak-ctx [data-ak="at:${c}"]`); if (b) b.classList.add('go') }); return }
   d.querySelectorAll('#ak-ctx [data-ak]').forEach(b => { const c = b.dataset.ak; const on = c === 'abc:' ? !!g.abc : c.startsWith('at:') && g.t.includes(c.slice(3)); b.classList.add(on ? 'go' : 'dim') });
   d.querySelectorAll('#ak-dig [data-ak]').forEach(b => { const c = b.dataset.ak.slice(3); const on = /^\d$/.test(c) ? !!g.d : c === '.' && !!g.dot; b.classList.add(on ? 'go' : 'dim') });
 }
@@ -1028,6 +1050,6 @@ function after() { if (ACT) renderDock(); else hideDock() }
 return {
   bind, field, after, cfgEditor, cfgResult, lineOf, plan, FIELDS, openAtc, nbId, openNum,
   // for tests
-  _: { DEF, PRESETS, presetCfg, sanitize, empty, slotsOf, fmtSlot, outSlot, atomsStr, apply, setSlot, firstEmpty, nextIdx, fmtRoute, okDigit, fmtTrend, fmtVia, atcType, atcBack, atcCommit, atcGuide, noteFreq, fmtFreq, get ACT() { return ACT }, set ACT(x) { ACT = x }, get HINT() { return HINT } }
+  _: { DEF, PRESETS, presetCfg, sanitize, empty, slotsOf, fmtSlot, outSlot, atomsStr, apply, setSlot, firstEmpty, nextIdx, fmtRoute, okDigit, fmtTrend, fmtVia, atcType, atcBack, atcCommit, atcGuide, atcOrder, noteFreq, fmtFreq, get ACT() { return ACT }, set ACT(x) { ACT = x }, get HINT() { return HINT } }
 };
 })();
