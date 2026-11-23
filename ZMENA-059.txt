@@ -1,0 +1,31 @@
+eTechLog – změna Z-059
+Verze: 0.7.21 (navazuje na Z-058 / 0.7.20)
+Datum: 2026-11-23
+
+- Technický deník – štítky závad u letu (sloupec Podpis):
+  - odstraněná závada: „CRS WO-2026-0142“ (číslo WO / workpacku zadané při odstranění závady),
+    bez WO jen „CRS ✓“; číslo závady (UFF-001) a text „na zemi odstraněná“ zmizely,
+  - otevřená / odložená závada dál s číslem: „UFF-003 otevřená“, „UFF-004 odložená“ (bez „na zemi“).
+  Číslo závady je dál v bublině po najetí myší a v záložce Závady.
+- Odstranění závady: pole se jmenuje „Číslo WO / workpacku“ (jako u CRS).
+
+Návrat
+- Na 0.7.20: eatl-Z-058-v0.7.20.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-059.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

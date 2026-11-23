@@ -62,3 +62,5 @@ Zip změny obsahuje jen změněné soubory ve správných složkách a popis `ZM
 | Z-055 | 0.7.17 | 2026-11-23 | Split duty bez otázky na ubytování (OFP, dokončení letu, oprava zápisu, Detail letu); výpočet FTL počítá přerušení jako s vhodným ubytováním. FTL – posádky: „Od konce služby“ nad 24 h jako >24h. |
 | Z-056 | 0.7.18 | 2026-11-23 | Můj účet – Zápis ATIS a clearance: odebrány předvolby ICAO / Evropa a USA, místo nich odkaz Obnovit výchozí pořadí. |
 | Z-057 | 0.7.19 | 2026-11-23 | Doplnění oleje: přiřadí se k letu, jehož off-block následuje po čase doplnění – i k letu už podepsanému (doplní se do jeho záznamu s historií). Formulář ukazuje, ke kterému letu se olej zapíše; při datu v minulosti se čas vymaže, aby nezůstal aktuální. |
+| Z-058 | 0.7.20 | 2026-11-23 | Odstranění závady a CRS: popisek výběru letu jen „Přiřadit k letu“. |
+| Z-059 | 0.7.21 | 2026-11-23 | ATL – štítky závad u letu: odstraněná závada jako „CRS WO …“ (číslo WO / workpacku z odstranění), bez čísla závady a bez „na zemi odstraněná“; otevřená / odložená bez „na zemi“. Formulář odstranění závady: pole „Číslo WO / workpacku“. |

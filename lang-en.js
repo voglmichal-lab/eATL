@@ -2360,6 +2360,7 @@ self.ETL_EN={
 "Zapíše se k letu":"Goes to flight",
 "– ten už je podepsaný, olej se do jeho záznamu doplní dodatečně (s vaším jménem v historii).":"– already signed, the oil is added to its record afterwards (with your name in the history).",
 "(předvyplní se při jeho uzavření).":"(pre-filled when it is closed).",
+"Přiřadit k letu":"Assign to a flight",
 "CRS {0} ({1}) · {2} · TTAF {3} / {4} cyklů":"CRS {0} ({1}) · {2} · TTAF {3} / {4} cycles",
 "Na {0} probíhá jiný let {1} → {2} – nejdřív ho uzavřete.":"Another flight {1} → {2} is in progress on {0} – close it first.",
 "Plán: ramp EST {0} · used CALC {1} lbs":"Plan: ramp EST {0} · used CALC {1} lbs",

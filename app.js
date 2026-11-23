@@ -715,7 +715,8 @@ function viewLog(ac,u){
     if(l.void)flags.push('<span class="ann mute">zneplatněno</span>');
     if(l.plannedTo)flags.push(`<span class="ann warn">DIVERT · plán ${esc(l.plannedTo)}</span>`);
     if(l.split)flags.push(`<span class="ann info">SPLIT DUTY ›</span>`);
-    for(const d of ac.defects.filter(x=>x.pageLeg===l.legId))flags.push(`<span class="ann ${d.status==='open'?'warn':d.status==='deferred'?'caution':'ok'}">${esc(d.no)}${d.ground?' na zemi':''} ${d.status==='open'?'otevřená':d.status==='deferred'?'odložená':'odstraněná'}</span>`);
+    // defects on this flight: open / deferred by their number; a rectified one by its work order / release number (WO)
+    for(const d of ac.defects.filter(x=>x.pageLeg===l.legId))flags.push(d.status==='closed'?`<span class="ann ok" title="${esc(d.no)}">CRS ${d.rect&&d.rect.wo?esc(/^WO/i.test(d.rect.wo)?d.rect.wo:'WO '+d.rect.wo):'✓'}</span>`:`<span class="ann ${d.status==='open'?'warn':'caution'}">${esc(d.no)} ${d.status==='open'?'otevřená':'odložená'}</span>`);
     const pic=S.users[l.pic],sic=S.users[l.sic];
     const gap=l.gap?`<tr class="gaprow"><td colspan="16">Přerušený řetězec: předchozí let přistál v <b class="mono">${esc(l.gap)}</b>, tento odlétá z <b class="mono">${esc(l.from)}</b>. Chybí zápis, nebo jde o přelet mimo deník?</td></tr>`:'';
     const op=l.state==='open'&&!l.void;
@@ -2947,11 +2948,11 @@ function openRectify(id,prepId){
   const d=S.defects[id];if(!d)return;const ac=S.ac[d.acId];const u=me();const auth=can.crs(u);if(!auth&&(pr||!can.rectify(u)))return;
   const pv=(k,x)=>pr&&pr[k]!=null?pr[k]:x;
   openSheet((auth?'Odstranění závady a CRS – ':'Odstranění závady – příprava – ')+d.no,`${auth?'':'<div class="warnline info">Podepsat CRS může jen osvědčující personál s oprávněním. Připravené odstranění uvidí u závady a v záložce Uvolnění.</div>'}${pr?`<div class="warnline info">Připravil ${esc(pr.who.name)} · ${fmtTs(pr.at)} – zkontrolujte a podepište.</div>`:''}<p class="txt">${esc(d.text)}</p><div class="fgrid">
-    ${F.text('f-ata','ATA kapitola',pv('ata',d.ata||''),{attrs:'inputmode="numeric" maxlength="2"'})}${F.text('f-wo','Číslo WO',pv('wo',''))}
+    ${F.text('f-ata','ATA kapitola',pv('ata',d.ata||''),{attrs:'inputmode="numeric" maxlength="2"'})}${F.text('f-wo','Číslo WO / workpacku',pv('wo',''),{attrs:'autocapitalize="characters" placeholder="např. WO-2026-0142"'})}
     ${F.text('f-air','TTAF při odstranění',hm(pv('acAir',ac.air)).replace(/\u2009/g,''),{attrs:'inputmode="numeric" class="mono"'})}${F.text('f-cyc','Cykly',String(pv('acCyc',ac.cyc)),{attrs:'inputmode="numeric"'})}
     ${auth?F.text('f-lic','Číslo licence / oprávnění',u.licence||''):''}</div>
     ${F.area('f-action','Provedená opatření',pv('action',''),'Co bylo provedeno, podle jakého dokumentu (AMM/IPC kapitola)')}
-    <div class="fgrid wide">${legPick('f-rectleg',ac,pr?(pr.atLeg||''):(ac.lastLeg?ac.lastLeg.legId:''),'Přiřadit k letu – uvidí ho posádka v ATL')}</div>
+    <div class="fgrid wide">${legPick('f-rectleg',ac,pr?(pr.atLeg||''):(ac.lastLeg?ac.lastLeg.legId:''),'Přiřadit k letu')}</div>
     ${auth?`<div class="statement">${CRS_TEXT}</div>${F.check('f-stmt','Potvrzuji prohlášení o uvolnění do provozu',false)}`:''}`,{submit:auth?'Podepsat CRS':'Připravit k podpisu',sign:true,onSubmit:async()=>{
     const action=v('f-action');if(action.length<4)fail('Popište provedená opatření.');const air=parseDur(v('f-air'));if(air==null)fail('TTAF zadejte jako hodiny:minuty, např. 3455:40.');
     const base={defId:id,ata:v('f-ata'),wo:v('f-wo'),acAir:air,acCyc:parseInt(v('f-cyc'),10)||0,action,atLeg:v('f-rectleg')||null};
@@ -3022,7 +3023,7 @@ function openCrs(legId,prepId){
   const pv=(k,d)=>pr&&pr[k]!=null?pr[k]:d;
   // the release belongs to a flight's ATL page so the crew sees it – by default after the last flight
   const selLeg=pr?(pr.legId||''):(L?L.legId:(ac.lastLeg?ac.lastLeg.legId:''));
-  const legSel=legPick('f-crsleg',ac,selLeg,'Přiřadit k letu – uvidí ho posádka v ATL');
+  const legSel=legPick('f-crsleg',ac,selLeg,'Přiřadit k letu');
   const openD=ac.open||(ac.defects||[]).filter(d=>d.status==='open');
   openSheet((auth?'Uvolnění do provozu – ':'Příprava uvolnění – ')+ac.reg,`${auth?'':'<div class="warnline info">Podepsat CRS může jen osvědčující personál s oprávněním. Připravené uvolnění uvidí v záložce Uvolnění, zkontroluje a podepíše.</div>'}${pr?`<div class="warnline info">Připravil ${esc(pr.who.name)} · ${fmtTs(pr.at)} – zkontrolujte a podepište.</div>`:''}${L?`<div class="warnline info">Po letu <b class="mono">${esc(L.from)} → ${esc(L.to)}</b> · ${fmtDate(L.date)} · stránka ${esc(L.page)}/${L.idx} · on-block ${esc(L.in)}Z</div>`:''}
     ${openD.length?`<div class="warnline warn wrap"><b>Na letadle ${openD.length===1?'je otevřená závada':'jsou otevřené závady'}.</b> Závadu uzavře jen její odstranění (CRS k závadě) – obecné CRS ji neuzavře a dál by svítila.</div>
