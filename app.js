@@ -149,6 +149,10 @@ function emit(items,asId){
   persist();rebuild();render();flush();
 }
 
+// the flight an oil top-up belongs to: the first flight of the aircraft whose off-block is at or after the oil time
+const legStartISO=l=>{const t=normHM(l.out||l.off||'');return l.date&&parseHM(t)!=null?l.date+'T'+t:null};
+function oilTargetIn(st,acId,date,time){if(!date||parseHM(normHM(time||''))==null)return null;const t=date+'T'+normHM(time);
+  let best=null,bt=null;for(const l of Object.values(st.legs)){if(l.acId!==acId||l.void)continue;const lt=legStartISO(l);if(!lt||lt<t)continue;if(!best||lt<bt){best=l;bt=lt}}return best}
 function rebuild(){
   // time, then for one device its own sequence (two records can share a millisecond), then the order inside one signature
   const all=ORD||(ORD=Object.values(EV).sort(evCmp));const pendFill={};
@@ -170,7 +174,12 @@ function rebuild(){
       case 'leg.amend':{const l=s.legs[p.legId];if(!l)break;const prev={};for(const k in p.changes)prev[k]=l[k];Object.assign(l,p.changes);l.history.push(Object.assign({},who,{reason:p.reason,changes:p.changes,prev}));break}
       case 'leg.void':{const l=s.legs[p.legId];if(l)l.void=Object.assign({},who,{reason:p.reason});break}
       case 'leg.split':{const l=s.legs[p.legId];if(!l)break;const nm=x=>x?(x.acc==='basic'?'ano – jiné ubytování':'ano'):'ne';l.history.push(Object.assign({},who,{reason:'Split duty'+(p.reason?' – '+p.reason:''),changes:{split:nm(p.split)},prev:{split:nm(l.split)}}));l.split=p.split||null;break}
-      case 'oil.add':s.oilAdds[p.svcId]=Object.assign({},p,{who,at:e.at});break;
+      case 'oil.add':{s.oilAdds[p.svcId]=Object.assign({},p,{who,at:e.at});
+        // written afterwards for a flight that is already signed (oil time before its off-block): it belongs to that flight
+        const tg=oilTargetIn(s,p.acId,p.date,p.time);
+        if(tg&&tg.state==='closed'&&!(tg.oilSvc||[]).includes(p.svcId)){const o0=parseOil(tg.oil)||{l:0,r:0};const nl=Math.round((o0.l+(+p.l||0))*10)/10,nr=Math.round((o0.r+(+p.r||0))*10)/10;const prev=tg.oil||'';
+          tg.oil=`${nl} / ${nr}`;tg.oilSvc=(tg.oilSvc||[]).concat(p.svcId);tg.history=tg.history||[];tg.history.push(Object.assign({},who,{reason:'Olej doplněn na zemi před letem – zapsáno dodatečně'+(p.note?' – '+p.note:''),changes:{oil:tg.oil},prev:{oil:prev}}))}
+        break}
       case 'daily.sign':{const k=p.acId+'|'+p.date;const r=Object.assign({},p,who);(s.daily[k]=s.daily[k]||[]).push(r);if(p.insId)s.svc[p.insId]=r;break}
       case 'svc.resolve':s.svcRes[p.insId+'|'+p.key]=Object.assign({note:p.note||''},who);break;
       case 'defect.report':s.defects[p.defId]=Object.assign({},p,{status:'open',reported:who,trail:[Object.assign({t:p.src==='paper'?'Převzato z papírového deníku'+(p.paperPage?', str. '+p.paperPage:''):'Zapsáno'},who)]});break;
@@ -1096,12 +1105,25 @@ function openOilForm(){
   openSheet('Doplnění oleje – '+ac.reg,`<p class="muted">Zapisuje se olej doplněný na zemi (po posledním letu, před dalším). Posádce dalšího letu se předvyplní a do ATL se zapíše u toho letu.</p>
     <div class="fgrid">${F.date('f-date','Datum',todayISO())}${F.time('f-time','Čas (UTC)',nowHM())}</div>
     <div class="fgrid">${F.text('f-ol','Motor L (litry)','',{attrs:'inputmode="decimal"'})}${F.text('f-or','Motor P (litry)','',{attrs:'inputmode="decimal"'})}</div>
-    ${F.area('f-onote','Poznámka (nepovinné)','','')}`,{submit:'Podepsat doplnění oleje',sign:true,onSubmit:async()=>{
+    ${F.area('f-onote','Poznámka (nepovinné)','','')}<p class="oil-target" id="f-otarget"></p>`,{submit:'Podepsat doplnění oleje',sign:true,live:()=>oilTargetLive(ac),onSubmit:async()=>{
       const date=parseDate(v('f-date'));if(!date)fail('Datum musí být ve tvaru dd/mm/rrrr.');const time=normHM(v('f-time'));if(parseHM(time)==null)fail('Čas zadejte jako 4 číslice, např. 1840.');
       const q=x=>{const t=String(x||'0').replace(',','.').trim();if(!/^\d+(\.\d+)?$/.test(t))fail('Množství oleje zadejte v litrech, např. 0,5.');return +t};
       const L=q(v('f-ol')),R=q(v('f-or'));if(!L&&!R)fail('Zadejte množství doplněného oleje alespoň u jednoho motoru.');if(L>10||R>10)fail('Tolik oleje se nedoplňuje – zkontrolujte hodnotu (zadává se v litrech).');
-      await checkPin();emit([['oil.add',{svcId:rid('oil'),acId:ac.acId,date,time,l:L,r:R,note:v('f-onote')}]]);closeSheet();toast('Doplnění oleje zapsáno – předvyplní se dalšímu letu');
+      const tg=oilTargetIn(S,ac.acId,date,time);
+      await checkPin();emit([['oil.add',{svcId:rid('oil'),acId:ac.acId,date,time,l:L,r:R,note:v('f-onote')}]]);closeSheet();toast(tg&&tg.state==='closed'?`Doplnění oleje zapsáno k letu ${tg.from}–${tg.to} ${fmtDate(tg.date)}`:'Doplnění oleje zapsáno – předvyplní se dalšímu letu');
   }});
+  oilTargetLive(ac);
+}
+// which flight the top-up goes to, shown before signing (a date in the past: the time must be typed, not left at "now")
+function oilTargetLive(ac){
+  const el=document.getElementById('f-otarget');if(!el)return;const dEl=document.getElementById('f-date'),tEl=document.getElementById('f-time');
+  const date=parseDate(v('f-date'));
+  if(dEl&&tEl&&date&&date!==todayISO()&&tEl.dataset.auto!=='0'&&dEl.dataset.last!==date){tEl.value='';tEl.dataset.auto='0';tEl.placeholder='čas doplnění';}
+  if(dEl)dEl.dataset.last=date||'';
+  const time=normHM(v('f-time'));
+  if(!date||parseHM(time)==null){el.innerHTML='<span class="muted">Zadejte datum a čas doplnění (UTC) – podle nich se olej přiřadí k letu.</span>';return}
+  const tg=oilTargetIn(S,ac.acId,date,time);
+  el.innerHTML=!tg?'Zapíše se k <b>dalšímu letu</b> (předvyplní se posádce).':tg.state==='closed'?`Zapíše se k letu <b class="mono">${esc(tg.from)}–${esc(tg.to)} ${fmtDate(tg.date)} ${esc(normHM(tg.out||tg.off))}Z</b> – ten už je podepsaný, olej se do jeho záznamu doplní dodatečně (s vaším jménem v historii).`:`Zapíše se k letu <b class="mono">${esc(tg.from)}–${esc(tg.to)} ${fmtDate(tg.date)}</b> (předvyplní se při jeho uzavření).`;
 }
 function oilPendingNote(acId){const pd=oilPending(acId,null);if(!pd)return '';
   return `<div class="warnline info" style="margin:0"><b>Doplněno před dalším letem:</b> olej L ${pd.l} l · P ${pd.r} l <span class="muted">(${pd.who})</span></div>`}

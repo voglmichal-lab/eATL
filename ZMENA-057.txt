@@ -1,0 +1,36 @@
+eTechLog – změna Z-057
+Verze: 0.7.19 (navazuje na Z-056 / 0.7.18)
+Datum: 2026-11-23
+
+Doplnění oleje (tlačítko Doplnění oleje / Jen doplnění oleje u prohlídky):
+- Olej se přiřadí k letu, jehož off-block následuje po zadaném čase doplnění.
+  Když je ten let už podepsaný (zápis zpětně), olej se do jeho záznamu doplní dodatečně –
+  v Detailu letu je vidět a v historii letu je „Olej doplněn na zemi před letem – zapsáno dodatečně“ se jménem.
+  Dalšímu letu se pak už nepředvyplní.
+- Když po čase doplnění žádný let není, předvyplní se jako dosud dalšímu letu.
+- Formulář pod políčky ukazuje, ke kterému letu se olej zapíše (např. „Zapíše se k letu LCLK–LIML 22/11/2026 15:15Z – ten už je podepsaný…“).
+- Při změně data na jiný den než dnes se čas vymaže – dřív v něm zůstal aktuální čas, a zpětný zápis se tak
+  přiřadil až k dalšímu letu.
+
+Pozn.: doplnění zapsané dřív (před touto verzí) se přiřadí podle svého uloženého času.
+
+Návrat
+- Na 0.7.18: eatl-Z-056-v0.7.18.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-057.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

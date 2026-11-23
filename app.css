@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.7.18"}
+:root{--etl-build:"0.7.19"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -724,3 +724,4 @@ table.ofplog .ofp-notebtn span{max-width:100%;white-space:normal;overflow-wrap:a
 .fgrid+.fgrid{margin-top:10px}
 .fg-arrow{font-size:1.4rem;color:var(--muted);padding:0 2px 12px;line-height:1}
 @media (max-width:560px){.fgrid.fg3{grid-template-columns:1fr 1fr}.fgrid.fg3>.fld:first-child{grid-column:1/-1}.fgrid.fg-route{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}.fgrid.fg-route>.fld:last-child{grid-column:1/-1}}
+.oil-target{margin:8px 0 0;padding:8px 12px;border-radius:6px;background:var(--accent-soft);font-size:.9rem}
