@@ -1618,11 +1618,11 @@ function viewOfp(o,u){
       <div class="ob-t key"><span>Trip fuel</span><b class="mono">${f.trip?fmtN(f.trip.fuel):'–'}<small> lbs</small></b>${f.trip&&f.trip.time?`<em class="mono">${esc(f.trip.time)}</em>`:''}</div>
       <div class="ob-t key"><span>Ramp MREQ</span><b class="mono">${fmtN(f.rampMreq)}<small> lbs</small></b></div>
       <div class="ob-t"><span>Vzdálenost</span><b class="mono">${fmtN(o.dist)}<small> NM</small></b></div>
-      <div class="ob-t"><span>PAX / POB</span><b class="mono">${esc(o.totPax??'–')} / ${esc(o.pob??'–')}</b></div>
+      <div class="ob-t"><span>PAX / POB</span><b class="mono">${esc(o.totPax??'–')} / ${esc(o.pob??'–')}</b>${o.pax?`<em class="mono" title="muži / ženy / děti / kojenci">M ${o.pax.m} · F ${o.pax.f} · C ${o.pax.c} · I ${o.pax.i}</em>`:''}</div>
     </div>
     ${ofpAltnBlock(o)}
     <div class="two">
-      <div><p class="label">Plán letu</p><dl class="kvgrid"><dt>PAX / POB</dt><dd class="mono">${o.pax?`${o.pax.m}/${o.pax.f}/${o.pax.c}/${o.pax.i}`:'–'} · ${esc(o.totPax??'')} PAX · POB ${esc(o.pob??'')} · cargo ${fmtN(o.cargo)} lb</dd><dt>Druh</dt><dd>${esc(o.ops||'')}</dd></dl>
+      <div><p class="label">Plán letu</p><dl class="kvgrid"><dt>Cestující</dt><dd>${o.pax?`<span class="pax-mf">muži <b class="mono">${o.pax.m}</b> · ženy <b class="mono">${o.pax.f}</b> · děti <b class="mono">${o.pax.c}</b> · kojenci <b class="mono">${o.pax.i}</b> · celkem <b class="mono">${esc(o.totPax??'')}</b></span>`:`celkem <b class="mono">${esc(o.totPax??'–')}</b>`}</dd><dt>POB</dt><dd class="mono">${esc(o.pob??'–')}</dd><dt>Cargo</dt><dd class="mono">${fmtN(o.cargo)} lb</dd><dt>Druh</dt><dd>${esc(o.ops||'')}</dd></dl>
         <p class="label" style="margin-top:6px">ATC route</p><p class="mono" style="font-size:.84rem;overflow-wrap:anywhere">${esc(o.route||'')}</p></div>
       <div><p class="label">Palivo (lbs)</p><table class="plain"><tbody>${fr('trip','Trip')}${fr('altn','Alternate')}${fr('cont','Contingency')}${fr('final','Final reserve')}${fr('taxi','Taxi')}${fr('add','Additional')}${fr('extra','Extra')}
         <tr><td><b>Ramp MREQ</b></td><td></td><td class="r mono"><b>${fmtN(f.rampMreq)}</b></td></tr><tr><td>Ramp EST</td><td></td><td class="r mono">${fmtN(f.rampEst)}</td></tr><tr><td>Used CALC</td><td></td><td class="r mono">${fmtN(f.usedCalc)}</td></tr>${fr('discr','Discretionary')}</tbody></table>
@@ -1720,7 +1720,7 @@ async function ofpPdf(o){
   T(`PIC ${cr.picN||'–'}  ·  SIC ${cr.sicN||'–'}  ·  Palubní průvodčí ${cr.caN||'–'}  ·  CMD v OFP ${o.cmd||'–'}`,M,y,'b',9);y-=8;HL(y,M,PW-M,C.ink,1);y-=4;
   // --- plan and fuel ---
   section('Plán letu');
-  cells([['Vzdálenost',`${fmtN(o.dist)} NM`],['Max FL',o.maxFl],['Vítr',o.wind],['PAX / POB',`${o.totPax??'–'} PAX · POB ${o.pob??'–'}`],['Cargo',o.cargo!=null?fmtN(o.cargo)+' lb':''],['Druh',o.ops]],6);
+  cells([['Vzdálenost',`${fmtN(o.dist)} NM`],['Max FL',o.maxFl],['Vítr',o.wind],['PAX M/F/C/I · POB',`${o.pax?`${o.pax.m}/${o.pax.f}/${o.pax.c}/${o.pax.i} (${o.totPax??'–'})`:(o.totPax??'–')+' PAX'} · POB ${o.pob??'–'}`],['Cargo',o.cargo!=null?fmtN(o.cargo)+' lb':''],['Druh',o.ops]],6);
   if(o.route){need(24);T('ATC route',M,y,'b',7,C.mute);y-=10.5;for(const ln of wrap(o.route,'m',8,CW)){need(10);T(ln,M,y,'m',8);y-=10}y-=2}
   section('Palivo (lbs)');
   const fk2=[['trip','Trip'],['altn','Alternate'],['cont','Contingency'],['final','Final reserve'],['taxi','Taxi'],['add','Additional'],['extra','Extra'],['discr','Discretionary']].filter(([k])=>f[k]);

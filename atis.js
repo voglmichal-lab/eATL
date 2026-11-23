@@ -758,8 +758,11 @@ function notePress(f, code) {
   else if (code.startsWith('nt:')) {
     const ch = code.slice(3), fq = noteFreq(note.slice(0, pos));
     // frequency after FREQ: 1 3 3 3 5 5 → 133.355 (a typed dot is not doubled, at most 3 + 3 digits)
-    if (fq != null && /^[\d.]$/.test(ch)) { const dg = fq.replace(/\D/g, ''); if (ch === '.' ? fq.includes('.') || dg.length !== 3 : dg.length >= 6) { renderDock(); return }
-      const add = ch !== '.' && dg.length === 3 && !fq.includes('.') ? '.' + ch : ch; note = note.slice(0, pos) + add + note.slice(pos); pos += add.length }
+    // without the leading 1 as in the clearance: 2 0 5 3 → 120.53, 3 3 3 5 5 → 133.355, 1 2 1 5 → 121.5
+    if (fq != null && /^[\d.]$/.test(ch)) { const dg = fq.replace(/\D/g, '');
+      if (ch === '.') { if (fq.includes('.') || freqNorm(dg).length !== 3) { renderDock(); return } note = note.slice(0, pos) + '.' + note.slice(pos); pos++ }
+      else { const n = freqNorm(dg + ch); if (n.length > 6 || !freqPre(n)) { renderDock(); return }
+        const out = n.length > 3 ? n.slice(0, 3) + '.' + n.slice(3) : n, st = pos - fq.length; note = note.slice(0, st) + out + note.slice(pos); pos = st + out.length } }
     else { note = note.slice(0, pos) + ch + note.slice(pos); pos += ch.length } }
   ACT.pos = pos; save(f.o, f.key, { v: f.v, note, prev: f.prev }); refreshField(f.o.ofpId, f.key); renderDock();
 }

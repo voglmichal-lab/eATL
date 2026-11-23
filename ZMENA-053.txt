@@ -1,0 +1,31 @@
+eTechLog – změna Z-053
+Verze: 0.7.15 (navazuje na Z-052 / 0.7.14)
+Datum: 2026-11-23
+
+- OFP krok 1 – cestující podle OFP (PAX M/F/C/I):
+  - dlaždice PAX / POB má pod čísly řádek „M 1 · F 1 · C 0 · I 0“,
+  - v Plánu letu: Cestující – muži, ženy, děti, kojenci, celkem; zvlášť POB a Cargo,
+  - v PDF OFP: „PAX M/F/C/I · POB“ = 1/1/0/0 (2) · POB 4.
+- ATIS – frekvence za FREQ (rychlá poznámka i vlastní poznámka): jde zadat bez úvodní jedničky
+  stejně jako v clearance: 2053 → 120.53, 33355 → 133.355, 1875 → 118.75. S jedničkou to funguje dál.
+
+Návrat
+- Na 0.7.14: eatl-Z-052-v0.7.14.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-053.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js
