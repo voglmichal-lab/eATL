@@ -1716,7 +1716,7 @@ function viewOfp(o,u){
     </div>
     ${ofpAltnBlock(o)}
     <div class="two">
-      <div><p class="label">Plán letu</p><dl class="kvgrid"><dt>Cestující</dt><dd>${o.pax?`<span class="pax-mf">muži <b class="mono">${o.pax.m}</b> · ženy <b class="mono">${o.pax.f}</b> · děti <b class="mono">${o.pax.c}</b> · kojenci <b class="mono">${o.pax.i}</b> · celkem <b class="mono">${esc(o.totPax??'')}</b></span>`:`celkem <b class="mono">${esc(o.totPax??'–')}</b>`}</dd><dt>POB</dt><dd class="mono">${esc(o.pob??'–')}</dd><dt>Cargo</dt><dd class="mono">${fmtN(o.cargo)} lb</dd><dt>Druh</dt><dd>${esc(o.ops||'')}</dd></dl>
+      <div><p class="label">Plán letu</p><dl class="kvgrid"><dt>PAX M/F/C/I</dt><dd class="mono" title="muži / ženy / děti / kojenci">${o.pax?`${o.pax.m}/${o.pax.f}/${o.pax.c}/${o.pax.i} · ${esc(o.totPax??'')} PAX`:`${esc(o.totPax??'–')} PAX`}</dd><dt>POB</dt><dd class="mono">${esc(o.pob??'–')}</dd><dt>Cargo</dt><dd class="mono">${fmtN(o.cargo)} lb</dd><dt>Druh</dt><dd>${esc(o.ops||'')}</dd></dl>
         <p class="label" style="margin-top:6px">ATC route</p><p class="mono" style="font-size:.84rem;overflow-wrap:anywhere">${esc(o.route||'')}</p></div>
       <div><p class="label">Palivo (lbs)</p><table class="plain"><tbody>${fr('trip','Trip')}${fr('altn','Alternate')}${fr('cont','Contingency')}${fr('final','Final reserve')}${fr('taxi','Taxi')}${fr('add','Additional')}${fr('extra','Extra')}
         <tr><td><b>Ramp MREQ</b></td><td></td><td class="r mono"><b>${fmtN(f.rampMreq)}</b></td></tr><tr><td>Ramp EST</td><td></td><td class="r mono">${fmtN(f.rampEst)}</td></tr><tr><td>Used CALC</td><td></td><td class="r mono">${fmtN(f.usedCalc)}</td></tr>${fr('discr','Discretionary')}</tbody></table>

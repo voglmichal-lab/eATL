@@ -1,0 +1,29 @@
+eTechLog – změna Z-064
+Verze: 0.7.26 (navazuje na Z-063 / 0.7.25)
+Datum: 2026-11-24
+
+- ATIS: čas vysílání už není nad písmenem INFO, ale v nadpisu vedle ICAO letiště
+  („ATIS DEP EGGW  ČAS 1400“). Řádek polí ATIS je tak zase nízký jako dřív.
+  Klepnutím na čas se otevře klávesnice na čase; pořadí kláves se nemění (po písmenu INFO jde čas).
+  Čas se dál zapne / vypne v Můj účet → Zápis ATIS a clearance → ČAS.
+
+Návrat
+- Na 0.7.25: eatl-Z-063-v0.7.25.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-064.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

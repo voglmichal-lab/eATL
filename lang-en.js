@@ -2399,6 +2399,8 @@ self.ETL_EN={
 "Spotřeba = doplněný olej ÷ nalétané hodiny v období. Rostoucí spotřeba na jednom motoru bývá časný signál problému; limity jsou v EMM motoru.":"Consumption = oil added ÷ hours flown in the period. Rising consumption on one engine is often an early sign of a problem; limits are in the engine EMM.",
 "1 litr za {0} FH":"1 litre per {0} FH",
 "litry":"litres",
+"PAX M/F/C/I":"PAX M/F/C/I",
+"čas vysílání ATIS („at time 1230“) – v nadpisu vedle letiště":"ATIS broadcast time (“at time 1230”) – in the heading next to the airport",
 "CRS {0} ({1}) · {2} · TTAF {3} / {4} cyklů":"CRS {0} ({1}) · {2} · TTAF {3} / {4} cycles",
 "Na {0} probíhá jiný let {1} → {2} – nejdřív ho uzavřete.":"Another flight {1} → {2} is in progress on {0} – close it first.",
 "Plán: ramp EST {0} · used CALC {1} lbs":"Plan: ramp EST {0} · used CALC {1} lbs",

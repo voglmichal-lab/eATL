@@ -26,7 +26,7 @@ const REM_DEF = ['BIRDS', 'GNSS RFI', 'WORKS', 'TWY _ CLSD', 'LVP'];
 const DEF = {
   atis: {
     info: { l: 'INFO', ph: 'D', h: 'Písmeno informace – „Delta“ je D.' },
-    time: { l: 'ČAS', ph: '1320', dig: 1, d: 'čas vysílání ATIS („at time 1230“) – nad písmenem', h: 'Čas vysílání (UTC), čtyři číslice – „at time 1230“.' },
+    time: { l: 'ČAS', ph: '1320', dig: 1, d: 'čas vysílání ATIS („at time 1230“) – v nadpisu vedle letiště', h: 'Čas vysílání (UTC), čtyři číslice – „at time 1230“.' },
     app: { l: 'APP', ph: 'ILS', h: 'Typ přiblížení, varianta Z / Y / X, CAT II. Může zaznít před dráhou i po ní. Když nezazní, pište dál – číslice skočí do dalšího pole.' },
     rwy: { l: 'RWY', ph: '24', dig: 1, h: 'Dráha, dvě číslice. L, C nebo R přidáte tlačítkem.' },
     cond: { l: 'STAV RWY', ph: 'WET', dig: 1, skip: 1, h: 'Jak zazní: číslice = RWYCC (5 5 5 = 5/5/5), pokrytí 25–100 %, mm a číslice = hloubka, povrch. Jednou pro celou dráhu, po třetinách jen když se liší.' },
@@ -134,11 +134,13 @@ const freqNorm = d => (d = String(d || ''), /^[23]/.test(d) || /^1[89]/.test(d) 
 const freqPre = n => n.length <= 6 && (n === '' || (n[0] === '1' && (n.length < 2 || '123'.includes(n[1])) && (n.length < 3 || (n[1] === '1' ? '89'.includes(n[2]) : n[1] === '3' ? n[2] <= '6' : true))));
 function fmtFreq(d, live) { const n = freqNorm(d); if (n.length < 3) return n; const dec = n.slice(3); return n.slice(0, 3) + (dec || !live ? '.' + (live ? dec : dec.padEnd(2, '0')) : '') }
 const prefixOnly = g => !!g && /^[−+]?(VC)?(SH|TS|FZ)?$/.test(g);
+// a weather group has at most one descriptor: SH then FZ = two groups (VCSH FZFG), and there is no VCFZ
+const glueTo = (last, t) => prefixOnly(last) && !(/^(SH|TS|FZ)$/.test(t) && /(SH|TS|FZ)$/.test(last)) && !(t === 'FZ' && /VC$/.test(last));
 function atomsStr(a) {
   const out = []; let prev = null;
   for (const t of (a || [])) {
     const isD = /^\d$/.test(t), last = out.length ? out[out.length - 1] : null;
-    const glue = last !== null && ((isD && (/\d$/.test(last) || CT.includes(prev))) || (!isD && (prefixOnly(last) || (PRECIP.includes(t) && PRECIP.includes(prev)))));
+    const glue = last !== null && ((isD && (/\d$/.test(last) || CT.includes(prev))) || (!isD && (glueTo(last, t) || (PRECIP.includes(t) && PRECIP.includes(prev)))));
     if (glue) out[out.length - 1] = last + t; else out.push(t); prev = t;
   }
   return out.join(' ');
@@ -165,7 +167,7 @@ function fmtTrend(a, live) {
       out.push(fmtVis(s, live && j >= a.length)); first = false; prevT = 'VIS'; i = j; continue;
     }
     const last = out.length ? out[out.length - 1] : null;
-    if (last !== null && (prefixOnly(last) || (PRECIP.includes(t) && PRECIP.includes(prevT)) || ((t === 'CB' || t === 'TCU') && prevT === 'H'))) out[out.length - 1] = last + t; else out.push(t);
+    if (last !== null && (glueTo(last, t) || (PRECIP.includes(t) && PRECIP.includes(prevT)) || ((t === 'CB' || t === 'TCU') && prevT === 'H'))) out[out.length - 1] = last + t; else out.push(t);
     first = false; prevT = t; i++;
   }
   return out.join(' ');
@@ -224,6 +226,7 @@ function load(o, key) {
   return { v, note: String(st.note || ''), saved: true, text, prev: Array.isArray(st.prev) ? st.prev.slice(-5) : [] };
 }
 function save(o, key, st) {
+  LAST_ED[o.ofpId + '|' + key] = Date.now();
   const line = lineOf(FIELDS[key].type, st.v, (st.note || '').trim());
   API.ofpSet(o.ofpId, 'k_' + key, JSON.stringify(Object.assign({ v: st.v, note: st.note || '', line }, st.prev && st.prev.length ? { prev: st.prev.slice(-5) } : {})));
   API.ofpSet(o.ofpId, key, line);
@@ -332,7 +335,11 @@ function letter(f, k, L) {
     if (f.type === 'atis' && v.info && L !== v.info && others && f.prev) {
       const last = f.prev[f.prev.length - 1], snap = JSON.stringify(Object.assign({}, v, { info: '' }));
       // a mistyped letter right after the switch is replaced, not archived
-      if (!(last && JSON.stringify(Object.assign({}, last.v, { info: '' })) === snap)) f.prev.push({ info: v.info, v: JSON.parse(JSON.stringify(v)), line: lineOf(f.type, v, '') });
+      // fields rewritten before the letter (time first, then E → F) belong to the new ATIS: the old one keeps its own values
+      const bk = f.o.ofpId + '|' + f.key, b = BASE[bk], av = JSON.parse(JSON.stringify(v));
+      if (b && b.info === v.info) for (const s2 in av) if (s2 !== 'info' && b[s2] !== undefined && !/^(""|\[\]|null|\{\})$/.test(JSON.stringify(b[s2])) && JSON.stringify(b[s2]) !== JSON.stringify(av[s2])) av[s2] = JSON.parse(JSON.stringify(b[s2]));
+      delete BASE[bk];
+      if (!(last && JSON.stringify(Object.assign({}, last.v, { info: '' })) === snap)) f.prev.push({ info: v.info, v: av, line: lineOf(f.type, av, '') });
       const from = f.prev[f.prev.length - 1].info; v.info = L; ACT.newAtis = from;
       HINT = `Nový ATIS ${L}: hodnoty z ${from} zůstaly. Přepište, co se změnilo – ťuknutím na pole nebo Další ›.`;
       adv(f); return;
@@ -568,9 +575,14 @@ function slotHTML(f, i, s) {
 function slotsHTML(f) {
   const show = (s, i) => !s.skip || hasVal(f, i) || (ACT && ACT.oid === f.o.ofpId && ACT.key === f.key && ACT.s === i);
   const out = f.L.map((s, i) => show(s, i) ? slotHTML(f, i, s) : '');
-  // ATIS: the broadcast time sits in a small box above the letter ("ATIS L at time 1230")
-  if (f.type === 'atis') { const i = f.L.findIndex(s => s.k === 'info'); if (i >= 0 && f.L[i + 1] && f.L[i + 1].k === 'time' && out[i + 1]) { out[i] = `<span class="ak-stack">${out[i + 1].replace('class="ak-slot', 'class="ak-slot mini')}${out[i]}</span>`; out[i + 1] = '' } }
+  // ATIS: the broadcast time is not a box in the row – it sits in the heading next to the airport (timeHTML)
+  if (f.type === 'atis') { const i = f.L.findIndex(s => s.k === 'time'); if (i >= 0) out[i] = '' }
   return out.join('');
+}
+// "ATIS DEP EGGW  ČAS 1400" – the time box in the heading, small; tapping it opens the keypad on the time
+function timeHTML(f) {
+  if (f.type !== 'atis') return ''; const i = f.L.findIndex(s => s.k === 'time'); if (i < 0) return '';
+  return slotHTML(f, i, f.L[i]).replace('class="ak-slot', 'class="ak-slot mini hdr');
 }
 function outHTML(f) {
   const line = f.st.text;
@@ -589,7 +601,9 @@ function prevHTML(f) {
 function field(o, key, locked) {
   const F0 = FIELDS[key]; if (!F0) return '';
   const apt = aptOf(o, key), id = domId(o, key);
-  const head = `<div class="atf-h"><span class="label">${esc(F0.title)}</span><span class="mono muted">${esc(apt)}${F0.type === 'clr' && o.des ? ' → ' + esc(o.des) : ''}</span>${F0.type === 'atis' && !(locked || o.closed || o.void) ? `<span class="sp"></span><button type="button" class="btn sm" data-ak-new="${key}" data-ak-o="${esc(o.ofpId)}">Nový ATIS</button>` : ''}</div>`;
+  const live = !(locked || o.closed || o.void), st0 = live && F0.type === 'atis' ? load(o, key) : null;
+  const tm = st0 ? `<span class="atf-tm" id="${id}-tm">${timeHTML({ o, key, type: F0.type, v: st0.v, st: st0, prev: st0.prev, L: slotsOf(F0.type) })}</span>` : '';
+  const head = `<div class="atf-h"><span class="label">${esc(F0.title)}</span><span class="mono muted">${esc(apt)}${F0.type === 'clr' && o.des ? ' → ' + esc(o.des) : ''}</span>${tm}${F0.type === 'atis' && !(locked || o.closed || o.void) ? `<span class="sp"></span><button type="button" class="btn sm" data-ak-new="${key}" data-ak-o="${esc(o.ofpId)}">Nový ATIS</button>` : ''}</div>`;
   if (locked || o.closed || o.void) return `<div class="atf">${head}<p class="mono atf-ro">${esc(API.ofpVal(o, key) || '–')}</p></div>`;
   const st = load(o, key), f = { o, key, type: F0.type, v: st.v, st, prev: st.prev, L: slotsOf(F0.type) };
   return `<div class="atf" id="${id}">${head}
@@ -602,6 +616,7 @@ function field(o, key, locked) {
 function refreshField(oid, key) {
   const f = ctxOf(oid, key); if (!f) return; const id = domId(f.o, key);
   const sl = document.getElementById(id + '-sl'); if (sl) sl.innerHTML = slotsHTML(f);
+  const tm = document.getElementById(id + '-tm'); if (tm) tm.innerHTML = timeHTML(f);
   const out = document.getElementById(id + '-out'); if (out) out.innerHTML = outHTML(f);
   const pv = document.getElementById(id + '-pv'); if (pv) pv.innerHTML = prevHTML(f);
   const nt = document.getElementById(id + '-nt'); if (nt && document.activeElement !== nt && nt.value !== f.st.note) nt.value = f.st.note;
@@ -772,8 +787,12 @@ function ensureVisible(id) {
   let dy = 0; if (r.bottom > lim) dy = r.bottom - lim; if (r.top - dy < top) dy = r.top - top;
   if (Math.abs(dy) > 2) window.scrollBy({ top: dy, behavior: 'smooth' });
 }
+// the ATIS as it stood when its keypad was opened (complete, this letter) – what the letter archives if fields change before it
+const BASE = {}, LAST_ED = {};
 function open(oid, key, i) {
   const f = ctxOf(oid, key); if (!f) return;
+  // taken when the keypad is opened after a pause (a new broadcast comes minutes later, not while the first one is being typed)
+  if (f.type === 'atis') { const bk = oid + '|' + key, v = f.v; if (v.info && f.L.some((s, j) => s.k !== 'info' && hasVal(f, j)) && Date.now() - (LAST_ED[bk] || 0) > 120000) BASE[bk] = JSON.parse(JSON.stringify(v)) }
   const prev = ACT && ACT.oid === oid && ACT.key === key && ACT.mode !== 'atc' ? null : ACT;
   ACT = { oid, key, s: 0, fresh: false }; setSlot(f, i == null ? firstEmpty(f) : i); HINT = null;
   leave(prev);
