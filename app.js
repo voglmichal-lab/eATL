@@ -594,7 +594,7 @@ function bindControl(){return `<div class="inline"><select id="bind-sel" aria-la
 
 function renderApp(){
   const u=me();const ac=S.ac[UI.acId];
-  {const ins=inspDraft(u);if(ins&&S.ac[ins.acId]){UI.acId=ins.acId;return `<div class="wrap view">${viewInsp(ins,S.ac[ins.acId],u)}</div>`}}
+  {const ins=inspDraft(u);if(ins&&!ins.away&&S.ac[ins.acId]){UI.acId=ins.acId;return `<div class="wrap view">${viewInsp(ins,S.ac[ins.acId],u)}</div>`}}
   if(!ac){
     if(can.admin(u))return `<div class="wrap view">${UI.tab==='admin'?`<div class="chips"><button class="btn" data-act="tab" data-id="setup">‹ Úvodní nastavení</button></div>${viewAdmin(u)}`:viewSetup(u)}</div>`;
     return `<div class="wrap view"><div class="empty"><h2>Zatím žádné letadlo</h2><p>Deník se teprve nastavuje. Požádejte správce nebo CAMO o dokončení úvodního nastavení.</p></div></div>`;
@@ -615,7 +615,7 @@ function renderApp(){
     if(ac.openLeg)acts.push(`<button class="btn primary" data-act="close-flight">${ICON.check}Uzavřít let ${esc(ac.openLeg.from)} → ${esc(ac.openLeg.to)}</button>`);
     else{acts.push(`<button class="btn primary" data-act="start-flight">${ICON.plus}Začít let</button>`);if(has(u,'camo'))acts.push(`<button class="btn" data-act="leg-form">Zapsat let ručně (z papíru)</button>`)}
   }
-  if(can.svc(u))acts.push(`<button class="btn ${can.leg(u)?'':'primary'}" data-act="insp-start">${ICON.clip}Provést prohlídku</button>`);
+  if(can.svc(u))acts.push(`<button class="btn ${can.leg(u)?'':'primary'}" data-act="insp-start">${ICON.clip}${inspDraft(u)?'Pokračovat v prohlídce':'Provést prohlídku'}</button>`);
   else if(can.daily(u)&&has(u,'mech'))acts.push(`<button class="btn" data-act="daily-form">${ICON.clip}Prohlídka</button>`);
   acts.push(`<button class="btn" data-act="defect-form">${ICON.alert}Zapsat závadu</button>`);
   if(can.crs(u))acts.push(`<button class="btn" data-act="crs-form">${ICON.check}Uvolnit do provozu (CRS)</button>`);else if(can.prepCrs(u))acts.push(`<button class="btn" data-act="crs-form">${ICON.check}Připravit uvolnění (CRS)</button>`);
@@ -634,7 +634,7 @@ function renderApp(){
   if(canDel(u))tabs.push(['testdel','Mazání (test)','!','warn']);
   if(!ac.isLive&&['log','ofp','crs'].includes(UI.tab))UI.tab=can.admin(u)?'setup':'defects';
   if(!tabs.some(t=>t[0]===UI.tab))UI.tab='log';
-  const tabHtml=`<div class="wrap"><div class="actions">${acts.join('')}</div>${oilPendingNote(ac.acId)}${prepNote(ac.acId)}${svcFlagsNote(ac.acId,u)}<nav class="tabs" role="tablist">${tabs.map(t=>`<button class="tab ${UI.tab===t[0]?'on':''}" role="tab" aria-selected="${UI.tab===t[0]}" data-act="tab" data-id="${t[0]}">${t[1]}${t[2]?`<span class="cnt ${t[3]||''}">${t[2]}</span>`:''}</button>`).join('')}</nav></div>`;
+  const tabHtml=`<div class="wrap"><div class="actions">${acts.join('')}</div>${inspAwayNote(u)}${oilPendingNote(ac.acId)}${prepNote(ac.acId)}${svcFlagsNote(ac.acId,u)}<nav class="tabs" role="tablist">${tabs.map(t=>`<button class="tab ${UI.tab===t[0]?'on':''}" role="tab" aria-selected="${UI.tab===t[0]}" data-act="tab" data-id="${t[0]}">${t[1]}${t[2]?`<span class="cnt ${t[3]||''}">${t[2]}</span>`:''}</button>`).join('')}</nav></div>`;
   let view='';
   switch(UI.tab){
     case 'log':view=viewLog(ac,u);break;
@@ -1497,8 +1497,8 @@ function ofpFlush(){
   softRender();flush();
 }
 function ofpSet(id,k,val){const oo=ofpOf(id);if(oo&&(oo.closed||oo.void))return;if(!UI.ofpDirty||UI.ofpDirty.id!==id){ofpFlush();UI.ofpDirty={id,data:{}}}UI.ofpDirty.data[k]=val;clearTimeout(ofpFlush.t);ofpFlush.t=setTimeout(ofpFlush,2500)}
-window.addEventListener('pagehide',()=>{try{ofpFlush()}catch(e){}});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{ofpFlush()}catch(e){}}});
+window.addEventListener('pagehide',()=>{try{ofpFlush()}catch(e){}try{if(inspInput.t){clearTimeout(inspInput.t);inspSave()}}catch(e){}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{ofpFlush()}catch(e){}try{if(inspInput.t){clearTimeout(inspInput.t);inspSave()}}catch(e){}}});
 
 function ofpStatus(o){if(o.void)return ['mute','zrušeno'];if(o.closed)return ['ok','uzavřeno'];if(o.leg&&o.leg.state==='closed')return ['ok','let uzavřen'];if(o.leg)return ['info','let probíhá'];return ['caution','plánováno']}
 function viewOfpList(ac){
@@ -1978,7 +1978,6 @@ function ofpAltnBlock(o){
       <div class="altn-h"><span class="ann info">ALTN${n>1?' '+n:''}</span><b class="mono altn-icao">${esc(a.icao)}</b><span class="altn-name">${esc(a.name&&(!h.name||a.name.startsWith(h.name))?a.name:(h.name||a.name||''))}</span>${h.eta?`<span class="mono">ETA ${esc(h.eta)}Z</span>`:''}</div>
       ${facts?`<div class="altn-f">${facts}</div>`:''}
       ${a.route||a.via?`<p class="altn-r"><small>Trať</small> <span class="mono">${esc(a.route||a.via)}</span></p>`:''}
-      ${a.sun?`<p class="altn-s muted">Východ slunce <span class="mono">${esc(a.sun[1])}Z</span> · západ <span class="mono">${esc(a.sun[2])}Z</span> <small>(soumrak ${esc(a.sun[0])}–${esc(a.sun[3])}Z)</small></p>`:''}
     </div>`};
   return `<div class="ob-altn"><p class="label">Záložní letiště</p><div class="altn-cards">${list.map(card).join('')}</div></div>`;
 }
@@ -3156,14 +3155,40 @@ function svcItems(kind){return SVC_ITEMS.filter(i=>!i.only||i.only===kind)}
 function svcItemTitle(k,kind){const i=SVC_ITEMS.find(x=>x.k===k);if(!i)return k;return typeof i.t==='string'?i.t:(i.t[kind]||i.t.SVC_PRE)}
 function svcOpenFlags(r){return Object.entries(r.items||{}).filter(([k,x])=>x&&x.flag&&!S.svcRes[r.insId+'|'+k]).map(([k,x])=>({k,note:x.note||'',r}))}
 function svcFlagTxt(p){const n=Object.values(p.items||{}).filter(x=>x&&x.flag).length;return n?` · nedostatky: ${n}`:''}
+// An inspection in progress is saved on every change, one draft per user (another mechanic on the same iPad
+// does not overwrite it). It survives going back to the log, a reload, the app being closed and logging out and in.
+// Kept for INSP_KEEP after the last change.
+const INSP_KEEP=24*3600e3;
+function inspAll(){const m=store.get('etl.inspd',null);if(m&&typeof m==='object')return m;
+  const old=store.get('etl.insp',null);const o={};if(old&&old.uid)o[old.uid]=Object.assign({saved:Date.now()},old);return o}
 function inspDraft(u){
-  if(UI.insp===undefined)UI.insp=store.get('etl.insp',null);
-  const d=UI.insp;if(d&&(!u||d.uid!==(u.userId||u.id)||!S.ac[d.acId])){return null}
-  return d||null}
-function inspSave(){store.set('etl.insp',UI.insp||null)}
-function inspNew(acId,kind){const u=me();UI.insp={uid:u.userId||u.id,acId,kind,date:todayISO(),items:{},meas:{},oilL:'',oilR:'',notes:'',open:{}};inspSave();render();window.scrollTo(0,0)}
+  if(!u)return null;const uid=u.userId||u.id;
+  if(UI.insp&&UI.insp.uid===uid)return S.ac[UI.insp.acId]?UI.insp:null;
+  const m=inspAll();let d=m[uid]||null;
+  if(d&&Date.now()-(d.saved||0)>INSP_KEEP){delete m[uid];store.set('etl.inspd',m);d=null}
+  UI.insp=d;return d&&S.ac[d.acId]?d:null}
+function inspSave(){
+  const m=inspAll();const d=UI.insp;
+  if(d){d.saved=Date.now();m[d.uid]=d}else{const u=me();if(u)delete m[u.userId||u.id]}
+  store.set('etl.inspd',m);if(store.get('etl.insp',null))store.set('etl.insp',null);
+  const el=document.getElementById('insp-saved');if(el&&d)el.textContent=inspSavedTxt(d)}
+function inspDrop(){const u=me();const m=inspAll();if(u)delete m[u.userId||u.id];UI.insp=null;store.set('etl.inspd',m)}
+function inspSavedTxt(d){return 'Průběžně ukládáno · '+new Date(d.saved||Date.now()).toISOString().slice(11,16)+'Z'}
+function inspNew(acId,kind){const u=me();UI.insp={uid:u.userId||u.id,acId,kind,date:todayISO(),items:{},meas:{},oilL:'',oilR:'',notes:'',open:{},started:Date.now()};inspSave();render();window.scrollTo(0,0)}
+function inspCount(d){const items=svcItems(d.kind);return [items.filter(i=>(d.items[i.k]||{}).done).length,items.length]}
+// banner while the inspection is put aside (mechanic went back to the log)
+function inspAwayNote(u){
+  const d=inspDraft(u);if(!d||!d.away)return '';const ac=S.ac[d.acId];const [n,all]=inspCount(d);
+  const t=new Date(d.saved||Date.now()).toISOString().slice(11,16);
+  return `<div class="warnline info insp-away"><span><b>Rozdělaná prohlídka</b> – ${esc(ac.reg)} · ${esc(SVC_KIND[d.kind])} · ${n}/${all} provedeno <span class="muted">· uloženo ${t}Z</span></span><span class="chips"><button type="button" class="btn sm primary" data-act="insp-resume">Pokračovat v prohlídce</button><button type="button" class="btn sm" data-act="insp-discard">Zahodit</button></span></div>`}
+function openInspDiscard(){
+  const d=UI.insp;if(!d)return;const [n,all]=inspCount(d);
+  openSheet('Zahodit rozdělanou prohlídku?',`<p class="txt">${esc(S.ac[d.acId].reg)} · ${esc(SVC_KIND[d.kind])} · ${n}/${all} provedeno. Zapsané údaje se smažou a prohlídka se nepodepíše.</p>`,{submit:'Zahodit prohlídku',onSubmit:async()=>{
+    inspDrop();closeSheet();render();window.scrollTo(0,0);toast('Prohlídka zahozena')}});
+}
 function openInspStart(){
   const ac=S.ac[UI.acId];if(!ac)return;
+  {const d=inspDraft(me());if(d){d.away=false;inspSave();UI.acId=d.acId;render();window.scrollTo(0,0);toast('Pokračujete v rozdělané prohlídce');return}}
   openSheet('Provést prohlídku – '+ac.reg,`<div class="insp-kinds">
       <button type="button" class="btn big primary" data-act="insp-kind" data-id="SVC_PRE">Před letem</button>
       <button type="button" class="btn big primary" data-act="insp-kind" data-id="SVC_POST">Po letu</button></div>
@@ -3175,7 +3200,7 @@ function viewInsp(d,ac,u){
   const defs=ac.open.concat(ac.deferred);
   const num=(id,label,val,unit,mode)=>`<label class="fld"><span>${label}${unit?` <small class="lim">${unit}</small>`:''}</span><input type="text" id="${id}" data-in="${id}" value="${esc(val||'')}" inputmode="${mode||'decimal'}" autocomplete="off"></label>`;
   return `<div class="insp" data-keep>
-    <div class="chips"><button type="button" class="btn" data-act="insp-cancel">‹ Zpět</button><span class="ann ${ac.status}">${esc(ac.reg)} · ${STATUS_LABEL[ac.status]}</span></div>
+    <div class="chips"><button type="button" class="btn" data-act="insp-away">‹ Deník</button><span class="ann ${ac.status}">${esc(ac.reg)} · ${STATUS_LABEL[ac.status]}</span></div>
     <div><p class="label">${esc(ac.reg)} · ${esc(u.name)}</p><h1>${esc(SVC_KIND[d.kind])}</h1></div>
     <div class="seg">${Object.entries(SVC_KIND).map(([k,t])=>`<button type="button" class="${d.kind===k?'on':''}" data-act="insp-switch" data-id="${k}">${k==='SVC_PRE'?'Před letem':'Po letu'}</button>`).join('')}</div>
     <div class="fgrid"><label class="fld"><span>Datum (UTC)</span><input type="text" id="insp-date" data-in="date" value="${esc(fmtDate(d.date))}" inputmode="numeric" autocomplete="off"></label></div>
@@ -3189,13 +3214,14 @@ function viewInsp(d,ac,u){
       ${showN?`<textarea id="insp-n-${i.k}" data-in="note:${i.k}" rows="2" placeholder="${x.flag?'Co je potřeba řešit (upozornění pro CAMO)':'Poznámka'}">${esc(x.note||'')}</textarea>`:''}</div>`}).join('')}</section>
     <label class="fld"><span>Poznámka k prohlídce</span><textarea id="insp-notes" data-in="notes" rows="2">${esc(d.notes||'')}</textarea></label>
     <div class="insp-bar"><span><b>${done}/${items.length}</b> provedeno${flags?` · <b class="warn-t">nedostatky: ${flags}</b>`:''}</span><button type="button" class="btn primary" data-act="insp-sign">Podepsat prohlídku</button></div>
+    <div class="insp-foot"><span class="muted" id="insp-saved">${esc(inspSavedTxt(d))}</span><button type="button" class="linkbtn" data-act="insp-discard">Zahodit prohlídku</button></div>
   </div>`;
 }
 function inspInput(t){
   const d=UI.insp;if(!d)return;const k=t.dataset.in,v=t.value;
   if(k==='date')d.date=v;else if(k==='notes')d.notes=v;else if(k==='insp-oill')d.oilL=v;else if(k==='insp-oilr')d.oilR=v;
   else if(k.startsWith('insp-m-'))d.meas[k.slice(7)]=v;else if(k.startsWith('note:')){const ik=k.slice(5);(d.items[ik]=d.items[ik]||{}).note=v}
-  clearTimeout(inspInput.t);inspInput.t=setTimeout(inspSave,400);
+  clearTimeout(inspInput.t);inspInput.t=setTimeout(()=>{inspInput.t=null;inspSave()},400);
 }
 function inspAct(a,id){
   const d=UI.insp;if(!d)return;const x=()=>d.items[id]=d.items[id]||{};
@@ -3222,7 +3248,7 @@ function inspSign(){
       ${flagged.length?`<dt>Nedostatky pro CAMO</dt><dd>${flagged.map(i=>`<div><b>${esc(svcItemTitle(i.k,d.kind))}</b> – ${esc(out[i.k].note)}</div>`).join('')}</dd>`:''}</dl>`,{submit:'Podepsat prohlídku',sign:true,onSubmit:async()=>{
     await checkPin();const insId=rid('ins');
     emit([['daily.sign',{insId,acId:ac.acId,date,kind:d.kind,time:nowHM(),items:out,meas,tyres:'',oil:oil?`${oil.l} / ${oil.r}`:'',brakes:false,notes:String(d.notes||'').trim()}]].concat(oil?[['oil.add',{svcId:rid('oil'),acId:ac.acId,date,time:nowHM(),l:oil.l,r:oil.r,note:d.kind==='SVC_PRE'?'při prohlídce před letem':'při prohlídce po letu'}]]:[]));
-    UI.insp=null;inspSave();closeSheet();render();window.scrollTo(0,0);toast(flagged.length?'Prohlídka podepsána – nedostatky vidí CAMO':'Prohlídka podepsána');
+    inspDrop();closeSheet();render();window.scrollTo(0,0);toast(flagged.length?'Prohlídka podepsána – nedostatky vidí CAMO':'Prohlídka podepsána');
   }});
 }
 // latest maintenance inspections of the aircraft (Releases tab) – CAMO sees them at once, also before any flight
@@ -3757,7 +3783,9 @@ document.addEventListener('click',e=>{
     case 'insp-daily':closeSheet();openDaily();break;
     case 'insp-done':case 'insp-flag':case 'insp-note':case 'insp-switch':inspAct(act,id);break;
     case 'insp-defect':{const d=UI.insp;const x=d&&id&&d.items[id];openDefectForm(id?(svcItemTitle(id,d.kind)+(x&&x.note?' – '+x.note:'')):'');break}
-    case 'insp-cancel':UI.insp=null;inspSave();render();window.scrollTo(0,0);toast('Prohlídka zrušena');break;
+    case 'insp-away':{const d=UI.insp;if(d){clearTimeout(inspInput.t);d.away=true;inspSave()}render();window.scrollTo(0,0);toast('Prohlídka uložena – pokračovat můžete kdykoli');break}
+    case 'insp-resume':openInspStart();break;
+    case 'insp-discard':openInspDiscard();break;
     case 'insp-sign':inspSign();break;
     case 'svc-detail':openSvcDetail(id);break;
     case 'svc-resolve':openSvcResolve(id);break;

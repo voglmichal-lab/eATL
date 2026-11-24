@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.7.26"}
+:root{--etl-build:"0.7.28"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -742,3 +742,7 @@ table.ofplog .ofp-notebtn span{max-width:100%;white-space:normal;overflow-wrap:a
 .ak-slot.mini.hdr{display:inline-flex;flex-direction:row;align-items:baseline;gap:8px;min-width:0;padding:2px 10px;min-height:30px}
 .ak-slot.mini.hdr .sl{font-size:.62rem}
 .ak-slot.mini.hdr .sv,.ak-slot.mini.hdr .pl,.ak-slot.mini.hdr .gh{font-size:.95rem}
+/* 0.7.27 inspection draft kept while away */
+.insp-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:.88rem}
+.insp-away{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.insp-away .chips{margin:0}

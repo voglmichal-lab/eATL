@@ -1,0 +1,27 @@
+eTechLog – změna Z-066
+Verze: 0.7.28 (navazuje na Z-065 / 0.7.27)
+Datum: 2026-11-24
+
+- OFP krok 1, Záložní letiště: u ALTN / ALTN 2 se už nezobrazuje východ a západ slunce (ani soumrak).
+  Karta má jen ETA, vzdálenost, FL, čas, palivo, MORA, TC a trať.
+
+Návrat
+- Na 0.7.27: eatl-Z-065-v0.7.27.zip.
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-066.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

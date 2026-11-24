@@ -69,3 +69,5 @@ Zip změny obsahuje jen změněné soubory ve správných složkách a popis `ZM
 | Z-062 | 0.7.24 | 2026-11-24 | OFP krok 1 – Plán letu: cestující jako PAX M/F/C/I (1/1/0/0 · 2 PAX) jako v OFP. |
 | Z-063 | 0.7.25 | 2026-11-24 | ATIS: nový ATIS zadaný nejdřív časem a pak písmenem – předchozí ATIS si nechá svůj čas (dřív dostal nový a ukazoval se jako „= E“). Jevy: jedna skupina má nejvýš jeden deskriptor – VC SH FZ FG = VCSH FZFG (dřív VCSHFZ FG). |
 | Z-064 | 0.7.26 | 2026-11-24 | ATIS: čas vysílání v nadpisu vedle ICAO letiště (malé pole, klepnutím se edituje), řádek polí ATIS je zase nízký. |
+| Z-065 | 0.7.27 | 2026-11-24 | Rozdělaná prohlídka technika se průběžně ukládá; „‹ Deník“ ji jen odloží (pruh Pokračovat / Zahodit), vydrží odhlášení, každý technik svou, 24 h od poslední změny. |
+| Z-066 | 0.7.28 | 2026-11-24 | OFP krok 1: u záložních letišť už není východ/západ slunce. |
