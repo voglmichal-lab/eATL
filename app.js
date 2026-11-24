@@ -755,7 +755,7 @@ function viewLog(ac,u){
       <div class="label" style="align-self:center">Celkem k přenosu</div><div class="v strong">${hm(pg.cfAir)}</div><div class="v">–</div><div class="v strong">${pg.cfCyc}</div>
     </div>
     <section class="sheet-sec"><span class="label">Prohlídky ${fmtDate(pg.date)}</span>
-      ${dailies.length?`<div class="list">${dailies.map(d=>`<div class="line-item${d.insId?' tap" data-act="svc-detail" data-id="'+esc(d.insId)+'" role="button" tabindex="0':''}"><span class="ann ${d.insId&&svcOpenFlags(d).length?'caution':'ok'}">${esc(DLAB(d.kind))}</span><span>${esc(d.name)}</span><span class="mono muted">${fmtTs(d.at)}</span>${d.tyres?`<span class="muted">Pneu N/L/P ${esc(d.tyres)} psi</span>`:''}${d.oil?`<span class="muted">Olej ${esc(d.oil)}</span>`:''}${d.brakes?'<span class="muted">Brzdy OK</span>':''}${d.notes?`<span>${esc(d.notes)}</span>`:''}</div>`).join('')}</div>`:`<p class="muted">Na tento den není podepsaná žádná prohlídka.</p>`}
+      ${dailies.length?`<div class="list">${dailies.map(d=>`<div class="line-item${d.insId?' tap" data-act="svc-detail" data-id="'+esc(d.insId)+'" role="button" tabindex="0':''}"><span class="ann ${d.insId&&svcOpenFlags(d).length?'caution':'ok'}">${esc(DLAB(d.kind))}${preSecLeg(ac,d)?' + security search':''}</span><span>${esc(d.name)}</span><span class="mono muted">${d.time||preSecLeg(ac,d)?fmtDate(d.date)+' '+esc(dailyHM(ac,d))+'Z':fmtTs(d.at)}</span>${d.tyres?`<span class="muted">Pneu N/L/P ${esc(d.tyres)} psi</span>`:''}${d.oil?`<span class="muted">Olej ${esc(d.oil)}</span>`:''}${d.brakes?'<span class="muted">Brzdy OK</span>':''}${d.notes?`<span>${esc(d.notes)}</span>`:''}</div>`).join('')}</div>`:`<p class="muted">Na tento den není podepsaná žádná prohlídka.</p>`}
     </section>
     ${(()=>{const cr=pg.legs.flatMap(l=>crsOf(l).map(c=>({at:c.at,html:`<div class="line-item tap" data-act="crs-detail" data-id="crs|${esc(c.crsId)}" role="button" tabindex="0"><span class="ann ok">CRS</span><span>po letu ${l.idx} ${esc(l.from)} → ${esc(l.to)}</span><span>${esc(crsTitle(c))}${c.wo?' · WO '+esc(c.wo):''}</span><span class="muted">${esc(c.name)} · ${esc(c.licence||'')} · ${fmtTs(c.at)}</span></div>`})).concat(
       rectOf(l).map(d=>({at:d.rect.at,html:`<div class="line-item tap" data-act="crs-detail" data-id="rect|${esc(d.defId)}" role="button" tabindex="0"><span class="ann ok">CRS k závadě</span><span>po letu ${l.idx} ${esc(l.from)} → ${esc(l.to)}</span><span>${esc(d.no)} – ${esc(d.text)}${d.rect.wo?' · WO '+esc(d.rect.wo):''}</span><span class="muted">${esc(d.rect.name)} · ${esc(d.rect.licence||'')} · ${fmtTs(d.rect.at)}</span></div>`})))).sort((a,b)=>a.at<b.at?-1:1);
@@ -1593,6 +1593,7 @@ function ofpSecPanel(o,u){
     ${oilPendingNote(o.acId)}${splitNote(S.ac[o.acId])}
     ${secTiles('c-secres',d.secRes,true)}
     ${d.secRes==='FOUND'?`<label class="fld"><span>Co a kde jste našli, komu nahlášeno</span><textarea data-k="secNote">${esc(d.secNote||'')}</textarea></label>`:''}
+    ${secTimeIn(d,o)}
     ${pre?'':`<label class="check"><input type="checkbox" data-k="pre" ${d.pre!==false?'checked':''}><span>Předletová prohlídka provedena – podepíše se zároveň</span></label>`}
     <p class="form-err" id="c-err" hidden></p>
     <button type="button" class="btn big primary" data-act="ofp-sec" data-id="${esc(o.ofpId)}">Podepsat a odeslat security search</button>
@@ -1607,10 +1608,10 @@ function ofpSecSign(id){
     if(!d.secRes)fail('Vyberte výsledek security search.');
     if(d.secRes==='FOUND'&&String(d.secNote||'').trim().length<3)fail('Popište, co jste našli a komu jste to nahlásili.');
     const today=todayISO();const date=o.date&&Math.abs(daysBetween(o.date,today))<=1?o.date:today;
-    const who=crewUser();const c=ofpCrew(o);const legId=rid('leg');crewBusyFail(ac.acId,[c.pic,c.sic,c.ca]);
+    const who=crewUser();const c=ofpCrew(o);const legId=rid('leg');crewBusyFail(ac.acId,[c.pic,c.sic,c.ca]);const secT=secTimeOf(d);
     const items=[['leg.open',{legId,acId:ac.acId,date,kind:'CAT',fno:String(o.flt||'').toUpperCase(),from:o.dep,to:o.des,std:o.std||'',pic:c.pic||who,sic:c.sic||'',sicTxt:c.sicTxt||'',ofpId:o.ofpId,fuelUp:null,fuelBlk:null,fuelMin:null,
-      sec:{time:nowHM(),place:o.dep,result:d.secRes,notes:d.secRes==='FOUND'?String(d.secNote).trim():d.secRes==='NA'?'Letadlo pod dohledem posádky':'',byName:(S.users[who]||{}).name||''}}]];
-    if(!hasPreToday(ac)&&d.pre!==false)items.push(['daily.sign',{acId:ac.acId,date,kind:'PRE',tyres:'',oil:'',brakes:false,notes:''}]);
+      sec:{time:secT,place:o.dep,result:d.secRes,notes:d.secRes==='FOUND'?String(d.secNote).trim():d.secRes==='NA'?'Letadlo pod dohledem posádky':'',byName:(S.users[who]||{}).name||''}}]];
+    if(!hasPreToday(ac)&&d.pre!==false)items.push(['daily.sign',{acId:ac.acId,date,kind:'PRE',time:secT,legId,tyres:'',oil:'',brakes:false,notes:''}]);
     UI.draft={};saveDraft();emit(items,who);window.scrollTo({top:0,behavior:'smooth'});
     toast(online()?'Security search odeslána – let je založený v ATL':'Security search podepsána – odešle se, až bude signál');
   }catch(x){crewErr(x)}
@@ -2190,7 +2191,7 @@ function evText(e){
     case 'sec.sign':return `${reg}Security ${esc(p.from)} ${esc(p.time)}Z – ${p.result==='FOUND'?'NÁLEZ: '+esc(p.notes):p.result==='NA'?'nebylo nutné, letadlo pod dohledem':'bez nálezu'}`;
     case 'leg.open':return `${reg}Před odletem ${esc(p.from)}→${esc(p.to)} ${fmtDate(p.date)} – bezpečnostní prohlídka ${esc(p.sec&&p.sec.time)}Z${p.sec&&p.sec.result==='FOUND'?' (NÁLEZ)':''} podepsána`;
     case 'leg.sign':return `${reg}Let ${esc(p.from)}–${esc(p.to)} ${fmtDate(p.date)} podepsán${p.paper?' (zpětně z papíru)':''}`;
-    case 'leg.amend':return `${reg}Oprava letu – ${esc(Object.keys(p.changes||{}).join(', '))}. Důvod: ${esc(p.reason)}`;
+    case 'leg.amend':return `${reg}Oprava letu – ${esc(Object.keys(p.changes||{}).map(k=>k==='sec'?'security search':k).join(', '))}. Důvod: ${esc(p.reason)}`;
     case 'leg.void':return `${reg}Let zneplatněn. Důvod: ${esc(p.reason)}`;
     case 'crew.login':return `${reg}Přihlášení na iPadu letadla`;
     case 'leg.split':return `${reg}Split duty po letu ${esc((S.legs[p.legId]||{}).from||'')}–${esc((S.legs[p.legId]||{}).to||'')}: ${p.split?(p.split.acc==='basic'?'ano, jiné ubytování':'ano'):'zrušena'}${p.reason?' – '+esc(p.reason):''}`;
@@ -2339,14 +2340,18 @@ function whoSeg(){return ''}
 function crewToday(ac){
   const today=todayISO();const d=UI.draft;
   const items=[];
-  (S.daily[ac.acId+'|'+today]||[]).forEach(x=>items.push({t:x.at,k:'daily',x}));
+  const isoAt=(dt,hm,fb)=>parseHM(hm)!=null?dt+'T'+normHM(hm)+':00.000Z':fb;
+  const withPre=new Set();
+  (S.daily[ac.acId+'|'+today]||[]).forEach(x=>{const sl=preSecLeg(ac,x);if(sl)withPre.add(sl.legId);items.push({t:isoAt(x.date,sl?sl.sec.time:x.time,x.at),k:'daily',x,sl})});
+  ac.legs.filter(l=>l.date===today&&l.sec&&!withPre.has(l.legId)&&!l.void).forEach(l=>items.push({t:isoAt(l.date,l.sec.time,legDepIso(l)),k:'lsec',x:l}));
   ac.secs.filter(x=>x.at.slice(0,10)===today).forEach(x=>items.push({t:x.at,k:'sec',x}));
   ac.legs.filter(l=>l.date===today&&l.state!=='open').forEach(l=>items.push({t:legDepIso(l),k:'leg',x:l}));
   items.sort((a,b)=>a.t<b.t?-1:1);
   const sent=(ev,okTxt)=>S.out.has(ev)?'<span class="sync-s wait">čeká na signál</span>':`<span class="sync-s ok">${okTxt||'odesláno'}</span>`;
   const row=it=>{
     const x=it.x;
-    if(it.k==='daily')return `<div class="tl-row"><span class="tl-time">${hmOfIso(x.at)}Z</span><span class="tl-ico">${ICON.check}</span><div class="tl-main"><b>${esc(DLAB(x.kind))}</b><span class="tl-sub">${esc(x.name)}</span></div><div class="tl-end">${sent(x.ev)}</div></div>`;
+    if(it.k==='daily'){const sl=it.sl,f=sl&&sl.sec.result==='FOUND';return `<div class="tl-row"><span class="tl-time">${esc(dailyHM(ac,x))}Z</span><span class="tl-ico ${f?'warn':''}">${f?ICON.alert:ICON.check}</span><div class="tl-main"><b>${esc(DLAB(x.kind))}${sl?` + security search <span class="mono">${esc(sl.from)}</span>`:''}</b><span class="tl-sub">${sl?secResTxt(sl.sec)+' · ':''}${esc(x.name)}</span></div><div class="tl-end">${sent(x.ev)}</div></div>`}
+    if(it.k==='lsec'){const f=x.sec.result==='FOUND';return `<div class="tl-row"><span class="tl-time">${esc(x.sec.time)}Z</span><span class="tl-ico ${f?'warn':''}">${f?ICON.alert:ICON.check}</span><div class="tl-main"><b>Security search <span class="mono">${esc(x.from)}</span></b><span class="tl-sub">${secResTxt(x.sec)} · ${esc(x.sec.byName||(x.opened&&x.opened.name)||'')}</span></div><div class="tl-end">${sent(x.openEv)}</div></div>`}
     if(it.k==='sec'){const f=x.result==='FOUND';return `<div class="tl-row"><span class="tl-time">${esc(x.time)}Z</span><span class="tl-ico ${f?'warn':''}">${f?ICON.alert:ICON.check}</span><div class="tl-main"><b>Security <span class="mono">${esc(x.from)}</span></b><span class="tl-sub">${f?'Nález: '+esc(x.notes):x.result==='NA'?'Nebylo nutné – letadlo pod dohledem':'Bez nálezu'} · ${esc(x.name)}</span></div><div class="tl-end">${sent(x.ev,'firma vidí')}</div></div>`}
     const defs=ac.defects.filter(df=>df.legId===x.legId);
     return `<div class="tl-row"><span class="tl-time">${esc(x.out)}Z</span><span class="tl-ico ${defs.some(df=>df.status==='open')?'warn':''}">${ICON.check}</span><div class="tl-main" style="${x.void?'text-decoration:line-through;color:var(--muted)':''}"><span class="route">${esc(x.from)} → ${esc(x.to)}</span><span class="tl-sub">Off ${esc(x.out)} · T/O ${esc(x.off)} · LDG ${esc(x.on)} · On ${esc(x.in)}</span><span class="tl-sub">Let ${hm(x.air)} · blok ${hm(x.block)} · ${esc(x.ldg)} přist.${x.app?' '+esc(x.app):''} · palivo ${fuelTxt(x)} · str. ${x.page}${defs.length?' · závady: '+defs.map(df=>esc(df.text)).join(', '):''}</span></div><div class="tl-end">${sent(x.ev)}<button type="button" class="btn sm" data-act="leg-detail" data-id="${esc(x.legId)}">Detail</button></div></div>`;
@@ -2441,6 +2446,20 @@ function unfinishedBlock(ac,withBtn){
   const ol=ac.openLegs||[];if(!ol.length)return '';
   return `<div class="unfinished"><b>${ol.length===1?'Neukončený let':'Neukončené lety ('+ol.length+')'}</b>${ol.map(l=>{const h=ageH(l);return `<div class="item"><span><span class="mono"><b>${esc(l.from)} → ${esc(l.to)}</b></span> · zahájen ${fmtDate(l.date)} ${hmOfIso(l.opened.at)}Z · ${esc(l.opened.name)}${h>12?` · <b style="color:var(--warn)">otevřený ${Math.floor(h)} h</b>`:''}</span>${withBtn||ol.length>1?`<button type="button" class="btn sm primary" data-act="complete-leg" data-id="${esc(l.legId)}">Uzavřít let</button>`:''}</div>`}).join('')}</div>`;
 }
+// time of the security search: empty = the moment of signing (a flight written afterwards gets its real time)
+function secTimeIn(d,o){
+  // an OFP whose departure is long past (flight written afterwards): ask for the real time
+  let hint='';if(o&&!d.secTime&&parseHM(o.std)!=null){const now=new Date();const nowM=now.getUTCHours()*60+now.getUTCMinutes();
+    if(o.date<todayISO()||(o.date===todayISO()&&nowM-parseHM(o.std)>60))hint=`<div class="warnline caution" style="margin:0">Plánovaný odlet byl ${o.date!==todayISO()?fmtDate(o.date)+' ':''}v <b class="mono">${esc(o.std)}Z</b>. Zapisujete-li let dodatečně, zadejte skutečný čas security search.</div>`}
+  return hint+`<label class="fld sec-time"><span>Čas security search (UTC)</span><input type="text" class="t4${NPI()}" data-k="secTime" data-now="1" value="${esc(d.secTime||'')}" inputmode="${NPM()}" maxlength="5" placeholder="––:––"><small class="muted">Nevyplněno = čas podpisu</small></label>`}
+function secTimeOf(d){const t=String(d.secTime||'').trim();if(!t)return nowHM();if(parseHM(t)==null)fail('Čas security search zadejte jako HH:MM UTC (nebo nechte prázdné = teď).');return normHM(t)}
+// the pre-flight inspection signed together with a security search (new entries carry legId, older ones are matched by the signing moment)
+function preSecLeg(ac,d){
+  if(!d||d.kind!=='PRE')return null;
+  if(d.legId)return ac.legs.find(l=>l.legId===d.legId&&l.sec)||null;
+  const t=Date.parse(d.at);return ac.legs.find(l=>l.sec&&l.opened&&l.date===d.date&&Math.abs(Date.parse(l.opened.at)-t)<5000)||null}
+function dailyHM(ac,d){const l=preSecLeg(ac,d);return l?l.sec.time:d.time||hmOfIso(d.at)}
+function secResTxt(x){return x.result==='FOUND'?'Nález: '+esc(x.notes):x.result==='NA'?'Nebylo nutné – letadlo pod dohledem':'Bez nálezu'}
 function secTiles(name,cur,draft){const dk=draft?' data-k="secRes"':'';return `<div class="tiles">
   <label class="tile"><input type="radio" name="${name}" value="NIL" ${cur==='NIL'?'checked':''}${dk}><span>Provedena, bez nálezu<small class="tile-sub">Exterior / Baggage / Cabin</small></span></label>
   ${cur==='NA'?`<label class="tile"><input type="radio" name="${name}" value="NA" checked${dk}>Nebylo nutné – letadlo pod dohledem</label>`:''}
@@ -2467,7 +2486,8 @@ function cardStart(ac,from,next){
     ${oilPendingNote(ac.acId)}${splitNote(ac)}
     <div style="display:grid;gap:10px"><div class="who-row"><span class="label">Security search – provádí ${esc((me()||{}).name||'')}</span>${whoSeg().replace('<span class="label">Provedl</span>','')}</div>
       ${secTiles('c-secres',d.secRes,true)}
-      ${d.secRes==='FOUND'?`<label class="fld"><span>Co a kde jste našli, komu nahlášeno</span><textarea data-k="secNote">${esc(d.secNote||'')}</textarea></label>`:''}</div>
+      ${d.secRes==='FOUND'?`<label class="fld"><span>Co a kde jste našli, komu nahlášeno</span><textarea data-k="secNote">${esc(d.secNote||'')}</textarea></label>`:''}
+      ${secTimeIn(d,d.ofpId&&ofpOf(d.ofpId))}</div>
     ${pre?'':`<label class="check"><input type="checkbox" data-k="pre" ${d.pre!==false?'checked':''}><span>Předletová prohlídka provedena – podepíše se zároveň</span></label>`}
     <div class="warns" id="c-warn"></div><p class="form-err" id="c-err" hidden></p>
     <button type="button" class="btn big primary" data-act="crew-start">${ICON.check}${UI.crewView==='ofp'&&d.ofpId?'Potvrdit palivo a security – zahájit let':'Začít let – podepsat'}</button>
@@ -2536,9 +2556,9 @@ function crewStart(){
     let cp,cs,cst='';if(d.ofpId&&ofpOf(d.ofpId)){const c=ofpCrew(ofpOf(d.ofpId));cp=c.pic;cs=c.sic;cst=c.sicTxt;if(!cp)fail('V OFP v bloku Posádka vyberte kapitána (PIC).')}
     else{const g=crewGuess(ac);cp=d.pic||g.pic;cs=(d.sic||g.sic||'-')==='-'?'':(d.sic||g.sic);if(!cp)fail('Vyberte kapitána (PIC).')}
     if(cs&&cs===cp)fail('PIC a SIC musí být různí.');crewBusyFail(ac.acId,[cp,cs]);
-    const fromOfp=d.ofpId&&UI.crewView==='ofp'?d.ofpId:null;
-    emit([['leg.open',{legId,acId:ac.acId,date,kind:'CAT',fno:String(d.fno||'').toUpperCase(),from,to,std:'',pic:cp,sic:cs||'',sicTxt:cst,ofpId:d.ofpId||null,fuelUp:fuel.fuelUp,fuelBlk:fuel.fuelBlk,fuelMin:fuel.fuelMin,sec:{time:nowHM(),place:from,result:d.secRes,notes:d.secRes==='FOUND'?String(d.secNote).trim():d.secRes==='NA'?'Letadlo pod dohledem posádky':'',byName:S.users[who].name}}]]);
-    if(!hasPreToday(ac)&&d.pre!==false)emit([['daily.sign',{acId:ac.acId,date,kind:'PRE',tyres:'',oil:'',brakes:false,notes:''}]],who);
+    const fromOfp=d.ofpId&&UI.crewView==='ofp'?d.ofpId:null;const secT=secTimeOf(d);
+    emit([['leg.open',{legId,acId:ac.acId,date,kind:'CAT',fno:String(d.fno||'').toUpperCase(),from,to,std:'',pic:cp,sic:cs||'',sicTxt:cst,ofpId:d.ofpId||null,fuelUp:fuel.fuelUp,fuelBlk:fuel.fuelBlk,fuelMin:fuel.fuelMin,sec:{time:secT,place:from,result:d.secRes,notes:d.secRes==='FOUND'?String(d.secNote).trim():d.secRes==='NA'?'Letadlo pod dohledem posádky':'',byName:S.users[who].name}}]]);
+    if(!hasPreToday(ac)&&d.pre!==false)emit([['daily.sign',{acId:ac.acId,date,kind:'PRE',time:secT,legId,tyres:'',oil:'',brakes:false,notes:''}]],who);
     UI.draft={who:d.who};UI.noOfp=false;if(fromOfp){UI.ofpId=fromOfp}saveDraft();render();if(fromOfp){setTimeout(()=>{const t=document.getElementById('ofps-perf');if(t)t.scrollIntoView({block:'start',behavior:'smooth'})},40)}else window.scrollTo({top:0,behavior:'smooth'});
     toast(online()?`Let ${from} → ${to} zahájen – firma vidí security`:`Let ${from} → ${to} zahájen – odešle se, až bude signál`);
   }catch(x){crewErr(x)}
@@ -2655,7 +2675,7 @@ function openStartFlight(ofpId){
     const fuel=readFuel(k=>({fuelUp:v('f-fuelup'),fuelBlk:v('f-fuelblk'),fuelMin:v('f-fuelmin')})[k]);
     await checkPin();
     const items=[['leg.open',{legId:rid('leg'),acId:ac.acId,ofpId:v('f-ofpid')||null,date,kind:'CAT',fno:v('f-fno').toUpperCase(),from:f,to:t,std:'',pic:v('f-pic'),sic:v('f-sic'),fuelUp:fuel.fuelUp,fuelBlk:fuel.fuelBlk,fuelMin:fuel.fuelMin,sec:{time:normHM(st),place:f,result:r.value,notes:r.value==='FOUND'?v('f-secnotes'):r.value==='NA'?'Letadlo pod dohledem posádky':'',byName:me().name}}]];
-    if(chk('f-pre'))items.push(['daily.sign',{acId:ac.acId,date,kind:'PRE',tyres:'',oil:'',brakes:false,notes:''}]);
+    if(chk('f-pre'))items.push(['daily.sign',{acId:ac.acId,date,kind:'PRE',time:normHM(st),legId:items[0][1].legId,tyres:'',oil:'',brakes:false,notes:''}]);
     UI.page=null;UI.tab='log';emit(items);closeSheet();toast(online()?`Let ${f} → ${t} zahájen – firma vidí security`:'Uloženo – odešle se, až bude signál');
   }});
 }
@@ -2910,7 +2930,7 @@ function openPredep(){
     await checkPin();
     const legId=rid('leg');
     const items=[['leg.open',{legId,acId:ac.acId,date,kind:v('f-kind'),fno:v('f-fno').toUpperCase(),from,to,std:v('f-std')?normHM(v('f-std')):'',pic:v('f-pic'),sic:v('f-sic'),fuelUp:v('f-fuelup'),fuelBlk:v('f-fuelblk'),sec:{time:normHM(st),place:v('f-secplace'),result:res,notes:v('f-secnotes'),byName:u.name}}]];
-    if(chk('f-pre'))items.push(['daily.sign',{acId:ac.acId,date,kind:'PRE',tyres:'',oil:'',brakes:false,notes:'Podepsáno s předletovým zápisem'}]);
+    if(chk('f-pre'))items.push(['daily.sign',{acId:ac.acId,date,kind:'PRE',time:normHM(st),legId,tyres:'',oil:'',brakes:false,notes:'Podepsáno s předletovým zápisem'}]);
     const online=!!db&&!SIMOFF&&navigator.onLine!==false;
     UI.page=null;UI.tab='log';emit(items);closeSheet();
     toast(online?'Podepsáno – odesílám firmě':'Uloženo v zařízení – odešle se po připojení');
@@ -2937,7 +2957,7 @@ function defRowHtml(){
 function openLegDetail(id){
   const l=S.legs[id];if(!l)return;const u=me();const ac=S.ac[l.acId];
   const pic=S.users[l.pic],sic=S.users[l.sic];
-  const hist=l.history.map(h=>`<li><b>${esc(h.name)}</b> ${fmtTs(h.at)} – ${esc(h.reason)}<br><span class="muted">${Object.keys(h.changes).map(k=>`${esc(k)}: ${esc(h.prev[k])} → ${esc(h.changes[k])}`).join('; ')}</span></li>`).join('');
+  const hist=l.history.map(h=>`<li><b>${esc(h.name)}</b> ${fmtTs(h.at)} – ${esc(h.reason)}<br><span class="muted">${Object.keys(h.changes).map(k=>{const f=x=>x&&typeof x==='object'?(x.time?x.time+'Z':JSON.stringify(x)):x;return `${esc(k==='sec'?'security search':k)}: ${esc(f(h.prev[k]))} → ${esc(f(h.changes[k]))}`}).join('; ')}</span></li>`).join('');
   const isOpen=l.state==='open';const s=l.sec;
   const secTxt=s?`${esc(s.time)}Z${s.place?' · '+esc(s.place):''} · ${s.result==='FOUND'?'<b style="color:var(--warn)">nález</b>':'bez nálezu'}${s.notes?' · '+esc(s.notes):''} · ${esc(s.byName||'')}`:'<span style="color:var(--caution)">nezapsána</span>';
   const btns=[];
@@ -2975,9 +2995,10 @@ function openLegDetail(id){
 function openAmend(id){
   const l=S.legs[id];const ac=S.ac[l.acId];
   const pic=S.users[l.pic];
-  openSheet('Oprava zápisu letu',`<div class="warnline info">Opravu smí podepsat jen PIC tohoto letu${pic?' ('+esc(pic.name)+')':''} nebo CAMO. Původní hodnoty zůstanou v historii, oprava musí mít důvod. Změna časů nebo přistání se promítne do TTAF a cyklů na všech dalších stránkách.</div>${legFields(l,ac)}${can.splitEdit(me(),l)?`<p class="label">Split duty</p>${S.cfg.splitDuty?'':'<div class="warnline caution">Provozní příručka split duty nepovoluje (Nastavení → Provoz) – označení se uloží, ale ve výpočtu FTL se nepoužije.</div>'}${splitBox('id',!!l.split,l.split&&l.split.acc,false,true)}`:''}${F.area('f-reason','Důvod opravy','', 'např. překlep v čase přistání podle záznamu FMS')}`,{submit:'Podepsat opravu',sign:true,live:(()=>{const lv=legLive(ac,id);return()=>{if(lv)lv();const c=document.getElementById('f-split');const a=document.querySelector('#sheet .split-acc');if(c&&a)a.hidden=!c.checked}})(),onSubmit:async()=>{
+  openSheet('Oprava zápisu letu',`<div class="warnline info">Opravu smí podepsat jen PIC tohoto letu${pic?' ('+esc(pic.name)+')':''} nebo CAMO. Původní hodnoty zůstanou v historii, oprava musí mít důvod. Změna časů nebo přistání se promítne do TTAF a cyklů na všech dalších stránkách.</div>${legFields(l,ac)}${l.sec?`<div class="fgrid">${F.time('f-sectime','Čas security search (UTC)',l.sec.time||'')}</div>`:''}${can.splitEdit(me(),l)?`<p class="label">Split duty</p>${S.cfg.splitDuty?'':'<div class="warnline caution">Provozní příručka split duty nepovoluje (Nastavení → Provoz) – označení se uloží, ale ve výpočtu FTL se nepoužije.</div>'}${splitBox('id',!!l.split,l.split&&l.split.acc,false,true)}`:''}${F.area('f-reason','Důvod opravy','', 'např. překlep v čase přistání podle záznamu FMS')}`,{submit:'Podepsat opravu',sign:true,live:(()=>{const lv=legLive(ac,id);return()=>{if(lv)lv();const c=document.getElementById('f-split');const a=document.querySelector('#sheet .split-acc');if(c&&a)a.hidden=!c.checked}})(),onSubmit:async()=>{
     const n=readLeg(true);checkTimes(l.acId,id,Object.assign({crew:[n.pic,n.sic,l.ca]},n),false);const reason=v('f-reason');if(!can.amend(me(),l))fail('Opravu smí podepsat jen PIC tohoto letu nebo CAMO.');if(reason.length<5)fail('Napište důvod opravy.');
     const changes={};for(const k in n){if(String(n[k]??'')!==String(l[k]??''))changes[k]=n[k]}
+    if(l.sec&&document.getElementById('f-sectime')){const st=v('f-sectime');if(parseHM(st)==null)fail('Čas security search zadejte jako HH:MM UTC.');if(normHM(st)!==l.sec.time)changes.sec=Object.assign({},l.sec,{time:normHM(st)})}
     // split duty after this flight, set or cleared afterwards
     let sp=null;const sc=document.getElementById('f-split');
     if(sc&&can.splitEdit(me(),l)){const want=sc.checked?{acc:v('f-splitacc')==='basic'?'basic':'suitable'}:null;if(JSON.stringify(want)!==JSON.stringify(l.split||null))sp=['leg.split',{legId:id,acId:l.acId,split:want,reason}]}

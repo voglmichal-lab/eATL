@@ -1,5 +1,5 @@
 /* build stamp – must match version.js; the app warns about a partial upload */
-:root{--etl-build:"0.7.28"}
+:root{--etl-build:"0.7.29"}
 /* publish skeleton equivalents (the demo ran inside a host page that provided these) */
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -746,3 +746,6 @@ table.ofplog .ofp-notebtn span{max-width:100%;white-space:normal;overflow-wrap:a
 .insp-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:.88rem}
 .insp-away{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .insp-away .chips{margin:0}
+/* 0.7.29 security search time */
+.sec-time{max-width:260px}
+.sec-time small{font-size:.8rem}

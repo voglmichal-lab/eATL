@@ -1,0 +1,36 @@
+eTechLog – změna Z-067
+Verze: 0.7.29 (navazuje na Z-066 / 0.7.28)
+Datum: 2026-11-24
+
+- Security search (v OFP i při zahájení letu bez OFP): nové pole „Čas security search (UTC)“ s klávesnicí
+  eTechLogu a tlačítkem NOW. Nevyplněné = čas podpisu jako dosud.
+  Když plánovaný odlet z OFP byl před víc než hodinou (let se zapisuje dodatečně), karta upozorní
+  „Plánovaný odlet byl v 10:20Z… zadejte skutečný čas security search“.
+- Předletová prohlídka podepsaná zároveň se security search dostane stejný čas.
+- Přehled dne: řádek se teď jmenuje „Předletová prohlídka + security search LCLK“, pod ním výsledek
+  (Bez nálezu / Nález) a kdo. Security search bez předletové prohlídky (ta už ten den byla) má
+  vlastní řádek „Security search LCLK“. Řazení podle času security search.
+  Ve stránce deníku má štítek také „+ security search“ a čas security search.
+- Oprava zápisu letu: u letu se security search jde opravit i její čas (s důvodem, zůstane v historii).
+  Tím jde opravit i už zapsaný let LCLK–BKPR (14:33 → skutečný čas).
+
+Návrat
+- Na 0.7.28: eatl-Z-066-v0.7.28.zip. (Záznamy z této verze ve starší fungují, jen bez nového označení.)
+
+Nahrání
+- Všechny soubory ze zipu (kromě ZMENA-067.txt) do kořene repozitáře eatl. config.js se nemění.
+Soubory:
+  CHANGELOG.md
+  README.md
+  app.css
+  app.js
+  atis.js
+  fonts.css
+  ftl.js
+  i18n.js
+  index.html
+  lang-en.js
+  manifest.webmanifest
+  sw.js
+  vercel.json
+  version.js

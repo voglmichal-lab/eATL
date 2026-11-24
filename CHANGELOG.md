@@ -71,3 +71,4 @@ Zip změny obsahuje jen změněné soubory ve správných složkách a popis `ZM
 | Z-064 | 0.7.26 | 2026-11-24 | ATIS: čas vysílání v nadpisu vedle ICAO letiště (malé pole, klepnutím se edituje), řádek polí ATIS je zase nízký. |
 | Z-065 | 0.7.27 | 2026-11-24 | Rozdělaná prohlídka technika se průběžně ukládá; „‹ Deník“ ji jen odloží (pruh Pokračovat / Zahodit), vydrží odhlášení, každý technik svou, 24 h od poslední změny. |
 | Z-066 | 0.7.28 | 2026-11-24 | OFP krok 1: u záložních letišť už není východ/západ slunce. |
+| Z-067 | 0.7.29 | 2026-11-24 | Security search: ruční čas (prázdné = teď), upozornění u dodatečného zápisu; přehled dne „Předletová prohlídka + security search“; čas security jde opravit v Opravě zápisu. |
